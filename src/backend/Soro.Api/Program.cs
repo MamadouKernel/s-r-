@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSoroAuthentication(builder.Configuration);
 builder.Services.AddSoroRateLimiting(builder.Configuration);
-builder.Services.AddSoroApplication();
+builder.Services.AddSoroApplication(builder.Configuration);
 builder.Services.AddSoroPersistence(
     builder.Configuration.GetConnectionString("Soro")
     ?? throw new InvalidOperationException("La chaîne de connexion ConnectionStrings:Soro n'est pas configurée."));
@@ -25,12 +25,16 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseAuthentication();
+app.UseTenantScope();
 app.UseRateLimiter();
 app.UseAuthorization();
+
+app.MapAuthEndpoints();
 
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapRegisterSessionEndpoints();
 api.MapSaleEndpoints();
+api.MapUserEndpoints();
 
 app.Run();
 

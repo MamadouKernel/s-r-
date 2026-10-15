@@ -4,6 +4,7 @@ using Soro.Application.Sales;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
+using Soro.Domain.Identity;
 
 namespace Soro.Application.Tests;
 
@@ -25,6 +26,8 @@ internal sealed class TestWorld
 
     public UserId Manager { get; } = UserId.New();
 
+    public UserId Owner { get; } = UserId.New();
+
     public FakeCurrentUser Current { get; }
 
     public FakeClock Clock { get; } = new();
@@ -39,6 +42,14 @@ internal sealed class TestWorld
 
     public RecordingAuditTrail Audit { get; } = new();
 
+    public InMemoryUserRepository Users { get; } = new();
+
+    public FakePinHasher Hasher { get; } = new();
+
+    public FakeTenantScope Scope { get; } = new();
+
+    private FakeTokenIssuer Tokens { get; } = new();
+
     private FakeShopSettings Settings { get; } = new();
 
     public OpenRegisterSessionHandler OpenSession => new(Current, Sessions, UnitOfWork);
@@ -51,7 +62,25 @@ internal sealed class TestWorld
 
     public CancelSaleHandler CancelSale => new(Current, Sales, Audit, Clock, UnitOfWork);
 
+    public LogInHandler LogIn => new(Scope, Users, Hasher, Tokens, Clock, UnitOfWork);
+
+    public RegisterUserHandler RegisterUser => new(Current, Users, Hasher, Clock, UnitOfWork);
+
+    public DisableUserHandler DisableUser => new(Current, Users, Audit, Clock, UnitOfWork);
+
     public void ActAs(UserId user, Role role) => Current.Become(user, role);
+
+    public User GivenUser(
+        string identifier = "awa.kone",
+        string pin = "1234",
+        Role role = Role.Cashier,
+        TenantId? tenant = null)
+    {
+        var user = User.Register(
+            UserId.New(), tenant ?? Tenant, identifier, "Awa Koné", role, Hasher.Hash(pin), Clock.UtcNow.AddDays(-1));
+        Users.Put(user);
+        return user;
+    }
 
     public CashRegisterSession GivenOpenSession(UserId? cashier = null, TenantId? tenant = null, long openingFloat = 10_000)
     {

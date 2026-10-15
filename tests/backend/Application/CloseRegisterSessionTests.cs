@@ -3,6 +3,7 @@ using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
 
 namespace Soro.Application.Tests;
 

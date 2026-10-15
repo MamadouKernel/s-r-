@@ -19,6 +19,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<AuditRow> AuditEntries => Set<AuditRow>();
 
+    internal DbSet<UserRow> Users => Set<UserRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSessions(modelBuilder.Entity<SessionRow>());
@@ -26,6 +28,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureSaleLines(modelBuilder.Entity<SaleLineRow>());
         ConfigurePayments(modelBuilder.Entity<PaymentRow>());
         ConfigureAudit(modelBuilder.Entity<AuditRow>());
+        ConfigureUsers(modelBuilder.Entity<UserRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
     }
 
@@ -85,6 +88,20 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         payment.HasIndex(row => new { row.TenantId, row.Method, row.ReferenceKey })
             .IsUnique()
             .HasFilter("reference_key IS NOT NULL");
+    }
+
+    private static void ConfigureUsers(EntityTypeBuilder<UserRow> user)
+    {
+        user.ToTable("users", table => table.HasCheckConstraint("ck_users_attempts", "failed_attempts >= 0"));
+        user.HasKey(row => row.Id);
+        user.Property(row => row.Identifier).HasMaxLength(32);
+        user.Property(row => row.DisplayName).HasMaxLength(100);
+        user.Property(row => row.PinHash).HasMaxLength(200);
+        user.Property(row => row.Role).HasConversion<string>().HasMaxLength(16);
+        user.Property(row => row.Status).HasConversion<string>().HasMaxLength(16);
+
+        // Un identifiant de connexion est unique dans un commerce, jamais entre commerces.
+        user.HasIndex(row => new { row.TenantId, row.Identifier }).IsUnique();
     }
 
     private static void ConfigureAudit(EntityTypeBuilder<AuditRow> audit)

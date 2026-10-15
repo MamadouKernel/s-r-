@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Soro.Application.Cash;
 using Soro.Application.Common;
+using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Infrastructure.Persistence;
 
@@ -16,6 +17,10 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddSoroPersistence(this IServiceCollection services, string connectionString)
     {
+        // Le commerce de la requête : posé par l'authentification (jeton) ou par la connexion (avant le jeton).
+        services.AddScoped<TenantContext>();
+        services.AddScoped<ITenantAccessor>(provider => provider.GetRequiredService<TenantContext>());
+        services.AddScoped<ITenantScope>(provider => provider.GetRequiredService<TenantContext>());
         services.AddScoped<TenantSessionInterceptor>();
         services.AddDbContext<SoroDbContext>((provider, options) => options
             .UseNpgsql(connectionString)
@@ -26,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         return services;
     }

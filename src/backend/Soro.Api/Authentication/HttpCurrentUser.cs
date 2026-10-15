@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Soro.Application.Identity;
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
 
 namespace Soro.Api.Authentication;
 

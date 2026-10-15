@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Soro.Application.Identity;
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
 
 namespace Soro.Integration.Tests;
 

@@ -5,16 +5,25 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Soro.Application.Identity;
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
+using Soro.Infrastructure.Security;
 
 namespace Soro.Integration.Tests;
 
 /// <summary>Le serveur d'API complet, en mémoire, branché sur le PostgreSQL de test et authentifié par JWT.</summary>
-internal sealed class ApiFactory(PostgresFixture fixture, int? permitPerMinute = null) : WebApplicationFactory<Program>
+internal sealed class ApiFactory(
+    PostgresFixture fixture,
+    int? permitPerMinute = null,
+    int? loginPermitsPerMinute = null) : WebApplicationFactory<Program>
 {
     private const string Issuer = "https://soro.tests";
     private const string Audience = "soro-api-tests";
 
     private readonly SymmetricSecurityKey _signingKey = new(RandomNumberGenerator.GetBytes(32));
+    private readonly byte[] _pepper = RandomNumberGenerator.GetBytes(32);
+
+    /// <summary>Même hachage que le serveur : sert à créer des utilisateurs de test directement en base.</summary>
+    public Pbkdf2PinHasher PinHasher => new(_pepper);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -23,6 +32,12 @@ internal sealed class ApiFactory(PostgresFixture fixture, int? permitPerMinute =
         builder.UseSetting("Jwt:Issuer", Issuer);
         builder.UseSetting("Jwt:Audience", Audience);
         builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(_signingKey.Key));
+        builder.UseSetting("Security:PinPepper", Convert.ToBase64String(_pepper));
+        if (loginPermitsPerMinute is { } loginPermits)
+        {
+            builder.UseSetting("RateLimit:LoginPermitsPerMinute", loginPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         if (permitPerMinute is { } permits)
         {
             builder.UseSetting("RateLimit:PermitsPerMinute", permits.ToString(System.Globalization.CultureInfo.InvariantCulture));

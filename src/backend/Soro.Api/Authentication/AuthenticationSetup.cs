@@ -6,18 +6,15 @@ namespace Soro.Api.Authentication;
 
 public static class AuthenticationSetup
 {
-    private const int MinimumKeyBytes = 32;
-
     /// <summary>
-    /// Valide les jetons JWT (signature HMAC-SHA256, émetteur, public, expiration). L'émission des jetons
-    /// (connexion par PIN, mot de passe + SMS) relève du module Identité, pas de cette API.
+    /// Valide les jetons JWT (signature HMAC-SHA256, émetteur, public, expiration) et les émet à la connexion.
     /// Démarrage refusé si la configuration est absente ou trop faible.
     /// </summary>
     public static IServiceCollection AddSoroAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        var issuer = Required(configuration, "Jwt:Issuer");
-        var audience = Required(configuration, "Jwt:Audience");
-        var signingKey = new SymmetricSecurityKey(ReadSigningKey(Required(configuration, "Jwt:SigningKey")));
+        var settings = JwtSettings.From(configuration);
+        services.AddSingleton(settings);
+        services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -26,9 +23,9 @@ public static class AuthenticationSetup
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidIssuer = issuer,
-                    ValidAudience = audience,
-                    IssuerSigningKey = signingKey,
+                    ValidIssuer = settings.Issuer,
+                    ValidAudience = settings.Audience,
+                    IssuerSigningKey = settings.Key,
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
                     ValidateIssuer = true,
                     ValidateAudience = true,
@@ -56,27 +53,5 @@ public static class AuthenticationSetup
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         return services;
-    }
-
-    private static string Required(IConfiguration configuration, string key) =>
-        configuration[key] is { Length: > 0 } value
-            ? value
-            : throw new InvalidOperationException($"La configuration {key} est obligatoire.");
-
-    private static byte[] ReadSigningKey(string base64)
-    {
-        byte[] key;
-        try
-        {
-            key = Convert.FromBase64String(base64);
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidOperationException("Jwt:SigningKey doit être encodée en Base64.", exception);
-        }
-
-        return key.Length >= MinimumKeyBytes
-            ? key
-            : throw new InvalidOperationException($"Jwt:SigningKey doit contenir au moins {MinimumKeyBytes} octets.");
     }
 }

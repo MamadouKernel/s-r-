@@ -1,4 +1,5 @@
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
 
 namespace Soro.Application.Identity;
 

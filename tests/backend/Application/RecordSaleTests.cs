@@ -3,6 +3,7 @@ using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
+using Soro.Domain.Identity;
 
 namespace Soro.Application.Tests;
 

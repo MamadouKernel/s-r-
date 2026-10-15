@@ -1,4 +1,5 @@
 using Soro.Domain.Cash;
+using Soro.Domain.Identity;
 using Soro.Domain.Sales;
 
 namespace Soro.Infrastructure.Persistence;
@@ -109,6 +110,31 @@ internal sealed class PaymentRow
 
     /// <summary>Référence normalisée (majuscules) : porte l'unicité insensible à la casse (RG-04).</summary>
     public string? ReferenceKey { get; set; }
+}
+
+internal sealed class UserRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Identifier { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public Role Role { get; set; }
+
+    public string PinHash { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public UserStatus Status { get; set; }
+
+    public int FailedAttempts { get; set; }
+
+    public DateTimeOffset? LockedUntil { get; set; }
+
+    public DateTimeOffset? LastLoginAt { get; set; }
 }
 
 internal sealed class AuditRow

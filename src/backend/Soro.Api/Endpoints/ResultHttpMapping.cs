@@ -23,7 +23,10 @@ internal static class ResultHttpMapping
         ErrorCodes.NotFound => StatusCodes.Status404NotFound,
         ErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
         ErrorCodes.RuleViolation => StatusCodes.Status422UnprocessableEntity,
-        ErrorCodes.MobileMoneyReferenceUsed or ErrorCodes.RegisterAlreadyOpen => StatusCodes.Status409Conflict,
+        ErrorCodes.MobileMoneyReferenceUsed or ErrorCodes.RegisterAlreadyOpen or ErrorCodes.IdentifierTaken
+            => StatusCodes.Status409Conflict,
+        ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
+        ErrorCodes.AccountLocked => StatusCodes.Status423Locked,
         _ => StatusCodes.Status400BadRequest,
     };
 
@@ -33,6 +36,8 @@ internal static class ResultHttpMapping
         StatusCodes.Status403Forbidden => "Action interdite",
         StatusCodes.Status422UnprocessableEntity => "Règle métier non respectée",
         StatusCodes.Status409Conflict => "Conflit",
+        StatusCodes.Status401Unauthorized => "Identifiants invalides",
+        StatusCodes.Status423Locked => "Compte verrouillé",
         _ => "Requête invalide",
     };
 }

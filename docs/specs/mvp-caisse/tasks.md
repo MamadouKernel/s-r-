@@ -30,7 +30,7 @@ Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigence
 - [x] T025 Projet `Soro.Infrastructure` : EF Core 10/Npgsql, unicités, RLS — SC-05, SC-06
 - [x] T026 Projet `Soro.Api` : endpoints versionnés, authentification, erreurs de synchronisation structurées
 
-- [ ] T027 Module Identité : annuaire des utilisateurs, connexion par PIN, émission et révocation des jetons — `docs/decisions/0002-api-authentification-jwt.md`
+- [x] T027 Module Identité : annuaire des utilisateurs, connexion par PIN, émission des jetons, équipe — `docs/decisions/0003-identite-pin-et-jetons.md` (reste : mot de passe + SMS du propriétaire, enrôlement d'appareil, premier propriétaire)
 - [ ] T028 Script d'exploitation du rôle PostgreSQL applicatif et paramètres du commerce stockés (seuils, plafonds)
 
 ## Phase 3 — PWA (à planifier après validation du gate UX/UI)

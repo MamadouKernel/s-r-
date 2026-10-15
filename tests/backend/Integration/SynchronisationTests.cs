@@ -6,6 +6,7 @@ using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
 using Soro.Infrastructure.Persistence;
+using Soro.Domain.Identity;
 
 namespace Soro.Integration.Tests;
 

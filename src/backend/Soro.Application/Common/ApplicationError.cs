@@ -17,4 +17,7 @@ public static class ErrorCodes
     public const string RuleViolation = "rule_violation";
     public const string MobileMoneyReferenceUsed = "mobile_money_reference_used";
     public const string RegisterAlreadyOpen = "register_already_open";
+    public const string InvalidCredentials = "invalid_credentials";
+    public const string AccountLocked = "account_locked";
+    public const string IdentifierTaken = "identifier_taken";
 }

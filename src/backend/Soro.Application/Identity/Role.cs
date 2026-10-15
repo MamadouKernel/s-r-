@@ -1,13 +1,6 @@
-namespace Soro.Application.Identity;
+using Soro.Domain.Identity;
 
-public enum Role
-{
-    Owner,
-    Manager,
-    Cashier,
-    StockKeeper,
-    Accountant,
-}
+namespace Soro.Application.Identity;
 
 /// <summary>Droits par profil (cahier des charges, section 3).</summary>
 public static class RolePolicy
@@ -15,4 +8,15 @@ public static class RolePolicy
     public static bool IsManager(Role role) => role is Role.Owner or Role.Manager;
 
     public static bool CanOperateRegister(Role role) => role is Role.Owner or Role.Manager or Role.Cashier;
+
+    /// <summary>
+    /// Qui crée ou désactive quel profil : le propriétaire gère tous les profils sauf un autre propriétaire,
+    /// un gérant gère les caissiers et les magasiniers, les autres profils ne gèrent personne.
+    /// </summary>
+    public static bool CanManageRole(Role actor, Role target) => actor switch
+    {
+        Role.Owner => target != Role.Owner,
+        Role.Manager => target is Role.Cashier or Role.StockKeeper,
+        _ => false,
+    };
 }
