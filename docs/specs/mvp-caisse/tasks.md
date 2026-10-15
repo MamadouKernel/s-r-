@@ -27,7 +27,7 @@ Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigence
 - [x] T022 Cas d'usage `RecordSale` avec contrôle des rôles (remise, annulation) — SC-04
 - [x] T023 Cas d'usage `SyncSales` idempotent par UUID — REQ-06, SC-03
 - [x] T024 Cas d'usage `CloseRegisterSession`
-- [ ] T025 Projet `Soro.Infrastructure` : EF Core 10/Npgsql, unicités, RLS — SC-05, SC-06
+- [x] T025 Projet `Soro.Infrastructure` : EF Core 10/Npgsql, unicités, RLS — SC-05, SC-06
 - [ ] T026 Projet `Soro.Api` : endpoints versionnés, authentification, erreurs de synchronisation structurées
 
 ## Phase 3 — PWA (à planifier après validation du gate UX/UI)

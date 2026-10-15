@@ -73,6 +73,26 @@ public sealed class CashRegisterSession
         Status = SessionStatus.Closed;
     }
 
+    /// <summary>Reconstruction depuis le stockage : l'état a déjà été validé par les opérations métier.</summary>
+    internal static CashRegisterSession Restore(
+        SessionId id,
+        RegisterAssignment assignment,
+        Money openingFloat,
+        DateTimeOffset openedAt,
+        SessionStatus status,
+        Money cashReceived,
+        Money? countedCash,
+        DateTimeOffset? closedAt,
+        long? cashVariance) =>
+        new(id, assignment, openingFloat, openedAt)
+        {
+            Status = status,
+            CashReceived = cashReceived,
+            CountedCash = countedCash,
+            ClosedAt = closedAt,
+            CashVariance = cashVariance,
+        };
+
     private void EnsureOpen() =>
         Ensure.That(Status == SessionStatus.Open, "La session de caisse est clôturée (RG-01).");
 }

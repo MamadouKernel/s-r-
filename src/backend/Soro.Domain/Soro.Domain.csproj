@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Seule l'infrastructure reconstruit les agrégats depuis le stockage (fabriques Restore internes). -->
+    <InternalsVisibleTo Include="Soro.Infrastructure" />
+  </ItemGroup>
+
 </Project>

@@ -3,6 +3,7 @@
   <Folder Name="/src/backend/">
     <Project Path="src/backend/Soro.Application/Soro.Application.csproj" />
     <Project Path="src/backend/Soro.Domain/Soro.Domain.csproj" />
+    <Project Path="src/backend/Soro.Infrastructure/Soro.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/backend/" />
@@ -11,5 +12,8 @@
   </Folder>
   <Folder Name="/tests/backend/Domain/">
     <Project Path="tests/backend/Domain/Soro.Domain.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/backend/Integration/">
+    <Project Path="tests/backend/Integration/Soro.Integration.Tests.csproj" />
   </Folder>
 </Solution>

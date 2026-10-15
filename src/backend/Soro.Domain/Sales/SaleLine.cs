@@ -26,6 +26,10 @@ public sealed record SaleLine
 
     public Money Total => UnitPrice * Quantity;
 
+    /// <summary>Reconstruction depuis le stockage : les données ont déjà été validées à la création.</summary>
+    internal static SaleLine Restore(ProductId productId, string productName, int quantity, Money unitPrice) =>
+        new(productId, productName, quantity, unitPrice);
+
     public static SaleLine Create(ProductId productId, string productName, int quantity, Money unitPrice)
     {
         Ensure.That(!string.IsNullOrWhiteSpace(productName), "Le nom du produit est obligatoire.");

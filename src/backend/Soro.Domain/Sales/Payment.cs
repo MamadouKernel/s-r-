@@ -52,6 +52,10 @@ public sealed record Payment
         return new Payment(id, PaymentMethod.Credit, amount, reference: null, change: Money.Zero);
     }
 
+    /// <summary>Reconstruction depuis le stockage : les données ont déjà été validées à la création.</summary>
+    internal static Payment Restore(PaymentId id, PaymentMethod method, Money amount, string? reference, Money change) =>
+        new(id, method, amount, reference, change);
+
     private static void RequirePositive(Money amount) =>
         Ensure.That(amount > Money.Zero, "Le montant d'un paiement doit être supérieur à zéro.");
 }

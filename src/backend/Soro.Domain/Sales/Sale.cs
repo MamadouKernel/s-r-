@@ -31,6 +31,36 @@ public sealed record Sale
         NetTotal = grossTotal - draft.Discount;
     }
 
+    private Sale(
+        SaleId id,
+        SessionId sessionId,
+        RegisterAssignment assignment,
+        long localSequence,
+        DateTimeOffset recordedAt,
+        SaleLine[] lines,
+        Money discount,
+        Payment[] payments,
+        CustomerId? customerId,
+        Money grossTotal,
+        Money netTotal,
+        SaleStatus status,
+        Cancellation? cancellation)
+    {
+        Id = id;
+        SessionId = sessionId;
+        Assignment = assignment;
+        LocalSequence = localSequence;
+        RecordedAt = recordedAt;
+        Lines = Array.AsReadOnly(lines);
+        Discount = discount;
+        Payments = Array.AsReadOnly(payments);
+        CustomerId = customerId;
+        GrossTotal = grossTotal;
+        NetTotal = netTotal;
+        Status = status;
+        Cancellation = cancellation;
+    }
+
     public SaleId Id { get; }
 
     public SessionId SessionId { get; }
@@ -99,6 +129,36 @@ public sealed record Sale
 
         return new Sale(sessionId, assignment, draft, lines, payments, grossTotal);
     }
+
+    /// <summary>Reconstruction depuis le stockage : les données ont déjà été validées à la création.</summary>
+    internal static Sale Restore(
+        SaleId id,
+        SessionId sessionId,
+        RegisterAssignment assignment,
+        long localSequence,
+        DateTimeOffset recordedAt,
+        IEnumerable<SaleLine> lines,
+        Money discount,
+        IEnumerable<Payment> payments,
+        CustomerId? customerId,
+        Money grossTotal,
+        Money netTotal,
+        SaleStatus status,
+        Cancellation? cancellation) =>
+        new(
+            id,
+            sessionId,
+            assignment,
+            localSequence,
+            recordedAt,
+            lines.ToArray(),
+            discount,
+            payments.ToArray(),
+            customerId,
+            grossTotal,
+            netTotal,
+            status,
+            cancellation);
 
     private static bool HasDuplicateMobileMoneyReference(IEnumerable<Payment> payments) =>
         payments

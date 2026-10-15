@@ -1,0 +1,4 @@
+[*.cs]
+# Migrations produites par `dotnet ef` : exclues des analyseurs de style.
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
