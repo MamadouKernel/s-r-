@@ -1,3 +1,5 @@
 [*.cs]
 # Les noms de tests décrivent un comportement en phrase : les traits de soulignement sont voulus.
 dotnet_diagnostic.CA1707.severity = none
+# Les aides de TestWorld restent des méthodes d'instance pour une lecture fluide (world.CashSale(...)).
+dotnet_diagnostic.CA1822.severity = none

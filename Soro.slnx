@@ -1,10 +1,14 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/backend/">
+    <Project Path="src/backend/Soro.Application/Soro.Application.csproj" />
     <Project Path="src/backend/Soro.Domain/Soro.Domain.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/backend/" />
+  <Folder Name="/tests/backend/Application/">
+    <Project Path="tests/backend/Application/Soro.Application.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/backend/Domain/">
     <Project Path="tests/backend/Domain/Soro.Domain.Tests.csproj" />
   </Folder>
