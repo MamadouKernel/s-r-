@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/backend/">
+    <Project Path="src/backend/Soro.Api/Soro.Api.csproj" />
     <Project Path="src/backend/Soro.Application/Soro.Application.csproj" />
     <Project Path="src/backend/Soro.Domain/Soro.Domain.csproj" />
     <Project Path="src/backend/Soro.Infrastructure/Soro.Infrastructure.csproj" />

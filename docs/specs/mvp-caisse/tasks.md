@@ -28,7 +28,10 @@ Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigence
 - [x] T023 Cas d'usage `SyncSales` idempotent par UUID — REQ-06, SC-03
 - [x] T024 Cas d'usage `CloseRegisterSession`
 - [x] T025 Projet `Soro.Infrastructure` : EF Core 10/Npgsql, unicités, RLS — SC-05, SC-06
-- [ ] T026 Projet `Soro.Api` : endpoints versionnés, authentification, erreurs de synchronisation structurées
+- [x] T026 Projet `Soro.Api` : endpoints versionnés, authentification, erreurs de synchronisation structurées
+
+- [ ] T027 Module Identité : annuaire des utilisateurs, connexion par PIN, émission et révocation des jetons — `docs/decisions/0002-api-authentification-jwt.md`
+- [ ] T028 Script d'exploitation du rôle PostgreSQL applicatif et paramètres du commerce stockés (seuils, plafonds)
 
 ## Phase 3 — PWA (à planifier après validation du gate UX/UI)
 
