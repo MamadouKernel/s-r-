@@ -1,0 +1,42 @@
+# Tâches : Caisse MVP hors ligne
+
+Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigences/scénarios`. `[P]` = parallélisable (fichiers distincts). Chaque tâche de code est précédée de ses tests (RED → GREEN → REFACTOR).
+
+## Phase 0 — Bootstrap
+
+- [x] T001 Solution `Soro.slnx`, `Directory.Build.props` (net10.0, nullable, avertissements en erreurs), `.editorconfig`, `.gitignore`
+- [x] T002 Projet `Soro.Domain` sans aucune dépendance externe
+- [x] T003 [P] Projet `Soro.Domain.Tests` (xunit)
+- [x] T004 Test d'architecture : le domaine ne référence aucun assembly hors BCL — Constitution 2
+
+## Phase 1 — Domaine (étape 1 du plan)
+
+- [x] T010 Objet-valeur `Money` : FCFA entier, non négatif, arithmétique sûre — RG-18
+- [x] T011 [P] Identifiants typés (`TenantId`, `SaleId`, `SessionId`…) générables hors ligne (UUID) — RG-17
+- [x] T012 `CashRegisterSession` : ouverture avec fond, refus de vente si fermée, clôture avec montant attendu et écart — REQ-01, REQ-08, RG-01, RG-24
+- [x] T013 `Payment` : espèces avec monnaie rendue, Mobile Money avec référence obligatoire, crédit avec client — REQ-03, REQ-04, RG-04
+- [x] T014 `SaleLine` : quantité strictement positive, prix unitaire figé — RG-21
+- [x] T015 `Sale` : totaux cohérents, paiements = total net, attribution complète, annulation motivée par opération inverse — REQ-07, RG-02, RG-20
+- [x] T016 `CashRegisterSession.RecordSale(SaleDraft)` : seule porte de création d'une vente, rattachée à la session ouverte, cumul des espèces encaissées — SC-01
+- [ ] T017 Effet d'une annulation sur la caisse (remboursement espèces, écriture inverse du stock) : règle de remboursement à valider avec le pilote — RG-02
+
+## Phase 2 — Application et API (à planifier)
+
+- [ ] T020 Projet `Soro.Application` et ports (dépôts, horloge, tenant et utilisateur courants)
+- [ ] T021 Cas d'usage `OpenRegisterSession`
+- [ ] T022 Cas d'usage `RecordSale` avec contrôle des rôles (remise, annulation) — SC-04
+- [ ] T023 Cas d'usage `SyncSales` idempotent par UUID — REQ-06, SC-03
+- [ ] T024 Cas d'usage `CloseRegisterSession`
+- [ ] T025 Projet `Soro.Infrastructure` : EF Core 10/Npgsql, unicités, RLS — SC-05, SC-06
+- [ ] T026 Projet `Soro.Api` : endpoints versionnés, authentification, erreurs de synchronisation structurées
+
+## Phase 3 — PWA (à planifier après validation du gate UX/UI)
+
+- [ ] T030 Maquettes des parcours de `DESIGN.md` §8, validées mobile et desktop
+- [x] T033 Projet Angular PWA dans `src/frontend/` avec Tailwind CSS et thème issu de `DESIGN.md` — `docs/decisions/0001-stack-et-tailwind.md`
+- [ ] T031 Journal IndexedDB et outbox ordonnée par caisse — REQ-05, SC-02
+- [ ] T032 Écrans de caisse : session, vente, paiement, clôture
+
+## Points bloquants non tranchés
+
+Voir `spec.md` (questions ouvertes) et `docs/analyse-merise.md` §11. Le domaine de la phase 1 n'impose aucun de ces choix : numérotation de ticket (OP-1), validité du Mobile Money hors ligne (OP-3) et politique de conflit de stock (OP-4) restent hors du modèle.

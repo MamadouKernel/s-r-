@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@import "@fontsource-variable/source-sans-3";
+
+/*
+ * Jetons de DESIGN.md (sections 2 à 5). Source unique des couleurs et de la typographie :
+ * les composants n'emploient que ces jetons, jamais de valeur en dur.
+ * La palette par défaut de Tailwind est retirée pour que seuls ces jetons existent.
+ */
+@theme {
+  --color-*: initial;
+
+  --color-ivoire: #f7f7f2;
+  --color-surface: #ffffff;
+  --color-charbon: #20231f;
+  --color-ardoise: #626a63;
+  --color-sauge: #dde2da;
+  --color-feuille: #287a52;
+
+  --color-succes: #287a52;
+  --color-avertissement: #a86412;
+  --color-erreur: #b43a32;
+  --color-information: #426a82;
+
+  --font-sans: "Source Sans 3 Variable", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Cible tactile minimale de la caisse : 48 px (DESIGN.md §4). */
+@utility touch-target {
+  min-height: 3rem;
+  min-width: 3rem;
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    background-color: var(--color-ivoire);
+    color: var(--color-charbon);
+    font-family: var(--font-sans);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-feuille);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

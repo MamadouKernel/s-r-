@@ -1,0 +1,49 @@
+namespace Soro.Domain.Common;
+
+// Identifiants typés : empêchent de confondre deux UUID et sont générables
+// hors ligne (RG-17). Version 7 : triable dans le temps, favorable aux index.
+
+public readonly record struct TenantId(Guid Value)
+{
+    public static TenantId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct PointOfSaleId(Guid Value)
+{
+    public static PointOfSaleId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct RegisterId(Guid Value)
+{
+    public static RegisterId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct UserId(Guid Value)
+{
+    public static UserId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct SessionId(Guid Value)
+{
+    public static SessionId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct SaleId(Guid Value)
+{
+    public static SaleId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct PaymentId(Guid Value)
+{
+    public static PaymentId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct ProductId(Guid Value)
+{
+    public static ProductId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct CustomerId(Guid Value)
+{
+    public static CustomerId New() => new(Guid.CreateVersion7());
+}

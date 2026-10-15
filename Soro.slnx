@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/Soro.Domain/Soro.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/backend/" />
+  <Folder Name="/tests/backend/Domain/">
+    <Project Path="tests/backend/Domain/Soro.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
