@@ -3,6 +3,7 @@ using Soro.Application.Identity;
 using Soro.Application.Cash;
 using Soro.Application.Sales;
 using Soro.Application.Settings;
+using Soro.Application.Reporting;
 using Soro.Application.Stock;
 using Soro.Domain.Stock;
 using Soro.Domain.Cash;
@@ -213,4 +214,50 @@ internal sealed class InMemoryStockMovementRepository : IStockMovementRepository
             .OrderByDescending(movement => movement.At)
             .Take(limit)
             .ToArray());
+}
+
+/// <summary>Enregistre les appels : la logique de requête est vérifiée contre PostgreSQL (tests d'intégration).</summary>
+internal sealed class FakeReportingQueries : IReportingQueries
+{
+    private readonly List<string> _calls = [];
+
+    public IReadOnlyList<string> Calls => _calls;
+
+    public TenantId? LastTenant { get; private set; }
+
+    public SalesFilter? LastSalesFilter { get; private set; }
+
+    public Task<IReadOnlyList<SaleSummary>> ListSalesAsync(
+        TenantId tenant, SalesFilter filter, CancellationToken cancellationToken)
+    {
+        Record(nameof(ListSalesAsync), tenant);
+        LastSalesFilter = filter;
+        return Task.FromResult<IReadOnlyList<SaleSummary>>([]);
+    }
+
+    public Task<SaleDetail?> GetSaleAsync(TenantId tenant, SaleId id, CancellationToken cancellationToken)
+    {
+        Record(nameof(GetSaleAsync), tenant);
+        return Task.FromResult<SaleDetail?>(null);
+    }
+
+    public Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
+        TenantId tenant, SessionsFilter filter, CancellationToken cancellationToken)
+    {
+        Record(nameof(ListSessionsAsync), tenant);
+        return Task.FromResult<IReadOnlyList<SessionSummary>>([]);
+    }
+
+    public Task<ActivityReport> GetActivityAsync(
+        TenantId tenant, DateTimeOffset periodStart, DateTimeOffset periodEnd, CancellationToken cancellationToken)
+    {
+        Record(nameof(GetActivityAsync), tenant);
+        return Task.FromResult(new ActivityReport(periodStart, periodEnd, 0, 0, 0, 0, 0, [], [], 0, 0, 0));
+    }
+
+    private void Record(string call, TenantId tenant)
+    {
+        _calls.Add(call);
+        LastTenant = tenant;
+    }
 }

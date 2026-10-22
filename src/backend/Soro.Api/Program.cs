@@ -36,6 +36,7 @@ api.MapRegisterSessionEndpoints();
 api.MapSaleEndpoints();
 api.MapUserEndpoints();
 api.MapProductEndpoints();
+api.MapReportingEndpoints();
 
 app.Run();
 

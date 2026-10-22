@@ -51,6 +51,15 @@ Voir `docs/specs/catalogue-stock/spec.md`.
 - [x] T044 Endpoints API catalogue et stock
 - [x] T045 Décrément du stock à la vente — STK-04
 
+## Consultation et rapports (V1)
+
+Voir `docs/specs/consultation-rapports/spec.md`.
+
+- [x] T050 Ports et vues de lecture, droits de consultation — REP-01 à REP-04
+- [x] T051 Cas d'usage de lecture (validation des périodes, pagination) — SC-R1, SC-R5
+- [x] T052 Requêtes EF Core en lecture seule — SC-R2, SC-R3, SC-R4
+- [x] T053 Endpoints API et tests d'intégration
+
 ## Points bloquants non tranchés
 
 Voir `spec.md` (questions ouvertes) et `docs/analyse-merise.md` §11. Le domaine de la phase 1 n'impose aucun de ces choix : numérotation de ticket (OP-1), validité du Mobile Money hors ligne (OP-3) et politique de conflit de stock (OP-4) restent hors du modèle.

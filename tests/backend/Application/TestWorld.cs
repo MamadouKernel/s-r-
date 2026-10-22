@@ -1,6 +1,7 @@
 using Soro.Application.Cash;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
+using Soro.Application.Reporting;
 using Soro.Application.Stock;
 using Soro.Domain.Stock;
 using Soro.Domain.Cash;
@@ -43,6 +44,8 @@ internal sealed class TestWorld
     public InMemorySaleRepository Sales { get; } = new();
 
     public RecordingAuditTrail Audit { get; } = new();
+
+    public FakeReportingQueries Reporting { get; } = new();
 
     public InMemoryProductRepository Products { get; } = new();
 
@@ -89,6 +92,14 @@ internal sealed class TestWorld
     public ListLowStockHandler ListLowStock => new(Current, Products);
 
     public ListStockMovementsHandler ListStockMovements => new(Current, Products, Movements);
+
+    public ListSalesHandler ListSales => new(Current, Reporting);
+
+    public GetSaleHandler GetSale => new(Current, Reporting);
+
+    public ListSessionsHandler ListSessions => new(Current, Reporting);
+
+    public GetActivityReportHandler ActivityReport => new(Current, Reporting);
 
     public void ActAs(UserId user, Role role) => Current.Become(user, role);
 
