@@ -24,6 +24,7 @@ internal static class ResultHttpMapping
         ErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
         ErrorCodes.RuleViolation => StatusCodes.Status422UnprocessableEntity,
         ErrorCodes.MobileMoneyReferenceUsed or ErrorCodes.RegisterAlreadyOpen or ErrorCodes.IdentifierTaken
+            or ErrorCodes.BarcodeTaken
             => StatusCodes.Status409Conflict,
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
         ErrorCodes.AccountLocked => StatusCodes.Status423Locked,

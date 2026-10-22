@@ -2,6 +2,7 @@ using Soro.Application.Cash;
 using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Application.Settings;
+using Soro.Application.Stock;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
@@ -39,6 +40,8 @@ public sealed class RecordSaleHandler(
     ICurrentUser user,
     ISessionRepository sessions,
     ISaleRepository sales,
+    IProductRepository products,
+    IStockMovementRepository stockMovements,
     IShopSettings settings,
     IUserDirectory directory,
     IAuditTrail audit,
@@ -104,8 +107,27 @@ public sealed class RecordSaleHandler(
         var sale = session.RecordSale(draft);
         await sales.AddAsync(sale, cancellationToken);
         await sessions.UpdateAsync(session, cancellationToken);
+        await DecrementStockAsync(sale, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
         return Result<RecordSaleResult>.Success(ToResult(sale, alreadyProcessed: false));
+    }
+
+    /// <summary>
+    /// Une vente fait baisser le stock des produits suivis (STK-04). Elle ne se bloque jamais sur le stock, et les
+    /// produits absents du catalogue sont ignorés. Les lignes d'un même produit sont regroupées en un mouvement.
+    /// </summary>
+    private async Task DecrementStockAsync(Sale sale, CancellationToken cancellationToken)
+    {
+        foreach (var group in sale.Lines.GroupBy(line => line.ProductId))
+        {
+            var product = await products.GetAsync(group.Key, user.Tenant, cancellationToken);
+            var movement = product?.RecordSale(group.Sum(line => line.Quantity), sale.Id.Value, user.User, clock.UtcNow);
+            if (movement is not null)
+            {
+                await stockMovements.AddAsync(movement, cancellationToken);
+                await products.UpdateAsync(product!, cancellationToken);
+            }
+        }
     }
 
     private async Task<ApplicationError?> CheckDiscountAsync(

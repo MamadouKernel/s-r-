@@ -21,7 +21,7 @@ public sealed partial class ApiExceptionHandler(ILogger<ApiExceptionHandler> log
         CancellationToken cancellationToken)
     {
         IResult problem;
-        if (PersistenceErrors.IsUniqueViolation(exception))
+        if (PersistenceErrors.IsUniqueViolation(exception) || PersistenceErrors.IsConcurrencyConflict(exception))
         {
             LogConcurrentWrite(exception, httpContext.Request.Path);
             problem = Results.Problem(

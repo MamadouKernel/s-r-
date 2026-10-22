@@ -47,3 +47,8 @@ public readonly record struct CustomerId(Guid Value)
 {
     public static CustomerId New() => new(Guid.CreateVersion7());
 }
+
+public readonly record struct StockMovementId(Guid Value)
+{
+    public static StockMovementId New() => new(Guid.CreateVersion7());
+}

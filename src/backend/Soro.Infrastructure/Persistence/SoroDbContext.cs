@@ -21,6 +21,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<UserRow> Users => Set<UserRow>();
 
+    internal DbSet<ProductRow> Products => Set<ProductRow>();
+
+    internal DbSet<StockMovementRow> StockMovements => Set<StockMovementRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSessions(modelBuilder.Entity<SessionRow>());
@@ -29,6 +33,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigurePayments(modelBuilder.Entity<PaymentRow>());
         ConfigureAudit(modelBuilder.Entity<AuditRow>());
         ConfigureUsers(modelBuilder.Entity<UserRow>());
+        ConfigureProducts(modelBuilder.Entity<ProductRow>());
+        ConfigureStockMovements(modelBuilder.Entity<StockMovementRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
     }
 
@@ -102,6 +108,37 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
         // Un identifiant de connexion est unique dans un commerce, jamais entre commerces.
         user.HasIndex(row => new { row.TenantId, row.Identifier }).IsUnique();
+    }
+
+    private static void ConfigureProducts(EntityTypeBuilder<ProductRow> product)
+    {
+        product.ToTable("products", table =>
+            table.HasCheckConstraint(
+                "ck_products_values",
+                "purchase_price >= 0 AND sale_price >= 0 AND alert_threshold >= 0 AND (tracks_stock OR quantity_on_hand = 0)"));
+        product.HasKey(row => row.Id);
+        product.Property(row => row.Name).HasMaxLength(200);
+        product.Property(row => row.Barcode).HasMaxLength(64);
+        product.Property(row => row.Category).HasMaxLength(100);
+
+        // xmin, colonne système de PostgreSQL, sert de jeton de concurrence : deux ventes simultanées
+        // ne s'écrasent pas, la seconde échoue et sera rejouée.
+        product.Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+
+        // CAT-01 : un code-barres est unique dans le commerce (jamais entre commerces).
+        product.HasIndex(row => new { row.TenantId, row.Barcode }).IsUnique().HasFilter("barcode IS NOT NULL");
+        product.HasIndex(row => new { row.TenantId, row.Name });
+    }
+
+    private static void ConfigureStockMovements(EntityTypeBuilder<StockMovementRow> movement)
+    {
+        movement.ToTable("stock_movements", table =>
+            table.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0"));
+        movement.HasKey(row => row.Id);
+        movement.Property(row => row.Kind).HasConversion<string>().HasMaxLength(24);
+        movement.Property(row => row.Reason).HasMaxLength(500);
+        movement.HasIndex(row => new { row.TenantId, row.ProductId, row.At });
+        movement.HasOne<ProductRow>().WithMany().HasForeignKey(row => row.ProductId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureAudit(EntityTypeBuilder<AuditRow> audit)

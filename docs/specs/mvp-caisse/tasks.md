@@ -40,6 +40,17 @@ Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigence
 - [ ] T031 Journal IndexedDB et outbox ordonnée par caisse — REQ-05, SC-02
 - [ ] T032 Écrans de caisse : session, vente, paiement, clôture
 
+## Catalogue et stock (V1)
+
+Voir `docs/specs/catalogue-stock/spec.md`.
+
+- [x] T040 Domaine `Product` et `StockMovement` (append-only) — CAT-01, CAT-02, STK-03
+- [x] T041 Cas d'usage créer/modifier/désactiver produit, consulter, alertes — CAT-01 à CAT-03, STK-05
+- [x] T042 Cas d'usage réception et perte — STK-01, STK-02
+- [x] T043 Persistance EF Core, migration, RLS, mouvements immuables — SC-C2, SC-C6
+- [x] T044 Endpoints API catalogue et stock
+- [x] T045 Décrément du stock à la vente — STK-04
+
 ## Points bloquants non tranchés
 
 Voir `spec.md` (questions ouvertes) et `docs/analyse-merise.md` §11. Le domaine de la phase 1 n'impose aucun de ces choix : numérotation de ticket (OP-1), validité du Mobile Money hors ligne (OP-3) et politique de conflit de stock (OP-4) restent hors du modèle.

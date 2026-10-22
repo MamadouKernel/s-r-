@@ -5,6 +5,7 @@ using Soro.Application.Cash;
 using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
+using Soro.Application.Stock;
 using Soro.Infrastructure.Persistence;
 
 namespace Soro.Infrastructure;
@@ -30,6 +31,8 @@ public static class DependencyInjection
 
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IStockMovementRepository, StockMovementRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserDirectory, UserDirectory>();

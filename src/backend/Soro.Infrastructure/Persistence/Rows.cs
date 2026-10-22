@@ -1,6 +1,7 @@
 using Soro.Domain.Cash;
 using Soro.Domain.Identity;
 using Soro.Domain.Sales;
+using Soro.Domain.Stock;
 
 namespace Soro.Infrastructure.Persistence;
 
@@ -150,6 +151,54 @@ internal sealed class AuditRow
     public Guid ResourceId { get; set; }
 
     public string Detail { get; set; } = string.Empty;
+
+    public DateTimeOffset At { get; set; }
+}
+
+internal sealed class ProductRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Barcode { get; set; }
+
+    public string? Category { get; set; }
+
+    public long PurchasePrice { get; set; }
+
+    public long SalePrice { get; set; }
+
+    public int AlertThreshold { get; set; }
+
+    public bool TracksStock { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public bool IsActive { get; set; }
+
+    public int QuantityOnHand { get; set; }
+}
+
+internal sealed class StockMovementRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid ProductId { get; set; }
+
+    public StockMovementKind Kind { get; set; }
+
+    public int QuantityDelta { get; set; }
+
+    public string? Reason { get; set; }
+
+    public Guid? SourceId { get; set; }
+
+    public Guid UserId { get; set; }
 
     public DateTimeOffset At { get; set; }
 }
