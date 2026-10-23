@@ -31,6 +31,22 @@ async function setup() {
   return { cash, journal, requestFlush, catalogue: TestBed.inject(CatalogueService) };
 }
 
+/** Un second démarrage de l'application sur la même base locale (rechargement de la page). */
+async function restart(journal: Journal): Promise<CashService> {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: JournalService, useValue: { get: () => Promise.resolve(journal) } },
+      { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null) } },
+      { provide: ApiService, useValue: {} },
+      { provide: AuthService, useValue: { device: () => ({ tenantId: 't', registerId: 'reg', pointOfSaleId: 'pos' }) } },
+    ],
+  });
+  const cash = TestBed.inject(CashService);
+  await cash.load();
+  return cash;
+}
+
 describe('CashService', () => {
   it('opens a session from the device and asks for a synchronisation', async () => {
     const { cash, requestFlush } = await setup();
@@ -97,5 +113,97 @@ describe('CashService', () => {
     expect(closing).toMatchObject({ kind: 'closeSession', status: 'pending' });
     expect(cash.session()).toBeNull();
     expect((await journal.pendingOperations()).at(-1)?.kind).toBe('closeSession');
+  });
+
+  it('keeps the cart after a reload of the page (SC-P8)', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus, 3);
+    cash.changeQuantity('p-jus', 4);
+    await cash.settle();
+
+    const reloaded = await restart(journal);
+
+    expect(reloaded.cart()).toEqual([{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 4 }]);
+    expect(reloaded.total()).toBe(2400);
+  });
+
+  it('forgets the cart once the sale is recorded, even after a reload', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus);
+    await cash.confirmSale([{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }]);
+    await cash.settle();
+
+    expect((await restart(journal)).cart()).toEqual([]);
+  });
+
+  it('holds the cart to serve the next customer without creating a sale or touching the stock (SC-P9)', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus, 2);
+
+    await cash.holdCurrent('Mme Koné');
+
+    expect(cash.cart()).toEqual([]);
+    expect(cash.held()).toHaveLength(1);
+    expect(cash.held()[0]).toMatchObject({ label: 'Mme Koné', lines: [{ productId: 'p-jus', quantity: 2 }] });
+    expect((await journal.operations()).filter((op) => op.kind === 'sale')).toHaveLength(0);
+    expect((await journal.findByBarcode('111'))?.quantityOnHand).toBe(24);
+  });
+
+  it('gives a default label with the time when none is typed, and refuses an empty cart', async () => {
+    const { cash } = await setup();
+    await expect(cash.holdCurrent()).rejects.toThrow(/vide/);
+    cash.add(jus);
+    await cash.holdCurrent('   ');
+    expect(cash.held()[0].label).toMatch(/^Vente de \d{2}:\d{2}$/);
+  });
+
+  it('resumes a held sale with its frozen prices, even if the catalogue price changed meanwhile', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus, 2);
+    await cash.holdCurrent('A');
+    await journal.replaceCatalogue([{ ...jus, salePriceFcfa: 700 }]);
+
+    await cash.resume(cash.held()[0].id);
+
+    expect(cash.cart()).toEqual([{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 2 }]);
+    expect(cash.held()).toEqual([]);
+  });
+
+  it('refuses to resume over a non empty cart and keeps both', async () => {
+    const { cash } = await setup();
+    cash.add(jus);
+    await cash.holdCurrent('A');
+    cash.add(jus, 5);
+    await cash.settle();
+
+    await expect(cash.resume(cash.held()[0].id)).rejects.toThrow(/panier en cours/);
+
+    expect(cash.cart()[0].quantity).toBe(5);
+    expect(cash.held()).toHaveLength(1);
+  });
+
+  it('keeps several held sales across a reload, and deletes one on request', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus);
+    await cash.holdCurrent('A');
+    cash.add(jus, 2);
+    await cash.holdCurrent('B');
+
+    const reloaded = await restart(journal);
+    expect(reloaded.held().map((held) => held.label)).toEqual(['A', 'B']);
+
+    await reloaded.discard(reloaded.held()[0].id);
+    expect(reloaded.held().map((held) => held.label)).toEqual(['B']);
+  });
+
+  it('drops the held sales when the session is closed', async () => {
+    const { cash } = await setup();
+    cash.add(jus);
+    await cash.holdCurrent('A');
+    expect(cash.held()).toHaveLength(1);
+
+    await cash.closeSession(10000);
+
+    expect(cash.held()).toEqual([]);
   });
 });

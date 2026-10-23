@@ -13,7 +13,7 @@ clôture, même sans réseau. Les REQ-01 à REQ-08 de `docs/specs/mvp-caisse/spe
 Inclus : configuration de l'appareil, connexion PIN, ouverture, vente, paiement (espèces, Mobile Money, mixte), bandeau réseau,
 journal local et synchronisation, file en attente et rejets, clôture avec écart.
 
-Hors lot (V1 suivants) : vente en attente et reprise, remises et annulations, dépenses de caisse, tickets imprimés ou WhatsApp, retours,
+Hors lot (V1 suivants) : remises et annulations, dépenses de caisse, tickets imprimés ou WhatsApp, retours,
 tableau de bord propriétaire, comptage par billets et pièces (la clôture saisit un montant compté global).
 
 ## Parcours et écrans
@@ -78,6 +78,15 @@ de l'écart avec un libellé explicite (manque / excédent / aucun écart). Hors
 Utilisable à 320 px sans défilement horizontal ; cibles de 48 px ; focus clavier visible ; états annoncés aux technologies d'assistance
 (`aria-live`) ; couleur jamais seule porteuse de sens ; `prefers-reduced-motion` respecté.
 
+### PWA-10 Panier durable et vente en attente
+- Le panier en cours est enregistré dans IndexedDB à chaque modification : un rechargement de la page ou un redémarrage de l'appareil ne le perd pas.
+- « Mettre en attente » range le panier courant (avec un libellé court facultatif, sinon l'heure) et vide l'écran pour servir le client suivant.
+- Une vente en attente n'est **pas** une vente : aucune opération dans la file d'envoi, aucun décrément de stock, aucune séquence consommée.
+- « Reprendre » n'est possible que lorsque le panier courant est vide (aucune fusion implicite). Les prix restent ceux figés à l'ajout (RG-21).
+- « Supprimer » une vente en attente demande une confirmation explicite : c'est la seule suppression de l'écran de vente.
+- À la clôture, les ventes encore en attente sont supprimées après un avertissement clair qui en donne le nombre.
+- La base locale passe en version 2 sans perdre le journal, le catalogue, l'appareil ni le jeton déjà présents.
+
 ## Scénarios d'acceptation
 
 - **SC-P1** Hors ligne, trois ventes sont confirmées ; après rechargement brutal de la page elles sont toujours dans la file, en attente.
@@ -87,6 +96,9 @@ Utilisable à 320 px sans défilement horizontal ; cibles de 48 px ; focus clavi
 - **SC-P5** Une référence Mobile Money déjà utilisée sur l'appareil est refusée avec un message clair.
 - **SC-P6** Le stock local d'un produit baisse après la vente et reste correct après rechargement.
 - **SC-P7** Deux onglets ouverts n'attribuent jamais le même numéro de séquence.
+- **SC-P8** Un panier de trois articles survit à un rechargement de la page.
+- **SC-P9** Une vente mise en attente puis reprise retrouve exactement ses lignes et ses prix, sans toucher au stock ni à la file d'envoi.
+- **SC-P10** Une base locale de la version 1 s'ouvre en version 2 en gardant toutes ses données.
 
 ## Décisions provisoires et questions ouvertes
 

@@ -30,6 +30,12 @@ import { SyncService } from '../services/sync.service';
             <div class="flex justify-between"><dt>Espèces attendues en caisse</dt><dd class="amount font-bold">{{ format(data.expectedCashFcfa) }}</dd></div>
           </dl>
         }
+        @if (cash.held().length > 0) {
+          <p class="mt-4 rounded border border-avertissement p-3 text-base font-semibold text-avertissement" role="note">
+            {{ cash.held().length }} vente{{ cash.held().length > 1 ? 's' : '' }} en attente ne {{ cash.held().length > 1 ? 'seront' : 'sera' }} pas conservée{{ cash.held().length > 1 ? 's' : '' }} :
+            elle{{ cash.held().length > 1 ? 's seront supprimées' : ' sera supprimée' }} à la clôture. Reprenez-la{{ cash.held().length > 1 ? 's' : '' }} et encaissez-la{{ cash.held().length > 1 ? 's' : '' }} si les clients sont toujours là.
+          </p>
+        }
         <form (submit)="submit($event)" class="mt-4" novalidate>
           <label class="field-label" for="compte">Espèces comptées (FCFA)</label>
           <input

@@ -1,4 +1,4 @@
-import { inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
+import { HELD, inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
 import { CartLine, CatalogueProduct, PaymentDraft } from '../domain/types';
 import { cartTotal } from '../domain/cart';
 import { referenceKey, validatePayments } from '../domain/payment';
@@ -76,6 +76,16 @@ export interface SessionSummary {
   salesCount: number;
   netTotalFcfa: number;
   expectedCashFcfa: number;
+}
+
+/** Panier rangé pour servir le client suivant : ce n'est pas une vente (PWA-10). */
+export interface HeldCart {
+  id: string;
+  label: string;
+  lines: CartLine[];
+  createdAt: string;
+  /** Ordre de mise en attente, attribué par le journal : l'heure seule ne départage pas deux paniers rangés à la même milliseconde. */
+  order?: number;
 }
 
 interface MetaEntry<T> {
@@ -261,7 +271,7 @@ export class Journal {
   }
 
   async closeSession(input: { countedCashFcfa: number; at: string }): Promise<CloseSessionOperation> {
-    return inTransaction(this.db, [OPERATIONS, META], 'readwrite', async (tx) => {
+    return inTransaction(this.db, [OPERATIONS, META, HELD], 'readwrite', async (tx) => {
       const session = await this.metaIn<LocalSession>(tx, 'session');
       if (!session) {
         throw new Error("Aucune session de caisse n'est ouverte.");
@@ -280,8 +290,76 @@ export class Journal {
       };
       await promisify(tx.objectStore(OPERATIONS).put(operation));
       await promisify(tx.objectStore(META).delete('session'));
+      // Les ventes en attente et le panier en cours ne sont pas des ventes : ils ne survivent pas à la session.
+      await promisify(tx.objectStore(HELD).clear());
+      await promisify(tx.objectStore(META).delete('draftCart'));
       return operation;
     });
+  }
+
+  // ---- Panier durable et ventes en attente (PWA-10) --------------------------------------------------
+
+  async loadDraft(): Promise<CartLine[]> {
+    return (await this.getMeta<CartLine[]>('draftCart')) ?? [];
+  }
+
+  /** Enregistre le panier en cours à chaque modification ; un panier vide efface le brouillon. */
+  async saveDraft(lines: readonly CartLine[]): Promise<void> {
+    await inTransaction(this.db, [META], 'readwrite', async (tx) => {
+      const store = tx.objectStore(META);
+      if (lines.length === 0) {
+        await promisify(store.delete('draftCart'));
+      } else {
+        await promisify(store.put({ key: 'draftCart', value: [...lines] } satisfies MetaEntry<CartLine[]>));
+      }
+    });
+  }
+
+  /** Range le panier : aucune opération n'est créée, le stock et la séquence ne bougent pas. */
+  async holdCart(input: HeldCart): Promise<HeldCart> {
+    if (input.lines.length === 0) {
+      throw new Error('Le panier est vide : il n’y a rien à mettre en attente.');
+    }
+    return inTransaction(this.db, [HELD, META], 'readwrite', async (tx) => {
+      // Compteur propre aux ventes en attente : la séquence d'envoi des opérations n'est jamais consommée.
+      const order = ((await this.metaIn<number>(tx, 'heldOrder')) ?? 0) + 1;
+      await promisify(tx.objectStore(META).put({ key: 'heldOrder', value: order } satisfies MetaEntry<number>));
+      const held: HeldCart = { ...input, order };
+      await promisify(tx.objectStore(HELD).put(held));
+      await promisify(tx.objectStore(META).delete('draftCart'));
+      return held;
+    });
+  }
+
+  /** Reprend une vente en attente dans le panier courant, qui doit être vide : aucune fusion implicite. */
+  async resumeHeld(id: string): Promise<CartLine[]> {
+    return inTransaction(this.db, [HELD, META], 'readwrite', async (tx) => {
+      const draft = await this.metaIn<CartLine[]>(tx, 'draftCart');
+      if (draft && draft.length > 0) {
+        throw new Error('Le panier en cours n’est pas vide : mettez-le en attente ou videz-le avant de reprendre.');
+      }
+      const held = (await promisify(tx.objectStore(HELD).get(id))) as HeldCart | undefined;
+      if (!held) {
+        throw new Error('Vente en attente introuvable.');
+      }
+      await promisify(tx.objectStore(HELD).delete(id));
+      await promisify(tx.objectStore(META).put({ key: 'draftCart', value: held.lines } satisfies MetaEntry<CartLine[]>));
+      return held.lines;
+    });
+  }
+
+  async deleteHeld(id: string): Promise<void> {
+    await inTransaction(this.db, [HELD], 'readwrite', async (tx) => {
+      await promisify(tx.objectStore(HELD).delete(id));
+    });
+  }
+
+  async listHeld(): Promise<HeldCart[]> {
+    return (await this.readAll<HeldCart>(HELD)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  async heldCount(): Promise<number> {
+    return (await this.readAll<HeldCart>(HELD)).length;
   }
 
   // ---- File d'opérations et synchronisation ----------------------------------------------------------

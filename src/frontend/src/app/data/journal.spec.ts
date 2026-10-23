@@ -261,3 +261,148 @@ describe('Journal: closing', () => {
     await expect(journal.recordSale(cashSale('late'))).rejects.toThrow(/session/i);
   });
 });
+
+describe('Journal: durable cart and held sales (PWA-10)', () => {
+  const lines = [
+    { productId: 'p-jus', name: jus.name, unitPriceFcfa: 600, quantity: 2 },
+    { productId: 'p-coupe', name: coupe.name, unitPriceFcfa: 1500, quantity: 1 },
+  ];
+
+  it('keeps the draft cart across a reopening of the database (SC-P8)', async () => {
+    const name = `soro-draft-${Math.random()}`;
+    const first = await Journal.open(name);
+    await first.saveDraft(lines);
+
+    expect(await (await Journal.open(name)).loadDraft()).toEqual(lines);
+  });
+
+  it('starts with an empty draft and clears it when saved empty', async () => {
+    const journal = await newJournal();
+    expect(await journal.loadDraft()).toEqual([]);
+    await journal.saveDraft(lines);
+    await journal.saveDraft([]);
+    expect(await journal.loadDraft()).toEqual([]);
+  });
+
+  it('holds the cart, empties the draft and touches neither the queue nor the stock (SC-P9)', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.saveDraft(lines);
+    const before = (await journal.operations()).length;
+
+    const held = await journal.holdCart({ id: 'h-1', label: 'Mme Koné', lines, createdAt: '2026-10-23T09:00:00.000Z' });
+
+    expect(held).toMatchObject({ id: 'h-1', label: 'Mme Koné', lines });
+    expect(await journal.loadDraft()).toEqual([]);
+    expect(await journal.listHeld()).toHaveLength(1);
+    expect((await journal.operations()).length).toBe(before);
+    expect((await journal.findByBarcode('111'))?.quantityOnHand).toBe(24);
+  });
+
+  it('resumes a held cart with exactly its lines and prices, once, into the draft', async () => {
+    const journal = await newJournal();
+    await journal.holdCart({ id: 'h-1', label: 'A', lines, createdAt: '2026-10-23T09:00:00.000Z' });
+
+    const resumed = await journal.resumeHeld('h-1');
+
+    expect(resumed).toEqual(lines);
+    expect(await journal.loadDraft()).toEqual(lines);
+    expect(await journal.listHeld()).toEqual([]);
+    await journal.saveDraft([]);
+    await expect(journal.resumeHeld('h-1')).rejects.toThrow(/introuvable/);
+  });
+
+  it('refuses to resume while the current cart is not empty, and loses nothing', async () => {
+    const journal = await newJournal();
+    await journal.holdCart({ id: 'h-1', label: 'A', lines, createdAt: '2026-10-23T09:00:00.000Z' });
+    await journal.saveDraft([lines[0]]);
+
+    await expect(journal.resumeHeld('h-1')).rejects.toThrow(/panier en cours/);
+
+    expect(await journal.listHeld()).toHaveLength(1);
+    expect(await journal.loadDraft()).toEqual([lines[0]]);
+  });
+
+  it('lists held carts in the order they were held, even within the same millisecond, and deletes one on request', async () => {
+    const journal = await newJournal();
+    const sameInstant = '2026-10-23T09:00:00.000Z';
+    await journal.holdCart({ id: 'first', label: 'A', lines, createdAt: sameInstant });
+    await journal.holdCart({ id: 'second', label: 'B', lines, createdAt: sameInstant });
+    await journal.holdCart({ id: 'third', label: 'C', lines, createdAt: sameInstant });
+
+    expect((await journal.listHeld()).map((held) => held.id)).toEqual(['first', 'second', 'third']);
+    await journal.deleteHeld('first');
+    expect((await journal.listHeld()).map((held) => held.id)).toEqual(['second', 'third']);
+  });
+
+  it('does not consume the sending sequence when a cart is held', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.holdCart({ id: 'h', label: 'A', lines, createdAt: '2026-10-23T09:00:00.000Z' });
+    const sale = await journal.recordSale(cashSale('after-hold'));
+    expect(sale.seq).toBe(2); // 1 = ouverture de session, 2 = la vente : la mise en attente n'a rien pris
+  });
+
+  it('refuses to hold an empty cart', async () => {
+    const journal = await newJournal();
+    await expect(journal.holdCart({ id: 'x', label: 'x', lines: [], createdAt: 'x' })).rejects.toThrow(/vide/);
+  });
+
+  it('purges the held carts and the draft when the session is closed, and reports how many', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.holdCart({ id: 'h-1', label: 'A', lines, createdAt: '2026-10-23T09:00:00.000Z' });
+    await journal.holdCart({ id: 'h-2', label: 'B', lines, createdAt: '2026-10-23T09:10:00.000Z' });
+    await journal.saveDraft(lines);
+    expect(await journal.heldCount()).toBe(2);
+
+    await journal.closeSession({ countedCashFcfa: 10000, at: '2026-10-23T17:00:00.000Z' });
+
+    expect(await journal.listHeld()).toEqual([]);
+    expect(await journal.loadDraft()).toEqual([]);
+  });
+});
+
+describe('Journal: database upgrade (SC-P10)', () => {
+  it('opens a version 1 database in version 2 and keeps its journal, catalogue, device and token', async () => {
+    const name = `soro-v1-${Math.random()}`;
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(name, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        const operations = db.createObjectStore('operations', { keyPath: 'seq' });
+        operations.createIndex('saleId', 'saleId', { unique: true });
+        operations.createIndex('status', 'status');
+        db.createObjectStore('products', { keyPath: 'id' });
+        db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(['operations', 'products', 'meta'], 'readwrite');
+        tx.objectStore('products').put(jus);
+        tx.objectStore('meta').put({ key: 'device', value: { tenantId: 't', registerId: 'r', pointOfSaleId: 'p' } });
+        tx.objectStore('meta').put({ key: 'sequence', value: 7 });
+        tx.objectStore('operations').put({
+          kind: 'openSession', seq: 7, status: 'pending', createdAt: 'x', sessionId: 's', pointOfSaleId: 'p',
+          registerId: 'r', openingFloatFcfa: 5000, openedAt: 'x',
+        });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
+
+    const journal = await Journal.open(name);
+
+    expect((await journal.getDevice())?.tenantId).toBe('t');
+    expect((await journal.listProducts()).map((product) => product.id)).toEqual(['p-jus']);
+    expect((await journal.operations()).map((operation) => operation.seq)).toEqual([7]);
+    // La séquence continue après la dernière valeur de la version 1 et les nouvelles fonctions marchent.
+    await journal.saveDraft([{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 1 }]);
+    expect(await journal.loadDraft()).toHaveLength(1);
+    expect(await journal.listHeld()).toEqual([]);
+  });
+});
