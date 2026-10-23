@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { formatFcfa, parseFcfa } from '../core/money';
+import { describeVariance } from '../core/variance';
 import { CloseSessionOperation, SessionSummary } from '../data/journal';
 import { CashService } from '../services/cash.service';
 import { SyncService } from '../services/sync.service';
@@ -106,12 +107,4 @@ export class ClosePage implements OnInit {
   protected async finish(): Promise<void> {
     await this.router.navigateByUrl('/ouverture');
   }
-}
-
-/** Écart de caisse en toutes lettres : le signe seul ne suffit pas (DESIGN.md §7). */
-export function describeVariance(variance: number): string {
-  if (variance === 0) {
-    return 'Aucun écart';
-  }
-  return variance < 0 ? `Manque de ${formatFcfa(-variance)}` : `Excédent de ${formatFcfa(variance)}`;
 }

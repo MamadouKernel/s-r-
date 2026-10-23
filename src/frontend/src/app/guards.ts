@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
-import { canManageCatalogue, canManageStock, canManageTeam } from './management/roles';
+import { canManageCatalogue, canManageStock, canManageTeam, canViewReports } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
@@ -56,4 +56,14 @@ export const teamGuard: CanActivateFn = () => {
     return router.parseUrl('/connexion');
   }
   return canManageTeam(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
+};
+
+/** Tableau de bord : les profils qui lisent les rapports. Un caissier retombe sur la caisse, où il a sa place. */
+export const reportsGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canViewReports(auth.user()?.role) ? true : router.parseUrl('/vente');
 };

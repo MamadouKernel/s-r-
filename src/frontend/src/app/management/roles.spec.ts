@@ -1,4 +1,4 @@
-import { canManageCatalogue, canManageStock, canManageTeam } from './roles';
+import { canManageCatalogue, canManageStock, canManageTeam, canViewReports } from './roles';
 
 describe('roles', () => {
   it('lets only the owner and the manager manage the catalogue', () => {
@@ -17,5 +17,12 @@ describe('roles', () => {
     expect(['Owner', 'Manager', 'StockKeeper', 'Cashier', 'Accountant', undefined].map(canManageTeam)).toEqual([
       true, true, false, false, false, false,
     ]);
+  });
+
+  it('lets the accountant read the reports without managing anything', () => {
+    expect(['Owner', 'Manager', 'Accountant', 'StockKeeper', 'Cashier', undefined].map(canViewReports)).toEqual([
+      true, true, true, false, false, false,
+    ]);
+    expect(canManageStock('Accountant')).toBe(false);
   });
 });

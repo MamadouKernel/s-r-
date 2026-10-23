@@ -67,6 +67,13 @@ Voir `docs/specs/equipe/spec.md`.
 - [x] T071 Écran Équipe : liste, ajout, désactivation — EQ-03 à EQ-05
 - [x] T072 Auteurs nommés dans l'historique du stock — EQ-06
 
+## Tableau de bord du propriétaire (V1)
+
+Voir `docs/specs/tableau-de-bord/spec.md`.
+
+- [x] T080 Périodes, indicateurs et service de lecture — TDB-01 à TDB-05
+- [x] T081 Page, droits, navigation, actualisation — TDB-06, TDB-07, SC-D5, SC-D8
+
 ## Consultation et rapports (V1)
 
 Voir `docs/specs/consultation-rapports/spec.md`.

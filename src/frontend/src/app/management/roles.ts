@@ -16,3 +16,8 @@ export function canManageStock(role: string | undefined): boolean {
 export function canManageTeam(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager';
 }
+
+/** Tableau de bord et rapports : propriétaire, gérant et comptable (lecture seule), comme le serveur. */
+export function canViewReports(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager' || role === 'Accountant';
+}

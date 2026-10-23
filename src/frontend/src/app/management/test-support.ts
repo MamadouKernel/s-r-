@@ -1,4 +1,4 @@
-import { signal, Type } from '@angular/core';
+import { Provider, signal, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -43,7 +43,7 @@ export function fakeTeamApi() {
 
 export async function render<T>(
   component: Type<T>,
-  options: { api: ReturnType<typeof fakeApi>; teamApi?: ReturnType<typeof fakeTeamApi>; role?: string; params?: Record<string, string>; online?: boolean; flash?: string },
+  options: { api: ReturnType<typeof fakeApi>; teamApi?: ReturnType<typeof fakeTeamApi>; role?: string; params?: Record<string, string>; online?: boolean; flash?: string; extraProviders?: Provider[] },
 ) {
   const flash = new FlashService();
   if (options.flash) {
@@ -53,6 +53,7 @@ export async function render<T>(
     providers: [
       provideRouter([]),
       { provide: FlashService, useValue: flash },
+      ...(options.extraProviders ?? []),
       { provide: ProductsApi, useValue: options.api },
       { provide: TeamApi, useValue: options.teamApi ?? fakeTeamApi() },
       { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'Moussa', role: options.role ?? 'Manager' }) } },
