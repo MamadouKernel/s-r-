@@ -39,6 +39,7 @@ Dérivé de `spec.md` et `plan.md`. Format : `[ID] [P?] Description — exigence
 - [x] T033 Projet Angular PWA dans `src/frontend/` avec Tailwind CSS et thème issu de `DESIGN.md` — `docs/decisions/0001-stack-et-tailwind.md`
 - [x] T031 Journal IndexedDB et outbox ordonnée par caisse — REQ-05, SC-02 (`docs/specs/caisse-pwa/spec.md`, ADR 0004)
 - [x] T032 Écrans de caisse : session, vente, paiement, clôture (structure et états faits ; détail visuel à valider avec T030)
+- [x] T034 Panier durable et vente en attente, base locale v2 avec migration — `docs/specs/caisse-pwa/spec.md` PWA-10
 
 ## Catalogue et stock (V1)
 

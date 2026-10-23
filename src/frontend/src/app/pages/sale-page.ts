@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { formatFcfa } from '../core/money';
-import { CatalogueProduct } from '../domain/types';
+import { cartTotal } from '../domain/cart';
+import { CartLine, CatalogueProduct } from '../domain/types';
 import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { PaymentPanel } from './payment-panel';
@@ -22,6 +23,34 @@ const MAX_VISIBLE = 60;
       <div class="grid grid-cols-[minmax(0,1fr)] gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_26rem] lg:pb-0">
         <section aria-labelledby="catalogue-titre">
           <h2 id="catalogue-titre" class="sr-only">Catalogue</h2>
+
+          @if (cash.held().length > 0) {
+            <section class="panel mb-4" aria-labelledby="attente-titre">
+              <h3 id="attente-titre" class="text-lg font-bold">Ventes en attente ({{ cash.held().length }})</h3>
+              <ul class="mt-2 divide-y divide-sauge">
+                @for (held of cash.held(); track held.id) {
+                  <li class="flex flex-wrap items-center gap-2 py-2">
+                    <span class="min-w-0 flex-1">
+                      <span class="block font-semibold">{{ held.label }}</span>
+                      <span class="amount block text-sm text-ardoise">{{ articleCount(held.lines) }} · {{ format(linesTotal(held.lines)) }}</span>
+                    </span>
+                    @if (confirmDelete() === held.id) {
+                      <span class="w-full text-base font-semibold text-erreur sm:w-auto" role="alert">Supprimer cette vente en attente ?</span>
+                      <button type="button" class="btn" (click)="confirmDelete.set(null)">Non, la garder</button>
+                      <button type="button" class="btn-primary !bg-erreur !border-erreur" (click)="discard(held.id)">Oui, supprimer</button>
+                    } @else {
+                      <button type="button" class="btn-primary" [attr.aria-label]="'Reprendre la vente ' + held.label" (click)="resume(held.id)">Reprendre</button>
+                      <button type="button" class="btn" [attr.aria-label]="'Supprimer la vente en attente ' + held.label" (click)="confirmDelete.set(held.id)">Supprimer</button>
+                    }
+                  </li>
+                }
+              </ul>
+              @if (cash.cart().length > 0) {
+                <p class="field-help">Pour reprendre une vente en attente, mettez d’abord le panier en cours en attente ou videz-le.</p>
+              }
+            </section>
+          }
+
           <form (submit)="scan($event)" role="search">
             <label class="field-label" for="recherche">Rechercher ou scanner un code-barres</label>
             <input
@@ -107,7 +136,30 @@ const MAX_VISIBLE = 60;
               Encaisser
             </button>
             @if (cash.cart().length > 0) {
-              <button type="button" class="btn mt-2 w-full" (click)="cash.clearCart()">Vider le panier</button>
+              @if (holding()) {
+                <form class="mt-3" (submit)="hold($event)" novalidate>
+                  <label class="field-label" for="attente-nom">Repère du client (facultatif)</label>
+                  <input
+                    id="attente-nom"
+                    class="field"
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [value]="holdLabel()"
+                    (input)="holdLabel.set($any($event.target).value)"
+                  />
+                  <div class="mt-2 grid grid-cols-2 gap-2">
+                    <button type="button" class="btn" (click)="holding.set(false)">Annuler</button>
+                    <button type="submit" class="btn-primary">Mettre en attente</button>
+                  </div>
+                </form>
+              } @else {
+                <button type="button" class="btn mt-2 w-full" (click)="holding.set(true)">Mettre en attente</button>
+                <button type="button" class="btn mt-2 w-full" (click)="cash.clearCart()">Vider le panier</button>
+              }
+            }
+            @if (message()) {
+              <p class="field-error" role="alert">{{ message() }}</p>
             }
           </div>
         </section>
@@ -136,6 +188,10 @@ export class SalePage implements OnInit {
   protected readonly paying = signal(false);
   protected readonly unknownCode = signal('');
   protected readonly announcement = signal('');
+  protected readonly holding = signal(false);
+  protected readonly holdLabel = signal('');
+  protected readonly confirmDelete = signal<string | null>(null);
+  protected readonly message = signal('');
   protected readonly visible = computed(() => this.catalogue.products().slice(0, MAX_VISIBLE));
   protected readonly itemCount = computed(() => this.cash.cart().reduce((sum, line) => sum + line.quantity, 0));
   protected readonly hiddenCount = computed(() => Math.max(this.catalogue.products().length - MAX_VISIBLE, 0));
@@ -164,6 +220,50 @@ export class SalePage implements OnInit {
       await this.search('');
     } else if (/^\d{6,}$/.test(code)) {
       this.unknownCode.set(code);
+    }
+  }
+
+  protected articleCount(lines: readonly CartLine[]): string {
+    const count = lines.reduce((sum, line) => sum + line.quantity, 0);
+    return `${count} article${count > 1 ? 's' : ''}`;
+  }
+
+  protected linesTotal(lines: readonly CartLine[]): number {
+    return cartTotal(lines);
+  }
+
+  protected async hold(event: Event): Promise<void> {
+    event.preventDefault();
+    await this.run(async () => {
+      await this.cash.holdCurrent(this.holdLabel());
+      this.holding.set(false);
+      this.holdLabel.set('');
+      this.announcement.set('Vente mise en attente. Le panier est vide.');
+    });
+  }
+
+  protected async resume(id: string): Promise<void> {
+    await this.run(async () => {
+      await this.cash.resume(id);
+      this.announcement.set('Vente reprise.');
+    });
+  }
+
+  protected async discard(id: string): Promise<void> {
+    await this.run(async () => {
+      await this.cash.discard(id);
+      this.confirmDelete.set(null);
+      this.announcement.set('Vente en attente supprimée.');
+    });
+  }
+
+  /** Les erreurs de règle (panier non vide, vente introuvable) s'affichent à l'écran, jamais en silence. */
+  private async run(action: () => Promise<void>): Promise<void> {
+    this.message.set('');
+    try {
+      await action();
+    } catch (error) {
+      this.message.set(error instanceof Error ? error.message : 'L’opération a échoué.');
     }
   }
 

@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { CloseSessionOperation, LocalSession, SaleOperation, SessionSummary } from '../data/journal';
+import { CloseSessionOperation, HeldCart, LocalSession, SaleOperation, SessionSummary } from '../data/journal';
 import { addProduct, cartTotal, removeLine, setQuantity } from '../domain/cart';
 import { CartLine, CatalogueProduct, PaymentDraft } from '../domain/types';
 import { AuthService } from './auth.service';
@@ -17,19 +17,39 @@ export class CashService {
 
   private readonly sessionSignal = signal<LocalSession | null>(null);
   private readonly cartSignal = signal<CartLine[]>([]);
+  private readonly heldSignal = signal<HeldCart[]>([]);
   private readonly lastSaleSignal = signal<SaleOperation | null>(null);
   private readonly submittingSignal = signal(false);
   private checkoutId: string | null = null;
   private inFlight: Promise<SaleOperation> | null = null;
+  /** Écritures du brouillon, en file : elles arrivent dans l'ordre et jamais après un « mettre en attente ». */
+  private draftWrites: Promise<void> = Promise.resolve();
 
   readonly session = this.sessionSignal.asReadonly();
   readonly cart = this.cartSignal.asReadonly();
   readonly total = computed(() => cartTotal(this.cartSignal()));
+  readonly held = this.heldSignal.asReadonly();
   readonly lastSale = this.lastSaleSignal.asReadonly();
   readonly submitting = this.submittingSignal.asReadonly();
 
   async load(): Promise<void> {
-    this.sessionSignal.set(await (await this.journalService.get()).currentSession());
+    const journal = await this.journalService.get();
+    this.sessionSignal.set(await journal.currentSession());
+    this.cartSignal.set(await journal.loadDraft());
+    this.heldSignal.set(await journal.listHeld());
+  }
+
+  /** Attend que le brouillon du panier soit écrit (tests, et avant toute opération qui le remplace). */
+  settle(): Promise<void> {
+    return this.draftWrites;
+  }
+
+  private setCart(update: (cart: CartLine[]) => CartLine[]): void {
+    this.cartSignal.update(update);
+    const snapshot = this.cartSignal();
+    this.draftWrites = this.draftWrites
+      .then(async () => (await this.journalService.get()).saveDraft(snapshot))
+      .catch(() => undefined);
   }
 
   async openSession(openingFloatFcfa: number): Promise<void> {
@@ -52,7 +72,7 @@ export class CashService {
   // ---- Panier ------------------------------------------------------------------------------------
 
   add(product: CatalogueProduct, quantity = 1): void {
-    this.cartSignal.update((cart) => addProduct(cart, product, quantity));
+    this.setCart((cart) => addProduct(cart, product, quantity));
   }
 
   /** Scan : ajoute le produit au code-barres exact ; renvoie `false` si le code est inconnu. */
@@ -66,16 +86,57 @@ export class CashService {
   }
 
   changeQuantity(productId: string, quantity: number): void {
-    this.cartSignal.update((cart) => setQuantity(cart, productId, quantity));
+    this.setCart((cart) => setQuantity(cart, productId, quantity));
   }
 
   remove(productId: string): void {
-    this.cartSignal.update((cart) => removeLine(cart, productId));
+    this.setCart((cart) => removeLine(cart, productId));
   }
 
   clearCart(): void {
+    this.setCart(() => []);
+    this.checkoutId = null;
+  }
+
+  // ---- Ventes en attente (PWA-10) -----------------------------------------------------------------
+
+  /** Range le panier pour servir le client suivant. Ce n'est pas une vente : file d'envoi et stock restent intacts. */
+  async holdCurrent(label?: string): Promise<void> {
+    const lines = this.cartSignal();
+    if (lines.length === 0) {
+      throw new Error('Le panier est vide : il n’y a rien à mettre en attente.');
+    }
+    await this.draftWrites;
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const journal = await this.journalService.get();
+    await journal.holdCart({
+      id: crypto.randomUUID(),
+      label: label?.trim() || `Vente de ${time}`,
+      lines,
+      createdAt: now.toISOString(),
+    });
     this.cartSignal.set([]);
     this.checkoutId = null;
+    this.heldSignal.set(await journal.listHeld());
+  }
+
+  /** Reprend une vente en attente : possible seulement si le panier courant est vide. */
+  async resume(id: string): Promise<void> {
+    if (this.cartSignal().length > 0) {
+      throw new Error('Le panier en cours n’est pas vide : mettez-le en attente ou videz-le avant de reprendre.');
+    }
+    await this.draftWrites;
+    const journal = await this.journalService.get();
+    this.cartSignal.set(await journal.resumeHeld(id));
+    this.checkoutId = null;
+    this.heldSignal.set(await journal.listHeld());
+  }
+
+  async discard(id: string): Promise<void> {
+    const journal = await this.journalService.get();
+    await journal.deleteHeld(id);
+    this.heldSignal.set(await journal.listHeld());
   }
 
   // ---- Encaissement ------------------------------------------------------------------------------
@@ -100,7 +161,7 @@ export class CashService {
       try {
         const sale = await (await this.journalService.get()).recordSale(input);
         this.lastSaleSignal.set(sale);
-        this.cartSignal.set([]);
+        this.setCart(() => []);
         this.checkoutId = null;
         await this.catalogue.loadLocal();
         void this.sync.requestFlush();
@@ -126,6 +187,7 @@ export class CashService {
     });
     this.sessionSignal.set(null);
     this.cartSignal.set([]);
+    this.heldSignal.set([]);
     void this.sync.requestFlush();
     return closing;
   }
