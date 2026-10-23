@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Une seule exécution par branche : un nouveau push annule la précédente.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Version cible de la production (docs/architecture.md). Les tests d'intégration lancent
+      # leur PostgreSQL jetable avec Testcontainers : Docker est disponible sur ubuntu-latest.
+      SORO_TEST_POSTGRES_IMAGE: postgres:18
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restaurer
+        run: dotnet restore Soro.slnx
+
+      # Les avertissements sont des erreurs (Directory.Build.props) : un style ou une analyse non respectés cassent la build.
+      - name: Compiler
+        run: dotnet build Soro.slnx --configuration Release --no-restore
+
+      - name: Tester
+        run: dotnet test Soro.slnx --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Publier les résultats de test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend (Angular)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Tester
+        run: npx ng test --watch=false
+
+      # La build de production applique les budgets de taille (500 ko en avertissement, 1 Mo en erreur).
+      - name: Compiler
+        run: npx ng build
