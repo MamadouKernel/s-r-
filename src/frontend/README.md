@@ -2,6 +2,17 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.2.
 
+## Poste de caisse : lancer en local
+
+L'API doit tourner sur `http://localhost:5140` ; le serveur de développement relaie `/api` vers elle (`proxy.conf.json`), ce qui évite
+toute configuration CORS. Le premier lancement demande le code du commerce (voir `docs/specs/caisse-pwa/spec.md`).
+
+```bash
+ng serve --port 4300
+```
+
+Les données locales (journal, catalogue, jeton) sont dans IndexedDB : pour repartir de zéro, effacez les données du site dans le navigateur.
+
 ## Development server
 
 To start a local development server, run:
