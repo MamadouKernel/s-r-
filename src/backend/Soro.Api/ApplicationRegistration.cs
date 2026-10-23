@@ -1,6 +1,7 @@
 using Soro.Application.Cash;
 using Soro.Application.Common;
 using Soro.Application.Identity;
+using Soro.Application.Reporting;
 using Soro.Application.Sales;
 using Soro.Application.Settings;
 using Soro.Application.Stock;
@@ -33,6 +34,10 @@ public static class ApplicationRegistration
         services.AddScoped<ListProductsHandler>();
         services.AddScoped<ListLowStockHandler>();
         services.AddScoped<ListStockMovementsHandler>();
+        services.AddScoped<ListSalesHandler>();
+        services.AddScoped<GetSaleHandler>();
+        services.AddScoped<ListSessionsHandler>();
+        services.AddScoped<GetActivityReportHandler>();
         return services;
     }
 

@@ -7,6 +7,9 @@ public static class RolePolicy
 {
     public static bool IsManager(Role role) => role is Role.Owner or Role.Manager;
 
+    /// <summary>Consultation des ventes, des écarts de caisse et des rapports : le comptable lit sans modifier.</summary>
+    public static bool CanViewReports(Role role) => role is Role.Owner or Role.Manager or Role.Accountant;
+
     /// <summary>Fiches produit et prix : gérant et propriétaire (cahier des charges, section 3).</summary>
     public static bool CanManageCatalogue(Role role) => IsManager(role);
 
