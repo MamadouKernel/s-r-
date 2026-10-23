@@ -1,6 +1,8 @@
 using Soro.Application.Cash;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
+using Soro.Application.Stock;
+using Soro.Domain.Stock;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
@@ -42,6 +44,10 @@ internal sealed class TestWorld
 
     public RecordingAuditTrail Audit { get; } = new();
 
+    public InMemoryProductRepository Products { get; } = new();
+
+    public InMemoryStockMovementRepository Movements { get; } = new();
+
     public InMemoryUserRepository Users { get; } = new();
 
     public FakePinHasher Hasher { get; } = new();
@@ -56,7 +62,7 @@ internal sealed class TestWorld
 
     public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, UnitOfWork);
 
-    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Settings, Directory, Audit, Clock, UnitOfWork);
+    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Settings, Directory, Audit, Clock, UnitOfWork);
 
     public SyncSalesHandler SyncSales => new(RecordSale);
 
@@ -67,6 +73,22 @@ internal sealed class TestWorld
     public RegisterUserHandler RegisterUser => new(Current, Users, Hasher, Clock, UnitOfWork);
 
     public DisableUserHandler DisableUser => new(Current, Users, Audit, Clock, UnitOfWork);
+
+    public CreateProductHandler CreateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
+
+    public UpdateProductHandler UpdateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
+
+    public DeactivateProductHandler DeactivateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
+
+    public ReceiveStockHandler ReceiveStock => new(Current, Products, Movements, Clock, UnitOfWork);
+
+    public RecordStockLossHandler RecordStockLoss => new(Current, Products, Movements, Audit, Clock, UnitOfWork);
+
+    public ListProductsHandler ListProducts => new(Current, Products);
+
+    public ListLowStockHandler ListLowStock => new(Current, Products);
+
+    public ListStockMovementsHandler ListStockMovements => new(Current, Products, Movements);
 
     public void ActAs(UserId user, Role role) => Current.Become(user, role);
 
@@ -80,6 +102,26 @@ internal sealed class TestWorld
             UserId.New(), tenant ?? Tenant, identifier, "Awa Koné", role, Hasher.Hash(pin), Clock.UtcNow.AddDays(-1));
         Users.Put(user);
         return user;
+    }
+
+    public Product GivenProduct(
+        string name = "Jus d'orange 1L",
+        string? barcode = "6111000000011",
+        int threshold = 5,
+        int stock = 0,
+        bool tracksStock = true,
+        TenantId? tenant = null)
+    {
+        var product = Product.Create(
+            ProductId.New(), tenant ?? Tenant, name, barcode, "Boissons",
+            Money.Fcfa(400), Money.Fcfa(600), threshold, tracksStock, Morning);
+        if (stock > 0)
+        {
+            product.Receive(stock, null, Manager, Morning);
+        }
+
+        Products.Put(product);
+        return product;
     }
 
     public CashRegisterSession GivenOpenSession(UserId? cashier = null, TenantId? tenant = null, long openingFloat = 10_000)

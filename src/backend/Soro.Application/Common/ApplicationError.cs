@@ -20,4 +20,5 @@ public static class ErrorCodes
     public const string InvalidCredentials = "invalid_credentials";
     public const string AccountLocked = "account_locked";
     public const string IdentifierTaken = "identifier_taken";
+    public const string BarcodeTaken = "barcode_taken";
 }

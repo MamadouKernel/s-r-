@@ -3,6 +3,7 @@ using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Application.Settings;
+using Soro.Application.Stock;
 using Soro.Domain.Common;
 using Soro.Infrastructure.Security;
 
@@ -24,6 +25,14 @@ public static class ApplicationRegistration
         services.AddScoped<LogInHandler>();
         services.AddScoped<RegisterUserHandler>();
         services.AddScoped<DisableUserHandler>();
+        services.AddScoped<CreateProductHandler>();
+        services.AddScoped<UpdateProductHandler>();
+        services.AddScoped<DeactivateProductHandler>();
+        services.AddScoped<ReceiveStockHandler>();
+        services.AddScoped<RecordStockLossHandler>();
+        services.AddScoped<ListProductsHandler>();
+        services.AddScoped<ListLowStockHandler>();
+        services.AddScoped<ListStockMovementsHandler>();
         return services;
     }
 

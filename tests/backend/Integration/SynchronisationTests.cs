@@ -29,6 +29,8 @@ public class SynchronisationTests(PostgresFixture fixture)
             User,
             new SessionRepository(db),
             new SaleRepository(db),
+            new ProductRepository(db),
+            new StockMovementRepository(db),
             new DefaultSettings(),
             new EmptyDirectory(),
             new AuditTrail(db),

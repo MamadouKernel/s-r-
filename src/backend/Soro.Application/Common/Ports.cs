@@ -34,4 +34,8 @@ public static class AuditActions
     public const string SaleCancelled = "sale.cancelled";
     public const string CancelRefused = "sale.cancel.refused";
     public const string UserDisabled = "user.disabled";
+    public const string ProductCreated = "product.created";
+    public const string ProductUpdated = "product.updated";
+    public const string ProductDeactivated = "product.deactivated";
+    public const string StockLoss = "stock.loss";
 }

@@ -12,7 +12,11 @@ internal static class SnakeCase
         {
             foreach (var property in entity.GetProperties())
             {
-                property.SetColumnName(ToSnakeCase(property.Name));
+                // xmin est une colonne système de PostgreSQL : son nom ne se change pas.
+                if (property.GetColumnName() != "xmin")
+                {
+                    property.SetColumnName(ToSnakeCase(property.Name));
+                }
             }
         }
     }

@@ -3,6 +3,8 @@ using Soro.Application.Identity;
 using Soro.Application.Cash;
 using Soro.Application.Sales;
 using Soro.Application.Settings;
+using Soro.Application.Stock;
+using Soro.Domain.Stock;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
@@ -139,4 +141,76 @@ internal sealed class InMemorySaleRepository : ISaleRepository
         _sales[index] = sale;
         return Task.CompletedTask;
     }
+}
+
+internal sealed class InMemoryProductRepository : IProductRepository
+{
+    private readonly List<Product> _products = [];
+
+    public void Put(Product product) => _products.Add(product);
+
+    public Task<Product?> GetAsync(ProductId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_products.FirstOrDefault(product => product.Id == id && product.Tenant == tenant));
+
+    public Task<bool> IsBarcodeUsedAsync(
+        TenantId tenant,
+        string barcode,
+        ProductId? except,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(_products.Any(product =>
+            product.Tenant == tenant && product.Barcode == barcode && product.Id != except));
+
+    public Task<IReadOnlyList<Product>> ListAsync(
+        TenantId tenant,
+        string? search,
+        bool includeInactive,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Product>>(_products
+            .Where(product => product.Tenant == tenant && (includeInactive || product.IsActive))
+            .Where(product => string.IsNullOrWhiteSpace(search)
+                || product.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || product.Barcode == search)
+            .OrderBy(product => product.Name)
+            .ToArray());
+
+    public Task<IReadOnlyList<Product>> ListLowStockAsync(TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Product>>(_products
+            .Where(product => product.Tenant == tenant && product.IsActive && product.IsLowStock)
+            .OrderBy(product => product.QuantityOnHand)
+            .ToArray());
+
+    public Task AddAsync(Product product, CancellationToken cancellationToken)
+    {
+        _products.Add(product);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Product product, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class InMemoryStockMovementRepository : IStockMovementRepository
+{
+    private readonly List<StockMovement> _movements = [];
+
+    public IReadOnlyList<StockMovement> All => _movements;
+
+    public Task<bool> ExistsAsync(StockMovementId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_movements.Any(movement => movement.Id == id && movement.Tenant == tenant));
+
+    public Task AddAsync(StockMovement movement, CancellationToken cancellationToken)
+    {
+        _movements.Add(movement);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<StockMovement>> ListForProductAsync(
+        ProductId product,
+        TenantId tenant,
+        int limit,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<StockMovement>>(_movements
+            .Where(movement => movement.Product == product && movement.Tenant == tenant)
+            .OrderByDescending(movement => movement.At)
+            .Take(limit)
+            .ToArray());
 }

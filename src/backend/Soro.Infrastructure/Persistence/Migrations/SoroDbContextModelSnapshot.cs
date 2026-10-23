@@ -121,6 +121,81 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.ProductRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AlertThreshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("alert_threshold");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("barcode");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("PurchasePrice")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_price");
+
+                    b.Property<int>("QuantityOnHand")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_on_hand");
+
+                    b.Property<long>("SalePrice")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sale_price");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("TracksStock")
+                        .HasColumnType("boolean")
+                        .HasColumnName("tracks_stock");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Barcode")
+                        .IsUnique()
+                        .HasFilter("barcode IS NOT NULL");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("products", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_products_values", "purchase_price >= 0 AND sale_price >= 0 AND alert_threshold >= 0 AND (tracks_stock OR quantity_on_hand = 0)");
+                        });
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleLineRow", b =>
                 {
                     b.Property<Guid>("SaleId")
@@ -313,6 +388,60 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.StockMovementRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("QuantityDelta")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_delta");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "ProductId", "At");
+
+                    b.ToTable("stock_movements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0");
+                        });
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.UserRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -404,6 +533,15 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.HasOne("Soro.Infrastructure.Persistence.SessionRow", null)
                         .WithMany()
                         .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.StockMovementRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.ProductRow", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
