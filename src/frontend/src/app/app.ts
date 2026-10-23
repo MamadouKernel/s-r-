@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NetworkBanner } from './shell/network-banner';
+import { canManageStock } from './management/roles';
 import { AuthService } from './services/auth.service';
 import { CashService } from './services/cash.service';
 import { SyncService } from './services/sync.service';
@@ -18,6 +19,7 @@ export class App {
 
   protected readonly user = this.auth.user;
   protected readonly hasSession = computed(() => this.cash.session() !== null);
+  protected readonly showManagement = computed(() => this.auth.signedIn() && canManageStock(this.auth.user()?.role));
   protected readonly showMenu = computed(() => this.auth.device() !== null && (this.auth.signedIn() || this.hasSession()));
 
   protected async logout(): Promise<void> {

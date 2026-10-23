@@ -20,6 +20,9 @@
             <span class="amount ml-2 rounded bg-sauge px-2 text-sm">{{ sync.counts().pending }}</span>
           }
         </a>
+        @if (showManagement()) {
+          <a class="btn" routerLink="/gestion" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Gestion</a>
+        }
         @if (hasSession()) {
           <a class="btn" routerLink="/cloture" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Clôture</a>
         }

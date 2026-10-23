@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
+import { canManageCatalogue, canManageStock } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
@@ -22,4 +23,27 @@ export const userGuard: CanActivateFn = () => {
 export const openSessionGuard: CanActivateFn = () => {
   const router = inject(Router);
   return inject(CashService).session() ? true : router.parseUrl('/ouverture');
+};
+
+/**
+ * Espace « Gestion » : il faut être connecté avec un profil qui gère le stock. Les écrans parlent directement au serveur, qui
+ * applique les mêmes droits ; ce contrôle évite seulement d'afficher des pages inutilisables.
+ */
+export const managementGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canManageStock(auth.user()?.role) ? true : router.parseUrl('/vente');
+};
+
+/** Création et modification des fiches produit : propriétaire et gérant seulement (le magasinier réceptionne mais ne change pas les prix). */
+export const catalogueGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canManageCatalogue(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
 };
