@@ -144,3 +144,93 @@ public sealed class GetActivityReportHandler(ICurrentUser user, IReportingQuerie
             await queries.GetActivityAsync(user.Tenant, query.From, query.To, cancellationToken));
     }
 }
+
+public sealed record GetTopProductsQuery(DateTimeOffset From, DateTimeOffset To, RankingCriterion By, int? Limit);
+
+/// <summary>Classement des produits vendus (MV-01). La marge n'est ni classable ni lisible pour qui ne voit pas les prix d'achat.</summary>
+public sealed class GetTopProductsHandler(ICurrentUser user, IReportingQueries queries)
+{
+    public const int DefaultLimit = 10;
+    public const int MaxLimit = 50;
+
+    public async Task<Result<IReadOnlyList<ProductRanking>>> HandleAsync(
+        GetTopProductsQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        if (!RolePolicy.CanViewReports(user.Role))
+        {
+            return Result<IReadOnlyList<ProductRanking>>.Failure(ReportingRules.Forbidden);
+        }
+
+        var canSeeMargin = RolePolicy.CanSeePurchasePrice(user.Role);
+        if (query.By == RankingCriterion.Margin && !canSeeMargin)
+        {
+            return Result<IReadOnlyList<ProductRanking>>.Failure(
+                ApplicationError.Forbidden("Ce profil ne peut pas consulter les marges."));
+        }
+
+        if (ReportingRules.CheckPeriod(query.From, query.To) is { } invalid)
+        {
+            return Result<IReadOnlyList<ProductRanking>>.Failure(invalid);
+        }
+
+        var limit = Math.Clamp(query.Limit ?? DefaultLimit, 1, MaxLimit);
+        return Result<IReadOnlyList<ProductRanking>>.Success(
+            await queries.GetTopProductsAsync(user.Tenant, query.From, query.To, query.By, limit, canSeeMargin, cancellationToken));
+    }
+}
+
+/// <summary>Catégories du journal et les préfixes d'action qu'elles recouvrent (MV-02).</summary>
+public static class AuditCategories
+{
+    private static readonly Dictionary<string, string[]> Prefixes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["sales"] = ["sale."],
+        ["catalogue"] = ["product."],
+        ["stock"] = ["stock."],
+        ["team"] = ["user."],
+    };
+
+    public static IReadOnlyCollection<string> Names => Prefixes.Keys;
+
+    public static bool TryGetPrefixes(string category, out string[] prefixes) => Prefixes.TryGetValue(category, out prefixes!);
+}
+
+public sealed record ListAuditLogQuery(DateTimeOffset? From, DateTimeOffset? To, string? Category, int? Limit, int? Offset);
+
+/// <summary>Journal des actions sensibles (MV-02) : propriétaire et comptable, dans leur commerce.</summary>
+public sealed class ListAuditLogHandler(ICurrentUser user, IAuditLogQueries queries)
+{
+    public const int DefaultLimit = 50;
+    public const int MaxLimit = 200;
+
+    public async Task<Result<AuditPage>> HandleAsync(
+        ListAuditLogQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        if (!RolePolicy.CanReadAuditLog(user.Role))
+        {
+            return Result<AuditPage>.Failure(ApplicationError.Forbidden("Ce profil ne peut pas consulter le journal."));
+        }
+
+        if (ReportingRules.CheckPeriod(query.From, query.To) is { } invalid)
+        {
+            return Result<AuditPage>.Failure(invalid);
+        }
+
+        string[]? prefixes = null;
+        if (!string.IsNullOrWhiteSpace(query.Category) && !AuditCategories.TryGetPrefixes(query.Category.Trim(), out prefixes))
+        {
+            return Result<AuditPage>.Failure(ApplicationError.RuleViolation(
+                $"Catégorie inconnue : choisissez parmi {string.Join(", ", AuditCategories.Names)}."));
+        }
+
+        var filter = new AuditLogFilter(
+            query.From,
+            query.To,
+            prefixes,
+            Math.Clamp(query.Limit ?? DefaultLimit, 1, MaxLimit),
+            Math.Max(query.Offset ?? 0, 0));
+        return Result<AuditPage>.Success(await queries.ListAsync(user.Tenant, filter, cancellationToken));
+    }
+}

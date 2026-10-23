@@ -47,6 +47,8 @@ internal sealed class TestWorld
 
     public FakeReportingQueries Reporting { get; } = new();
 
+    public FakeAuditLogQueries AuditLog { get; } = new();
+
     public InMemoryProductRepository Products { get; } = new();
 
     public InMemoryStockMovementRepository Movements { get; } = new();
@@ -104,6 +106,10 @@ internal sealed class TestWorld
     public ListSessionsHandler ListSessions => new(Current, Reporting);
 
     public GetActivityReportHandler ActivityReport => new(Current, Reporting);
+
+    public GetTopProductsHandler TopProducts => new(Current, Reporting);
+
+    public ListAuditLogHandler ListAuditLog => new(Current, AuditLog);
 
     public void ActAs(UserId user, Role role) => Current.Become(user, role);
 

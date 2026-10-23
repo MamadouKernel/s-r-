@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { fakeApi, fakeTeamApi, render } from '../management/test-support';
 import { ApiError } from '../sync/sync-api';
-import { ActivityReport, DashboardApi, SessionSummary } from './dashboard-api';
+import { ActivityReport, DashboardApi, ProductRanking, SessionSummary } from './dashboard-api';
 import { DashboardPage } from './dashboard-page';
 
 const NOW = new Date(2026, 9, 23, 10, 42);
@@ -22,6 +22,7 @@ function fakeDashboardApi() {
     activity: vi.fn().mockResolvedValue(activity()),
     openSessions: vi.fn().mockResolvedValue([]),
     closedWithVariance: vi.fn().mockResolvedValue([]),
+    topProducts: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -32,6 +33,7 @@ async function open(options: {
   variances?: SessionSummary[];
   role?: string;
   online?: boolean;
+  ranking?: ProductRanking[];
   dashboard?: ReturnType<typeof fakeDashboardApi>;
   products?: ReturnType<typeof fakeApi>;
   team?: ReturnType<typeof fakeTeamApi>;
@@ -42,6 +44,10 @@ async function open(options: {
   );
   dashboard.openSessions.mockResolvedValue(options.open ?? []);
   dashboard.closedWithVariance.mockResolvedValue(options.variances ?? []);
+  // Un classement imposé écrase le comportement par défaut ; sans lui, un faux serveur fourni par le test garde le sien.
+  if (options.ranking || !options.dashboard) {
+    dashboard.topProducts.mockResolvedValue(options.ranking ?? []);
+  }
   const products = options.products ?? fakeApi();
   const team = options.team ?? fakeTeamApi();
   team.directory.mockResolvedValue([{ id: 'c-awa', displayName: 'Awa Koné' }, { id: 'c-issa', displayName: 'Issa Diallo' }]);
@@ -285,5 +291,97 @@ describe('DashboardPage', () => {
     });
     expect(page.root.querySelector('p.sr-only[role="status"]')?.textContent).toContain('Données actualisées à 10:42.');
     expect(page.root.querySelector('table')!.closest('div')!.classList.contains('relative')).toBe(true);
+  });
+
+  describe('best sellers', () => {
+    const item = (name: string, quantity: number, revenueFcfa: number, marginFcfa: number | null): ProductRanking => ({
+      productId: name, name, quantity, revenueFcfa, marginFcfa,
+    });
+    const ranking = [item('Savon', 30, 7_500, 4_500), item('Jus', 10, 6_000, 2_000), item('Fantôme', 2, 200, null)];
+
+    it('shows the ranking of the last 7 days by quantity by default, with quantity first and revenue below (SC-M1)', async () => {
+      const { page, dashboard } = await open({ ranking });
+      const [range, by, limit] = dashboard.topProducts.mock.calls[0];
+      expect(by).toBe('quantity');
+      expect(limit).toBe(5);
+      expect(range.from).toBe(new Date(2026, 9, 17).toISOString());
+      expect(range.to).toBe(NOW.toISOString());
+
+      const rows = [...page.root.querySelectorAll('#classement-titre ~ ol li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+      expect(rows[0]).toContain('1.');
+      expect(rows[0]).toContain('Savon');
+      expect(rows[0]).toContain('30 vendus');
+      expect(rows[0].replace(/\u00a0/g, ' ')).toContain('7 500 FCFA de chiffre d’affaires');
+      expect(rows[2]).toContain('Fantôme');
+    });
+
+    it('reloads only the ranking when the criterion or the period changes (SC-M1)', async () => {
+      const { page, dashboard } = await open({ ranking });
+      const activityCalls = dashboard.activity.mock.calls.length;
+
+      await page.click('Plus de chiffre d’affaires');
+      expect(dashboard.topProducts.mock.calls.at(-1)![1]).toBe('revenue');
+
+      await page.click('30 jours');
+      const [range, by] = dashboard.topProducts.mock.calls.at(-1)!;
+      expect(by).toBe('revenue');
+      expect(range.from).toBe(new Date(2026, 8, 24).toISOString());
+
+      await page.click('Aujourd’hui');
+      expect(dashboard.topProducts.mock.calls.at(-1)![0].from).toBe(new Date(2026, 9, 23).toISOString());
+      expect(dashboard.activity.mock.calls.length).toBe(activityCalls); // le reste n'est pas relu
+    });
+
+    it('puts the revenue first when ranking by revenue, and names the margin as an estimate when ranking by margin', async () => {
+      const { page } = await open({ ranking });
+      await page.click('Plus de chiffre d’affaires');
+      const firstRevenueRow = page.root.querySelector('#classement-titre ~ ol li')!.textContent!.replace(/\s+/g, ' ');
+      expect(firstRevenueRow.replace(/\u00a0/g, ' ')).toContain('7 500 FCFA');
+      expect(firstRevenueRow).toContain('30 vendus');
+
+      await page.click('Plus rentables');
+      const rows = [...page.root.querySelectorAll('#classement-titre ~ ol li')].map((li) => li.textContent!.replace(/\s+/g, ' ').replace(/\u00a0/g, ' '));
+      expect(rows[0]).toContain('4 500 FCFA');
+      expect(rows[2]).toContain('marge inconnue'); // SC-M4 : jamais une fausse marge
+      expect(page.has('Marge estimée d’après le prix d’achat actuel')).toBe(true);
+    });
+
+    it('marks the chosen criterion and period for assistive technologies, not only by colour', async () => {
+      const { page } = await open({ ranking });
+      const pressed = (label: string) =>
+        [...page.root.querySelectorAll('#classement-titre ~ div button')].find((button) => button.textContent?.includes(label))!.getAttribute('aria-pressed');
+      expect(pressed('Plus vendus')).toBe('true');
+      expect(pressed('Plus rentables')).toBe('false');
+      expect(pressed('7 jours')).toBe('true');
+      expect(pressed('30 jours')).toBe('false');
+    });
+
+    it('does not offer the margin to the accountant (SC-M3)', async () => {
+      const { page } = await open({ role: 'Accountant', ranking });
+      expect(page.has('Plus rentables')).toBe(false);
+      expect(page.has('Plus vendus')).toBe(true);
+      expect(page.has('Plus de chiffre d’affaires')).toBe(true);
+    });
+
+    it('says when there is no sale on the period', async () => {
+      const { page } = await open({ ranking: [] });
+      expect(page.has('Aucune vente sur cette période.')).toBe(true);
+    });
+
+    it('keeps the other blocks when the ranking fails, and says so in the block (SC-D6)', async () => {
+      const dashboard = fakeDashboardApi();
+      dashboard.topProducts.mockRejectedValue(new ApiError(500, 'internal_error', ''));
+      const { page } = await open({ today: activity({ salesCount: 1, netTotalFcfa: 1_000 }), dashboard });
+      expect(page.has(`1${NBSP}000${NBSP}FCFA`)).toBe(true);
+      expect(page.root.querySelector('#classement-titre')!.closest('section')!.querySelector('[role="alert"]')).toBeTruthy();
+    });
+
+    it('keeps the last ranking and warns when a refresh of it fails', async () => {
+      const { page, dashboard } = await open({ ranking });
+      dashboard.topProducts.mockRejectedValue(new ApiError(0, 'network', ''));
+      await page.click('Actualiser');
+      expect(page.has('Savon')).toBe(true);
+      expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('meilleures ventes');
+    });
   });
 });

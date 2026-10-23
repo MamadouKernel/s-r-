@@ -27,3 +27,10 @@ export function yesterdaySameTimeRange(now: Date): Range {
   const elapsed = Math.max(now.getTime() - todayStart.getTime(), ONE_SECOND_MS);
   return { from: yesterdayStart.toISOString(), to: new Date(yesterdayStart.getTime() + elapsed).toISOString() };
 }
+
+/** Les `days` derniers jours calendaires locaux, aujourd'hui compris, du minuit local d'il y a `days - 1` jours à maintenant. */
+export function lastDaysRange(now: Date, days: number): Range {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (Math.max(days, 1) - 1));
+  const end = new Date(Math.max(now.getTime(), start.getTime() + ONE_SECOND_MS));
+  return { from: start.toISOString(), to: end.toISOString() };
+}

@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
-import { canManageCatalogue, canManageStock, canManageTeam, canViewReports } from './management/roles';
+import { canManageCatalogue, canManageStock, canManageTeam, canReadAuditLog, canViewReports } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
@@ -66,4 +66,14 @@ export const reportsGuard: CanActivateFn = () => {
     return router.parseUrl('/connexion');
   }
   return canViewReports(auth.user()?.role) ? true : router.parseUrl('/vente');
+};
+
+/** Journal des actions sensibles : propriétaire et comptable ; les autres profils retombent sur la caisse. */
+export const auditGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canReadAuditLog(auth.user()?.role) ? true : router.parseUrl('/vente');
 };

@@ -64,7 +64,7 @@ public sealed class GetDirectoryHandler(ICurrentUser actor, IUserRepository user
 {
     public async Task<Result<IReadOnlyList<DirectoryEntry>>> HandleAsync(CancellationToken cancellationToken = default)
     {
-        if (!RolePolicy.CanManageStock(actor.Role))
+        if (!RolePolicy.CanReadDirectory(actor.Role))
         {
             return Result<IReadOnlyList<DirectoryEntry>>.Failure(
                 ApplicationError.Forbidden("Ce profil ne peut pas consulter l'annuaire."));

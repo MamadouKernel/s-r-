@@ -36,9 +36,35 @@ public interface IReportingQueries
         SessionsFilter filter,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Produits les plus vendus sur <c>[périodeDébut, périodeFin[</c>, ventes validées seulement. Quand <paramref name="includeMargin"/> est faux,
+    /// la marge est toujours <c>null</c> (profil sans accès aux prix d'achat).
+    /// </summary>
+    Task<IReadOnlyList<ProductRanking>> GetTopProductsAsync(
+        TenantId tenant,
+        DateTimeOffset periodStart,
+        DateTimeOffset periodEnd,
+        RankingCriterion criterion,
+        int limit,
+        bool includeMargin,
+        CancellationToken cancellationToken);
+
     Task<ActivityReport> GetActivityAsync(
         TenantId tenant,
         DateTimeOffset periodStart,
         DateTimeOffset periodEnd,
         CancellationToken cancellationToken);
+}
+
+public sealed record AuditLogFilter(
+    DateTimeOffset? From,
+    DateTimeOffset? To,
+    IReadOnlyList<string>? ActionPrefixes,
+    int Limit,
+    int Offset);
+
+/// <summary>Lecture du journal des actions sensibles : plus récentes d'abord, commerce du jeton uniquement.</summary>
+public interface IAuditLogQueries
+{
+    Task<AuditPage> ListAsync(TenantId tenant, AuditLogFilter filter, CancellationToken cancellationToken);
 }

@@ -21,3 +21,13 @@ export function canManageTeam(role: string | undefined): boolean {
 export function canViewReports(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager' || role === 'Accountant';
 }
+
+/** Marge estimée : il faut lire les rapports ET voir les prix d'achat, donc propriétaire et gérant (pas le comptable). */
+export function canSeeMargin(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager';
+}
+
+/** Journal des actions sensibles : propriétaire et comptable, comme le serveur. Le gérant, qu'il surveille aussi, n'y a pas accès. */
+export function canReadAuditLog(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Accountant';
+}
