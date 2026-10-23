@@ -1,6 +1,6 @@
 import { ApiError } from '../sync/sync-api';
 import { ProductStockPage } from './product-stock-page';
-import { fakeApi, product, render } from './test-support';
+import { fakeApi, fakeTeamApi, product, render } from './test-support';
 
 const movement = (overrides = {}) => ({
   id: 'm-1', kind: 'Reception', quantityDelta: 24, reason: 'Grossiste Koné', sourceId: null,
@@ -101,6 +101,33 @@ describe('ProductStockPage', () => {
     expect(page.root.querySelector('#perte-motif')!.closest('form')!.querySelector('[role="alert"]')?.textContent).toContain(
       'dépasse le stock disponible',
     );
+  });
+
+  it('names the author of each movement from the directory (SC-E7)', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-1' })]);
+    api.movements.mockResolvedValue([movement()]);
+    const teamApi = fakeTeamApi();
+    teamApi.directory.mockResolvedValue([{ id: '0a1b2c3d-aaaa-bbbb-cccc-111122223333', displayName: 'Moussa Traoré' }]);
+
+    const page = await render(ProductStockPage, { api, teamApi, role: 'StockKeeper', params: { id: 'p-1' } });
+
+    expect(page.has('Moussa Traoré')).toBe(true);
+    expect(page.has('0a1b2c3d')).toBe(false);
+    expect(page.has('Les noms des auteurs ne sont pas disponibles')).toBe(false);
+  });
+
+  it('falls back to the short identifier, and says so, when the directory cannot be read', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-1' })]);
+    api.movements.mockResolvedValue([movement()]);
+    const teamApi = fakeTeamApi();
+    teamApi.directory.mockRejectedValue(new ApiError(403, 'forbidden', ''));
+
+    const page = await render(ProductStockPage, { api, teamApi, role: 'StockKeeper', params: { id: 'p-1' } });
+
+    expect(page.has('0a1b2c3d')).toBe(true);
+    expect(page.has('Les noms des auteurs ne sont pas disponibles')).toBe(true);
   });
 
   it('keeps the history table inside a positioned scrolling container', async () => {

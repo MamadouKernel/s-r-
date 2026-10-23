@@ -10,6 +10,13 @@ public static class RolePolicy
     /// <summary>Consultation des ventes, des écarts de caisse et des rapports : le comptable lit sans modifier.</summary>
     public static bool CanViewReports(Role role) => role is Role.Owner or Role.Manager or Role.Accountant;
 
+    /// <summary>Lecture de l'équipe (identifiants, rôles, états) : propriétaire et gérant, ceux qui la gèrent.</summary>
+    public static bool CanListTeam(Role role) => IsManager(role);
+
+    /// <summary>Profils qu'un utilisateur peut créer ou désactiver, dans l'ordre des rôles.</summary>
+    public static IReadOnlyList<Role> AssignableRoles(Role actor) =>
+        Enum.GetValues<Role>().Where(target => CanManageRole(actor, target)).ToArray();
+
     /// <summary>Fiches produit et prix : gérant et propriétaire (cahier des charges, section 3).</summary>
     public static bool CanManageCatalogue(Role role) => IsManager(role);
 

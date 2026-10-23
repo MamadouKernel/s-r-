@@ -26,6 +26,8 @@ public static class ApplicationRegistration
         services.AddScoped<LogInHandler>();
         services.AddScoped<RegisterUserHandler>();
         services.AddScoped<DisableUserHandler>();
+        services.AddScoped<ListUsersHandler>();
+        services.AddScoped<GetDirectoryHandler>();
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<UpdateProductHandler>();
         services.AddScoped<DeactivateProductHandler>();

@@ -1,0 +1,28 @@
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+import { ManagementShell } from './management-shell';
+
+async function render(role: string) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [provideRouter([]), { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'X', role }) } }],
+  });
+  const fixture = TestBed.createComponent(ManagementShell);
+  await fixture.whenStable();
+  return (fixture.nativeElement as HTMLElement).textContent ?? '';
+}
+
+describe('ManagementShell', () => {
+  it('shows the team section to the owner and the manager', async () => {
+    expect(await render('Owner')).toContain('Équipe');
+    expect(await render('Manager')).toContain('Équipe');
+  });
+
+  it('keeps the team section away from the stock keeper, who still sees the products (SC-E3)', async () => {
+    const text = await render('StockKeeper');
+    expect(text).toContain('Produits et stock');
+    expect(text).not.toContain('Équipe');
+  });
+});

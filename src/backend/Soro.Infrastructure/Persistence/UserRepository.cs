@@ -26,6 +26,14 @@ public sealed class UserRepository(SoroDbContext db) : IUserRepository
         return row is null ? null : UserMapper.ToDomain(row);
     }
 
+    public async Task<IReadOnlyList<User>> ListAsync(TenantId tenant, CancellationToken cancellationToken)
+    {
+        var rows = await db.Users.AsNoTracking()
+            .Where(user => user.TenantId == tenant.Value)
+            .ToListAsync(cancellationToken);
+        return rows.Select(UserMapper.ToDomain).ToArray();
+    }
+
     public Task AddAsync(User user, CancellationToken cancellationToken)
     {
         db.Users.Add(UserMapper.ToRow(user));

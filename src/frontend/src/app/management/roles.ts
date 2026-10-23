@@ -11,3 +11,8 @@ export function canManageCatalogue(role: string | undefined): boolean {
 export function canManageStock(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager' || role === 'StockKeeper';
 }
+
+/** Écran Équipe : propriétaire et gérant, ceux que le serveur autorise à lire et à gérer l'équipe. */
+export function canManageTeam(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager';
+}

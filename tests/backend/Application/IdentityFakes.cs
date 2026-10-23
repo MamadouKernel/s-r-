@@ -18,6 +18,9 @@ internal sealed class InMemoryUserRepository : IUserRepository
     public Task<User?> FindByIdentifierAsync(TenantId tenant, string identifier, CancellationToken cancellationToken) =>
         Task.FromResult(_users.Values.FirstOrDefault(user => user.Tenant == tenant && user.Identifier == identifier));
 
+    public Task<IReadOnlyList<User>> ListAsync(TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<User>>(_users.Values.Where(user => user.Tenant == tenant).ToArray());
+
     public Task AddAsync(User user, CancellationToken cancellationToken)
     {
         Put(user);

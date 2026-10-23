@@ -59,6 +59,14 @@ Voir `docs/specs/gestion-produits-stock/spec.md`.
 - [x] T060 Service API de gestion et garde par profil — GES-01 à GES-05
 - [x] T061 Écrans liste, fiche produit, réception, perte, historique — GES-01 à GES-06 (auteur affiché par identifiant en attendant l'écran Équipe)
 
+## Équipe — lecture serveur et écran (V1)
+
+Voir `docs/specs/equipe/spec.md`.
+
+- [x] T070 Lecture de l'équipe et annuaire côté serveur — EQ-01, EQ-02
+- [x] T071 Écran Équipe : liste, ajout, désactivation — EQ-03 à EQ-05
+- [x] T072 Auteurs nommés dans l'historique du stock — EQ-06
+
 ## Consultation et rapports (V1)
 
 Voir `docs/specs/consultation-rapports/spec.md`.
