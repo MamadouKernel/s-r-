@@ -248,6 +248,23 @@ internal sealed class FakeReportingQueries : IReportingQueries
         return Task.FromResult<IReadOnlyList<SessionSummary>>([]);
     }
 
+    public RankingCriterion? LastCriterion { get; private set; }
+
+    public int? LastLimit { get; private set; }
+
+    public bool? LastIncludeMargin { get; private set; }
+
+    public Task<IReadOnlyList<ProductRanking>> GetTopProductsAsync(
+        TenantId tenant, DateTimeOffset periodStart, DateTimeOffset periodEnd, RankingCriterion criterion, int limit,
+        bool includeMargin, CancellationToken cancellationToken)
+    {
+        Record(nameof(GetTopProductsAsync), tenant);
+        LastCriterion = criterion;
+        LastLimit = limit;
+        LastIncludeMargin = includeMargin;
+        return Task.FromResult<IReadOnlyList<ProductRanking>>([]);
+    }
+
     public Task<ActivityReport> GetActivityAsync(
         TenantId tenant, DateTimeOffset periodStart, DateTimeOffset periodEnd, CancellationToken cancellationToken)
     {
@@ -259,5 +276,22 @@ internal sealed class FakeReportingQueries : IReportingQueries
     {
         _calls.Add(call);
         LastTenant = tenant;
+    }
+}
+
+internal sealed class FakeAuditLogQueries : IAuditLogQueries
+{
+    public TenantId? LastTenant { get; private set; }
+
+    public AuditLogFilter? LastFilter { get; private set; }
+
+    public int Calls { get; private set; }
+
+    public Task<AuditPage> ListAsync(TenantId tenant, AuditLogFilter filter, CancellationToken cancellationToken)
+    {
+        Calls++;
+        LastTenant = tenant;
+        LastFilter = filter;
+        return Task.FromResult(new AuditPage([], false));
     }
 }

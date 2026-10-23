@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
-import { catalogueGuard, managementGuard, reportsGuard, teamGuard } from './guards';
+import { auditGuard, catalogueGuard, managementGuard, reportsGuard, teamGuard } from './guards';
 import { AuthService } from './services/auth.service';
 
 function run(signedIn: boolean, role: string | undefined, guard = managementGuard) {
@@ -76,5 +76,21 @@ describe('reportsGuard', () => {
 
   it('sends a signed out visitor to the login', () => {
     expect(run(false, undefined, reportsGuard)).toBe('/connexion');
+  });
+});
+
+describe('auditGuard', () => {
+  it('lets the owner and the accountant read the journal', () => {
+    expect(['Owner', 'Accountant'].map((role) => run(true, role, auditGuard))).toEqual([true, true]);
+  });
+
+  it('keeps the manager, the cashier and the stock keeper out (SC-M8)', () => {
+    for (const role of ['Manager', 'Cashier', 'StockKeeper']) {
+      expect(run(true, role, auditGuard)).toBe('/vente');
+    }
+  });
+
+  it('sends a signed out visitor to the login', () => {
+    expect(run(false, undefined, auditGuard)).toBe('/connexion');
   });
 });

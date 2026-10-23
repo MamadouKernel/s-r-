@@ -82,3 +82,5 @@ export function hoursOpen(openedAt: string, now: Date): number {
 export function isStaleSession(openedAt: string, now: Date): boolean {
   return hoursOpen(openedAt, now) > STALE_AFTER_HOURS;
 }
+
+export type RankingCriterionName = 'quantity' | 'revenue' | 'margin';

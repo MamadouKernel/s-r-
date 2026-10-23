@@ -74,6 +74,15 @@ Voir `docs/specs/tableau-de-bord/spec.md`.
 - [x] T080 Périodes, indicateurs et service de lecture — TDB-01 à TDB-05
 - [x] T081 Page, droits, navigation, actualisation — TDB-06, TDB-07, SC-D5, SC-D8
 
+## Meilleures ventes et journal des actions sensibles (V1)
+
+Voir `docs/specs/meilleures-ventes-journal/spec.md`.
+
+- [x] T090 Classement des produits côté serveur — MV-01
+- [x] T091 Journal des actions sensibles et annuaire du comptable côté serveur — MV-02, MV-03
+- [x] T092 Bloc « Meilleures ventes » du tableau de bord — MV-04
+- [x] T093 Page Journal — MV-05
+
 ## Consultation et rapports (V1)
 
 Voir `docs/specs/consultation-rapports/spec.md`.

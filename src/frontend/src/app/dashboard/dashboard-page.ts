@@ -4,15 +4,28 @@ import { formatFcfa } from '../core/money';
 import { describeVariance } from '../core/variance';
 import { describeError } from '../management/errors';
 import { ProductsApi } from '../management/products-api';
-import { canManageStock } from '../management/roles';
+import { canManageStock, canSeeMargin } from '../management/roles';
 import { TeamApi } from '../management/team-api';
 import { AuthService } from '../services/auth.service';
 import { NetworkService } from '../services/network.service';
-import { ActivityReport, DashboardApi, SessionSummary } from './dashboard-api';
-import { averageBasket, describeVariation, hoursOpen, isStaleSession, paymentLabel, paymentShares, variation } from './metrics';
-import { startOfLocalDay, todayRange, yesterdaySameTimeRange } from './period';
+import { ActivityReport, DashboardApi, ProductRanking, SessionSummary } from './dashboard-api';
+import { averageBasket, describeVariation, hoursOpen, isStaleSession, paymentLabel, paymentShares, RankingCriterionName, variation } from './metrics';
+import { lastDaysRange, startOfLocalDay, todayRange, yesterdaySameTimeRange } from './period';
 
 const REFRESH_EVERY_MS = 60_000;
+const RANKING_SIZE = 5;
+
+const CRITERIA: readonly { value: RankingCriterionName; label: string }[] = [
+  { value: 'quantity', label: 'Plus vendus' },
+  { value: 'revenue', label: 'Plus de chiffre d’affaires' },
+  { value: 'margin', label: 'Plus rentables' },
+];
+
+const PERIODS: readonly { days: number; label: string }[] = [
+  { days: 1, label: 'Aujourd’hui' },
+  { days: 7, label: '7 jours' },
+  { days: 30, label: '30 jours' },
+];
 
 /** Un bloc de données lu séparément : un échec n'efface ni ne bloque les autres, et ses derniers chiffres restent visibles. */
 interface Block<T> {
@@ -147,6 +160,43 @@ interface SessionsBlock {
           </section>
         }
 
+        <section class="panel mb-3" aria-labelledby="classement-titre">
+          <h3 id="classement-titre" class="text-lg font-bold">Meilleures ventes</h3>
+          <div role="group" aria-label="Critère du classement" class="mt-2 flex flex-wrap gap-2">
+            @for (option of criteria(); track option.value) {
+              <button type="button" class="btn" [class.border-2]="criterion() === option.value" [class.border-feuille]="criterion() === option.value" [class.text-feuille]="criterion() === option.value" [attr.aria-pressed]="criterion() === option.value" (click)="selectCriterion(option.value)">{{ option.label }}</button>
+            }
+          </div>
+          <div role="group" aria-label="Période du classement" class="mt-2 flex flex-wrap gap-2">
+            @for (option of periods; track option.days) {
+              <button type="button" class="btn" [class.border-2]="rankingDays() === option.days" [class.border-feuille]="rankingDays() === option.days" [class.text-feuille]="rankingDays() === option.days" [attr.aria-pressed]="rankingDays() === option.days" (click)="selectDays(option.days)">{{ option.label }}</button>
+            }
+          </div>
+          @if (ranking().data; as items) {
+            @if (items.length === 0) {
+              <p class="mt-3 text-base text-ardoise">Aucune vente sur cette période.</p>
+            } @else {
+              <ol class="mt-3 divide-y divide-sauge">
+                @for (item of items; track item.productId; let index = $index) {
+                  <li class="py-2">
+                    <div class="flex items-baseline gap-2">
+                      <span class="amount w-6 shrink-0 text-ardoise">{{ index + 1 }}.</span>
+                      <span class="min-w-0 flex-1 font-semibold">{{ item.name }}</span>
+                      <span class="amount shrink-0 font-bold">{{ headline(item) }}</span>
+                    </div>
+                    <p class="amount pl-8 text-sm text-ardoise">{{ details(item) }}</p>
+                  </li>
+                }
+              </ol>
+              @if (criterion() === 'margin') {
+                <p class="field-help">Marge estimée d’après le prix d’achat actuel de chaque produit : elle peut s’écarter de la réalité si ce prix a changé.</p>
+              }
+            }
+          } @else if (ranking().error) {
+            <p class="field-error" role="alert">{{ ranking().error }}</p>
+          }
+        </section>
+
         <section class="panel mb-3" aria-labelledby="caisses-titre">
           <h3 id="caisses-titre" class="text-lg font-bold">Caisses</h3>
           @if (sessions().data; as data) {
@@ -224,6 +274,9 @@ export class DashboardPage implements OnInit, OnDestroy {
   protected readonly activity = signal<Block<ActivityBlock>>(empty());
   protected readonly sessions = signal<Block<SessionsBlock>>(empty());
   protected readonly stock = signal<Block<number>>(empty());
+  protected readonly ranking = signal<Block<ProductRanking[]>>(empty());
+  protected readonly criterion = signal<RankingCriterionName>('quantity');
+  protected readonly rankingDays = signal(7);
   protected readonly names = signal<ReadonlyMap<string, string>>(new Map());
   protected readonly refreshing = signal(false);
   protected readonly firstLoad = signal(true);
@@ -239,6 +292,9 @@ export class DashboardPage implements OnInit, OnDestroy {
   };
 
   protected readonly showStock = computed(() => canManageStock(this.auth.user()?.role));
+  /** La marge n'est proposée qu'à qui voit les prix d'achat : un comptable n'a que les deux autres classements. */
+  protected readonly criteria = computed(() => (canSeeMargin(this.auth.user()?.role) ? CRITERIA : CRITERIA.filter((option) => option.value !== 'margin')));
+  protected readonly periods = PERIODS;
   protected readonly trend = computed(() => {
     const data = this.activity().data;
     return data ? variation(data.today.netTotalFcfa, data.yesterday.netTotalFcfa) : { kind: 'none' as const, percent: 0 };
@@ -264,6 +320,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       this.activity().error && this.activity().data ? 'chiffres du jour' : '',
       this.sessions().error && this.sessions().data ? 'caisses' : '',
       this.stock().error && this.stock().data !== null ? 'stock' : '',
+      this.ranking().error && this.ranking().data ? 'meilleures ventes' : '',
     ].filter(Boolean);
     const at = this.activity().at;
     return failing.length > 0
@@ -301,6 +358,47 @@ export class DashboardPage implements OnInit, OnDestroy {
     return this.inFlight;
   }
 
+  protected selectCriterion(value: RankingCriterionName): void {
+    this.criterion.set(value);
+    void this.refreshRanking();
+  }
+
+  protected selectDays(days: number): void {
+    this.rankingDays.set(days);
+    void this.refreshRanking();
+  }
+
+  /** Premier chiffre de la ligne : celui du critère choisi. */
+  protected headline(item: ProductRanking): string {
+    switch (this.criterion()) {
+      case 'revenue':
+        return formatFcfa(item.revenueFcfa);
+      case 'margin':
+        return item.marginFcfa === null ? 'marge inconnue' : formatFcfa(item.marginFcfa);
+      default:
+        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
+    }
+  }
+
+  /** Les deux autres chiffres, pour comparer sans changer de classement. */
+  protected details(item: ProductRanking): string {
+    switch (this.criterion()) {
+      case 'revenue':
+        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
+      case 'margin':
+        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''} · ${formatFcfa(item.revenueFcfa)} de chiffre d’affaires`;
+      default:
+        return `${formatFcfa(item.revenueFcfa)} de chiffre d’affaires`;
+    }
+  }
+
+  /** Relit le seul classement (changement de critère ou de période) : le reste du tableau de bord n'est pas relu. */
+  private async refreshRanking(): Promise<void> {
+    const now = new Date();
+    const [result] = await Promise.allSettled([this.api.topProducts(lastDaysRange(now, this.rankingDays()), this.criterion(), RANKING_SIZE)]);
+    this.apply(this.ranking, result, now, (list) => list);
+  }
+
   protected nameOf(userId: string): string {
     return this.names().get(userId) ?? `Caissier ${userId.slice(0, 8)}`;
   }
@@ -332,11 +430,12 @@ export class DashboardPage implements OnInit, OnDestroy {
       const openedFrom = startOfLocalDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)).toISOString();
       const startOfToday = startOfLocalDay(now).getTime();
 
-      const [activity, sessions, stock, directory] = await Promise.allSettled([
+      const [activity, sessions, stock, directory, ranking] = await Promise.allSettled([
         Promise.all([this.api.activity(today), this.api.activity(yesterday)]),
         Promise.all([this.api.openSessions(), this.api.closedWithVariance(openedFrom, new Date(now.getTime() + 60_000).toISOString())]),
         this.showStock() ? this.products.lowStock() : Promise.resolve(null),
         this.team.directory(),
+        this.api.topProducts(lastDaysRange(now, this.rankingDays()), this.criterion(), RANKING_SIZE),
       ]);
 
       this.apply(this.activity, activity, now, ([todayReport, yesterdayReport]) => ({ today: todayReport, yesterday: yesterdayReport }));
@@ -349,6 +448,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       } else {
         this.apply(this.stock, stock as PromiseSettledResult<{ length: number }>, now, (list) => list.length);
       }
+      this.apply(this.ranking, ranking, now, (list) => list);
       if (directory.status === 'fulfilled') {
         this.names.set(new Map(directory.value.map((entry) => [entry.id, entry.displayName])));
       }

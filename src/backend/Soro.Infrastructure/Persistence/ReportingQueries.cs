@@ -144,6 +144,63 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<ProductRanking>> GetTopProductsAsync(
+        TenantId tenant,
+        DateTimeOffset periodStart,
+        DateTimeOffset periodEnd,
+        RankingCriterion criterion,
+        int limit,
+        bool includeMargin,
+        CancellationToken cancellationToken)
+    {
+        var start = periodStart.ToUniversalTime();
+        var end = periodEnd.ToUniversalTime();
+
+        // Ventes validées de la période seulement : une vente annulée ne compte dans aucun classement.
+        var lines = db.Sales.AsNoTracking()
+            .Where(sale => sale.TenantId == tenant.Value
+                && sale.Status == SaleStatus.Validated
+                && sale.RecordedAt >= start
+                && sale.RecordedAt < end)
+            .SelectMany(sale => sale.Lines);
+
+        var sold = await lines
+            .GroupBy(line => line.ProductId)
+            .Select(group => new
+            {
+                ProductId = group.Key,
+                FrozenName = group.Max(line => line.ProductName)!,
+                Quantity = group.Sum(line => line.Quantity),
+                Revenue = group.Sum(line => line.UnitPrice * line.Quantity),
+            })
+            .ToListAsync(cancellationToken);
+
+        // Fiches des produits vendus : nom actuel et, si permis, prix d'achat actuel (estimation de marge).
+        var ids = sold.Select(item => item.ProductId).ToList();
+        var products = ids.Count == 0
+            ? []
+            : await db.Products.AsNoTracking()
+                .Where(product => product.TenantId == tenant.Value && ids.Contains(product.Id))
+                .Select(product => new { product.Id, product.Name, product.PurchasePrice })
+                .ToDictionaryAsync(product => product.Id, cancellationToken);
+
+        var ranking = sold.Select(item =>
+        {
+            products.TryGetValue(item.ProductId, out var product);
+            long? margin = includeMargin && product is not null ? item.Revenue - (long)item.Quantity * product.PurchasePrice : null;
+            return new ProductRanking(item.ProductId, product?.Name ?? item.FrozenName, item.Quantity, item.Revenue, margin);
+        });
+
+        // Critère décroissant, puis le nom pour un ordre stable ; sans marge connue, un produit passe après ceux qui en ont une.
+        var ordered = criterion switch
+        {
+            RankingCriterion.Revenue => ranking.OrderByDescending(item => item.RevenueFcfa),
+            RankingCriterion.Margin => ranking.OrderByDescending(item => item.MarginFcfa.HasValue).ThenByDescending(item => item.MarginFcfa),
+            _ => ranking.OrderByDescending(item => item.Quantity),
+        };
+        return ordered.ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).Take(limit).ToArray();
+    }
+
     public async Task<ActivityReport> GetActivityAsync(
         TenantId tenant,
         DateTimeOffset periodStart,

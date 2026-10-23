@@ -10,6 +10,12 @@ public static class RolePolicy
     /// <summary>Consultation des ventes, des écarts de caisse et des rapports : le comptable lit sans modifier.</summary>
     public static bool CanViewReports(Role role) => role is Role.Owner or Role.Manager or Role.Accountant;
 
+    /// <summary>Journal des actions sensibles : propriétaire et comptable (surveillance et lecture), pas les profils qu'il surveille.</summary>
+    public static bool CanReadAuditLog(Role role) => role is Role.Owner or Role.Accountant;
+
+    /// <summary>Annuaire (identifiant et nom) pour nommer les auteurs : profils du stock et comptable.</summary>
+    public static bool CanReadDirectory(Role role) => CanManageStock(role) || role == Role.Accountant;
+
     /// <summary>Lecture de l'équipe (identifiants, rôles, états) : propriétaire et gérant, ceux qui la gèrent.</summary>
     public static bool CanListTeam(Role role) => IsManager(role);
 

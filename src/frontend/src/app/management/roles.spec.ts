@@ -1,4 +1,4 @@
-import { canManageCatalogue, canManageStock, canManageTeam, canViewReports } from './roles';
+import { canManageCatalogue, canManageStock, canManageTeam, canReadAuditLog, canSeeMargin, canViewReports } from './roles';
 
 describe('roles', () => {
   it('lets only the owner and the manager manage the catalogue', () => {
@@ -24,5 +24,17 @@ describe('roles', () => {
       true, true, true, false, false, false,
     ]);
     expect(canManageStock('Accountant')).toBe(false);
+  });
+
+  it('keeps the margin to the profiles that see purchase prices', () => {
+    expect(['Owner', 'Manager', 'Accountant', 'StockKeeper', 'Cashier', undefined].map(canSeeMargin)).toEqual([
+      true, true, false, false, false, false,
+    ]);
+  });
+
+  it('keeps the journal to the owner and the accountant, not the manager it also watches', () => {
+    expect(['Owner', 'Accountant', 'Manager', 'StockKeeper', 'Cashier', undefined].map(canReadAuditLog)).toEqual([
+      true, true, false, false, false, false,
+    ]);
   });
 });

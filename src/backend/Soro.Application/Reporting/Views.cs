@@ -68,3 +68,22 @@ public sealed record ActivityReport(
     int SessionsClosed,
     long ShortfallFcfa,
     long SurplusFcfa);
+
+/// <summary>Critère de classement des produits vendus (MV-01).</summary>
+public enum RankingCriterion
+{
+    Quantity,
+    Revenue,
+    Margin,
+}
+
+/// <summary>
+/// Un produit au classement. La marge est une <b>estimation</b> : prix de vente figé de la ligne moins le prix d'achat actuel de la fiche.
+/// Elle vaut <c>null</c> quand elle n'est pas permise au profil ou quand la fiche du produit n'existe plus.
+/// </summary>
+public sealed record ProductRanking(Guid ProductId, string Name, int Quantity, long RevenueFcfa, long? MarginFcfa);
+
+/// <summary>Une entrée du journal des actions sensibles (MV-02).</summary>
+public sealed record AuditEntryView(Guid Id, DateTimeOffset At, Guid UserId, string Action, Guid ResourceId, string Detail);
+
+public sealed record AuditPage(IReadOnlyList<AuditEntryView> Entries, bool HasMore);

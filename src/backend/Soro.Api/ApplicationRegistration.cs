@@ -40,6 +40,8 @@ public static class ApplicationRegistration
         services.AddScoped<GetSaleHandler>();
         services.AddScoped<ListSessionsHandler>();
         services.AddScoped<GetActivityReportHandler>();
+        services.AddScoped<GetTopProductsHandler>();
+        services.AddScoped<ListAuditLogHandler>();
         return services;
     }
 

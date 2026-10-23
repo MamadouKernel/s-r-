@@ -1,3 +1,4 @@
+using Soro.Application.Common;
 using Soro.Application.Reporting;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
@@ -13,6 +14,8 @@ internal static class ReportingEndpoints
         api.MapGet("/sales/{saleId:guid}", GetSaleAsync);
         api.MapGet("/register-sessions", ListSessionsAsync);
         api.MapGet("/reports/activity", GetActivityAsync);
+        api.MapGet("/reports/top-products", GetTopProductsAsync);
+        api.MapGet("/audit-log", ListAuditLogAsync);
         return api;
     }
 
@@ -57,6 +60,37 @@ internal static class ReportingEndpoints
         var query = new ListSessionsQuery(from, to, status, onlyWithVariance ?? false, limit, offset);
         return (await handler.HandleAsync(query, cancellationToken)).ToHttp(sessions => Results.Ok(sessions));
     }
+
+    private static async Task<IResult> GetTopProductsAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        string? by,
+        int? limit,
+        GetTopProductsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        // Le critère s'écrit en minuscules dans l'URL (quantity, revenue, margin) : on l'accepte sans tenir compte de la casse.
+        RankingCriterion criterion = RankingCriterion.Quantity;
+        if (!string.IsNullOrWhiteSpace(by) && !Enum.TryParse(by.Trim(), ignoreCase: true, out criterion))
+        {
+            return ResultHttpMapping.ToProblem(
+                ApplicationError.RuleViolation("Critère inconnu : choisissez parmi quantity, revenue, margin."));
+        }
+
+        var result = await handler.HandleAsync(new GetTopProductsQuery(from, to, criterion, limit), cancellationToken);
+        return result.ToHttp(ranking => Results.Ok(ranking));
+    }
+
+    private static async Task<IResult> ListAuditLogAsync(
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        string? category,
+        int? limit,
+        int? offset,
+        ListAuditLogHandler handler,
+        CancellationToken cancellationToken) =>
+        (await handler.HandleAsync(new ListAuditLogQuery(from, to, category, limit, offset), cancellationToken))
+            .ToHttp(page => Results.Ok(page));
 
     private static async Task<IResult> GetActivityAsync(
         DateTimeOffset from,
