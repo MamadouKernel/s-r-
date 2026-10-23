@@ -52,6 +52,13 @@ Voir `docs/specs/catalogue-stock/spec.md`.
 - [x] T044 Endpoints API catalogue et stock
 - [x] T045 Décrément du stock à la vente — STK-04
 
+## Gestion des produits et du stock — écrans (V1)
+
+Voir `docs/specs/gestion-produits-stock/spec.md`.
+
+- [x] T060 Service API de gestion et garde par profil — GES-01 à GES-05
+- [x] T061 Écrans liste, fiche produit, réception, perte, historique — GES-01 à GES-06 (auteur affiché par identifiant en attendant l'écran Équipe)
+
 ## Consultation et rapports (V1)
 
 Voir `docs/specs/consultation-rapports/spec.md`.

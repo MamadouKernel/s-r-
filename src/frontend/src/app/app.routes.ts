@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { deviceGuard, openSessionGuard, userGuard } from './guards';
+import { catalogueGuard, deviceGuard, managementGuard, openSessionGuard, userGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', loadComponent: () => import('./pages/device-page').then((m) => m.DevicePage) },
@@ -27,6 +27,31 @@ export const routes: Routes = [
     path: 'cloture',
     canActivate: [deviceGuard, userGuard, openSessionGuard],
     loadComponent: () => import('./pages/close-page').then((m) => m.ClosePage),
+  },
+  {
+    path: 'gestion',
+    canActivate: [deviceGuard, managementGuard],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'produits' },
+      {
+        path: 'produits',
+        loadComponent: () => import('./management/products-page').then((m) => m.ProductsPage),
+      },
+      {
+        path: 'produits/nouveau',
+        canActivate: [catalogueGuard],
+        loadComponent: () => import('./management/product-form-page').then((m) => m.ProductFormPage),
+      },
+      {
+        path: 'produits/:id',
+        canActivate: [catalogueGuard],
+        loadComponent: () => import('./management/product-form-page').then((m) => m.ProductFormPage),
+      },
+      {
+        path: 'produits/:id/stock',
+        loadComponent: () => import('./management/product-stock-page').then((m) => m.ProductStockPage),
+      },
+    ],
   },
   { path: '', pathMatch: 'full', redirectTo: 'vente' },
   { path: '**', redirectTo: 'vente' },
