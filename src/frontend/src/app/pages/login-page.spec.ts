@@ -8,11 +8,11 @@ import { CatalogueService } from '../services/catalogue.service';
 import { SyncService } from '../services/sync.service';
 import { LoginPage } from './login-page';
 
-async function render(login = vi.fn().mockResolvedValue(undefined), session: unknown = null) {
+async function render(login = vi.fn().mockResolvedValue(undefined), session: unknown = null, role: string | undefined = 'Cashier') {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: AuthService, useValue: { login } },
+      { provide: AuthService, useValue: { login, user: () => (role ? { id: 'u', displayName: 'X', role } : null) } },
       { provide: CashService, useValue: { session: signal(session).asReadonly() } },
       { provide: CatalogueService, useValue: { refresh: vi.fn().mockResolvedValue(undefined) } },
       { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null) } },
@@ -55,6 +55,14 @@ describe('LoginPage', () => {
 
     expect(login).toHaveBeenCalledWith(' awa ', '4321');
     expect(navigate).toHaveBeenCalledWith('/ouverture');
+  });
+
+  it('sends the owner to the dashboard after the login (SC-D8)', async () => {
+    const { type, submit, navigate } = await render(undefined, null, 'Owner');
+    await type('#identifiant', 'proprio');
+    await type('#pin', '0000');
+    await submit();
+    expect(navigate).toHaveBeenCalledWith('/tableau-de-bord');
   });
 
   it('goes straight to the sale screen when a session is already open', async () => {

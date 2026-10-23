@@ -5,10 +5,14 @@
 >
 
 <header class="border-b border-sauge bg-surface">
-  <div class="mx-auto flex max-w-screen-xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2">
+  <div class="mx-auto flex max-w-screen-xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
     <h1 class="text-2xl font-bold text-feuille">Sôrô</h1>
     @if (showMenu()) {
-      <nav aria-label="Navigation principale" class="flex flex-wrap gap-1">
+      <!-- Téléphone : la navigation tient sur une ligne qui défile dans son propre conteneur, pour laisser la place au contenu. -->
+      <nav aria-label="Navigation principale" class="order-last flex w-full gap-1 overflow-x-auto pb-1 md:order-none md:w-auto md:overflow-visible md:pb-0 [&>a]:shrink-0">
+        @if (showDashboard()) {
+          <a class="btn" routerLink="/tableau-de-bord" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Tableau de bord</a>
+        }
         @if (hasSession()) {
           <a class="btn" routerLink="/vente" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Vente</a>
         } @else {
@@ -29,9 +33,9 @@
       </nav>
     }
     @if (user(); as current) {
-      <div class="ml-auto flex items-center gap-3 text-base">
-        <span class="text-ardoise">{{ current.displayName }}</span>
-        <button type="button" class="btn" (click)="logout()">Se déconnecter</button>
+      <div class="ml-auto flex min-w-0 items-center gap-3 text-base">
+        <span class="hidden truncate text-ardoise sm:inline">{{ current.displayName }}</span>
+        <button type="button" class="btn" [attr.aria-label]="'Se déconnecter (' + current.displayName + ')'" (click)="logout()">Se déconnecter</button>
       </div>
     }
   </div>

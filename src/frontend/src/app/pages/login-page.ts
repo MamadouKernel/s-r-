@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService, loginErrorMessage } from '../services/auth.service';
+import { landingPath } from './landing';
 import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { SyncService } from '../services/sync.service';
@@ -75,7 +76,7 @@ export class LoginPage {
       // Catalogue frais et envoi de ce qui attendait (jeton expiré pendant une coupure) ; sans bloquer l'accès à la caisse.
       void this.catalogue.refresh();
       void this.sync.requestFlush();
-      await this.router.navigateByUrl(this.cash.session() ? '/vente' : '/ouverture');
+      await this.router.navigateByUrl(landingPath(this.auth.user()?.role, this.cash.session() !== null));
     } catch (error) {
       this.pin.set('');
       this.error.set(loginErrorMessage(error));

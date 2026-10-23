@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { catalogueGuard, deviceGuard, managementGuard, openSessionGuard, teamGuard, userGuard } from './guards';
+import { catalogueGuard, deviceGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', loadComponent: () => import('./pages/device-page').then((m) => m.DevicePage) },
@@ -27,6 +27,11 @@ export const routes: Routes = [
     path: 'cloture',
     canActivate: [deviceGuard, userGuard, openSessionGuard],
     loadComponent: () => import('./pages/close-page').then((m) => m.ClosePage),
+  },
+  {
+    path: 'tableau-de-bord',
+    canActivate: [deviceGuard, reportsGuard],
+    loadComponent: () => import('./dashboard/dashboard-page').then((m) => m.DashboardPage),
   },
   {
     path: 'gestion',
