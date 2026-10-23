@@ -13,6 +13,9 @@ public interface IUserRepository
     /// <param name="cancellationToken">Jeton d'annulation.</param>
     Task<User?> FindByIdentifierAsync(TenantId tenant, string identifier, CancellationToken cancellationToken);
 
+    /// <summary>Tous les utilisateurs du commerce, actifs ou non.</summary>
+    Task<IReadOnlyList<User>> ListAsync(TenantId tenant, CancellationToken cancellationToken);
+
     Task AddAsync(User user, CancellationToken cancellationToken);
 
     Task UpdateAsync(User user, CancellationToken cancellationToken);

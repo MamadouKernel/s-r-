@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { catalogueGuard, deviceGuard, managementGuard, openSessionGuard, userGuard } from './guards';
+import { catalogueGuard, deviceGuard, managementGuard, openSessionGuard, teamGuard, userGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', loadComponent: () => import('./pages/device-page').then((m) => m.DevicePage) },
@@ -31,6 +31,7 @@ export const routes: Routes = [
   {
     path: 'gestion',
     canActivate: [deviceGuard, managementGuard],
+    loadComponent: () => import('./management/management-shell').then((m) => m.ManagementShell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'produits' },
       {
@@ -50,6 +51,16 @@ export const routes: Routes = [
       {
         path: 'produits/:id/stock',
         loadComponent: () => import('./management/product-stock-page').then((m) => m.ProductStockPage),
+      },
+      {
+        path: 'equipe',
+        canActivate: [teamGuard],
+        loadComponent: () => import('./management/team-page').then((m) => m.TeamPage),
+      },
+      {
+        path: 'equipe/nouveau',
+        canActivate: [teamGuard],
+        loadComponent: () => import('./management/member-form-page').then((m) => m.MemberFormPage),
       },
     ],
   },

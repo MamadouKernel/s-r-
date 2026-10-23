@@ -5,6 +5,7 @@ import { AuthService } from '../services/auth.service';
 import { FlashService } from './flash.service';
 import { NetworkService } from '../services/network.service';
 import { ManagedProduct, ProductsApi } from './products-api';
+import { TeamApi, TeamMember } from './team-api';
 
 export const product = (overrides: Partial<ManagedProduct> = {}): ManagedProduct => ({
   id: 'p-1', name: "Jus d'orange 1L", barcode: '111', category: 'Boissons', purchasePriceFcfa: 400, salePriceFcfa: 600,
@@ -25,9 +26,24 @@ export function fakeApi() {
   };
 }
 
+export const member = (overrides: Partial<TeamMember> = {}): TeamMember => ({
+  id: 'u-1', identifier: 'awa', displayName: 'Awa Koné', role: 'Cashier', status: 'Active', createdAt: '2026-10-01T08:00:00.000Z',
+  lastLoginAt: null, lockedUntil: null, canDisable: true, isSelf: false, ...overrides,
+});
+
+/** Faux service d'équipe : annuaire vide par défaut, ce qui ramène l'auteur à son identifiant court. */
+export function fakeTeamApi() {
+  return {
+    team: vi.fn().mockResolvedValue({ users: [], assignableRoles: ['Cashier', 'StockKeeper'] }),
+    directory: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue(undefined),
+    disable: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 export async function render<T>(
   component: Type<T>,
-  options: { api: ReturnType<typeof fakeApi>; role?: string; params?: Record<string, string>; online?: boolean; flash?: string },
+  options: { api: ReturnType<typeof fakeApi>; teamApi?: ReturnType<typeof fakeTeamApi>; role?: string; params?: Record<string, string>; online?: boolean; flash?: string },
 ) {
   const flash = new FlashService();
   if (options.flash) {
@@ -38,6 +54,7 @@ export async function render<T>(
       provideRouter([]),
       { provide: FlashService, useValue: flash },
       { provide: ProductsApi, useValue: options.api },
+      { provide: TeamApi, useValue: options.teamApi ?? fakeTeamApi() },
       { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'Moussa', role: options.role ?? 'Manager' }) } },
       { provide: NetworkService, useValue: { online: signal(options.online ?? true) } },
       { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap(options.params ?? {}) } } },

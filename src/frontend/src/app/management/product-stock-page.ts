@@ -3,6 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { formatFcfa, parseFcfa } from '../core/money';
 import { AuthService } from '../services/auth.service';
 import { describeError } from './errors';
+import { TeamApi } from './team-api';
 import { ManagedProduct, MovementKind, ProductsApi, StockMovement } from './products-api';
 
 const KIND_LABEL: Record<MovementKind, string> = {
@@ -99,13 +100,15 @@ const KIND_LABEL: Record<MovementKind, string> = {
                       <td class="px-3 py-2 font-semibold">{{ kind(movement) }}</td>
                       <td class="amount px-3 py-2 text-right font-bold">{{ movement.quantityDelta > 0 ? '+' : '' }}{{ movement.quantityDelta }}</td>
                       <td class="px-3 py-2">{{ movement.reason || '—' }}</td>
-                      <td class="px-3 py-2 font-mono text-sm text-ardoise">{{ movement.userId.slice(0, 8) }}</td>
+                      <td class="px-3 py-2">{{ author(movement) }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
-            <p class="field-help">L’auteur est affiché par son identifiant en attendant l’écran Équipe.</p>
+            @if (names().size === 0) {
+              <p class="field-help">Les noms des auteurs ne sont pas disponibles : leur identifiant est affiché.</p>
+            }
           }
         </section>
       }
@@ -116,6 +119,10 @@ export class ProductStockPage implements OnInit {
   private readonly api = inject(ProductsApi);
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
+  private readonly team = inject(TeamApi);
+
+  /** Noms des auteurs (annuaire) ; vide si l'annuaire n'est pas disponible : l'identifiant court sert alors de repli. */
+  protected readonly names = signal<ReadonlyMap<string, string>>(new Map());
 
   protected readonly product = signal<ManagedProduct | null>(null);
   protected readonly movements = signal<StockMovement[]>([]);
@@ -213,6 +220,10 @@ export class ProductStockPage implements OnInit {
     );
   }
 
+  protected author(movement: StockMovement): string {
+    return this.names().get(movement.userId) ?? movement.userId.slice(0, 8);
+  }
+
   protected kind(movement: StockMovement): string {
     return KIND_LABEL[movement.kind] ?? movement.kind;
   }
@@ -234,6 +245,14 @@ export class ProductStockPage implements OnInit {
     }
   }
 
+  private async loadNames(): Promise<void> {
+    try {
+      this.names.set(new Map((await this.team.directory()).map((entry) => [entry.id, entry.displayName])));
+    } catch {
+      this.names.set(new Map());
+    }
+  }
+
   private async refresh(): Promise<void> {
     try {
       const includeInactive = this.auth.user()?.role === 'Owner' || this.auth.user()?.role === 'Manager';
@@ -244,6 +263,7 @@ export class ProductStockPage implements OnInit {
       }
       this.product.set(found);
       this.movements.set(await this.api.movements(this.id(), 50));
+      await this.loadNames();
     } catch (error) {
       this.loadError.set(describeError(error));
     }

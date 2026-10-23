@@ -75,6 +75,10 @@ internal sealed class TestWorld
 
     public RegisterUserHandler RegisterUser => new(Current, Users, Hasher, Clock, UnitOfWork);
 
+    public ListUsersHandler ListUsers => new(Current, Users, Clock);
+
+    public GetDirectoryHandler GetDirectory => new(Current, Users);
+
     public DisableUserHandler DisableUser => new(Current, Users, Audit, Clock, UnitOfWork);
 
     public CreateProductHandler CreateProduct => new(Current, Products, Audit, Clock, UnitOfWork);

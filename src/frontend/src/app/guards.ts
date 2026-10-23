@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
-import { canManageCatalogue, canManageStock } from './management/roles';
+import { canManageCatalogue, canManageStock, canManageTeam } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
@@ -46,4 +46,14 @@ export const catalogueGuard: CanActivateFn = () => {
     return router.parseUrl('/connexion');
   }
   return canManageCatalogue(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
+};
+
+/** Écran Équipe : propriétaire et gérant seulement ; les autres profils retombent sur la liste des produits. */
+export const teamGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canManageTeam(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
 };
