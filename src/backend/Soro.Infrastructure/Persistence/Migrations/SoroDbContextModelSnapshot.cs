@@ -93,11 +93,11 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<string>("OwnerPhone")
+                    b.Property<string>("OwnerEmail")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("owner_phone");
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("owner_email");
 
                     b.Property<DateTimeOffset>("TermsAcceptedAt")
                         .HasColumnType("timestamp with time zone")
@@ -118,12 +118,76 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.ToTable("commerces", (string)null);
                 });
 
-            modelBuilder.Entity("Soro.Infrastructure.Persistence.OwnerDirectoryRow", b =>
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.EmailVerificationRow", b =>
                 {
-                    b.Property<string>("Phone")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("LastSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_sent_at");
+
+                    b.Property<string>("Payload")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("phone");
+                        .HasColumnName("purpose");
+
+                    b.Property<int>("ResendCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("resend_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email", "Purpose", "CreatedAt");
+
+                    b.ToTable("email_verifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_email_verifications_counters", "attempts >= 0 AND resend_count >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.OwnerDirectoryRow", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -133,7 +197,7 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
-                    b.HasKey("Phone");
+                    b.HasKey("Email");
 
                     b.ToTable("owner_directory", (string)null);
                 });
@@ -192,70 +256,6 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.ToTable("sale_payments", null, t =>
                         {
                             t.HasCheckConstraint("ck_payments_values", "amount > 0 AND change >= 0 AND ((method IN ('Cash', 'Credit')) = (reference IS NULL))");
-                        });
-                });
-
-            modelBuilder.Entity("Soro.Infrastructure.Persistence.PhoneVerificationRow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("integer")
-                        .HasColumnName("attempts");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("code_hash");
-
-                    b.Property<DateTimeOffset?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("consumed_at");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTimeOffset>("LastSentAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_sent_at");
-
-                    b.Property<string>("Payload")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("payload");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("purpose");
-
-                    b.Property<int>("ResendCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("resend_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Phone", "Purpose", "CreatedAt");
-
-                    b.ToTable("phone_verifications", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_phone_verifications_counters", "attempts >= 0 AND resend_count >= 0");
                         });
                 });
 
@@ -597,6 +597,11 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
                     b.Property<int>("FailedAttempts")
                         .HasColumnType("integer")
                         .HasColumnName("failed_attempts");
@@ -619,11 +624,6 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("password_hash");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("phone");
 
                     b.Property<string>("PinHash")
                         .HasMaxLength(200)

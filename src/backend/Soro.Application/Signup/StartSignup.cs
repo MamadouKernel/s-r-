@@ -7,7 +7,7 @@ using Soro.Domain.Tenancy;
 namespace Soro.Application.Signup;
 
 public sealed record StartSignupCommand(
-    string Phone,
+    string Email,
     string CommerceName,
     ActivityType Activity,
     string OwnerName,
@@ -19,14 +19,14 @@ public sealed record SignupStarted(Guid VerificationId, DateTimeOffset ExpiresAt
 internal sealed record SignupPayload(string CommerceName, ActivityType Activity, string OwnerName, string TermsVersion);
 
 /// <summary>
-/// Première étape de l'inscription (INS-01, INS-02, INS-07) : valide les informations, vérifie que le numéro est libre et qu'il n'a pas
-/// épuisé son plafond quotidien, puis envoie un code par SMS. <b>Rien n'est créé</b> : ni commerce, ni utilisateur.
+/// Première étape de l'inscription (INS-01, INS-02, INS-07) : valide les informations, vérifie que l'adresse est libre et qu'il n'a pas
+/// épuisé son plafond quotidien, puis envoie un code par e-mail. <b>Rien n'est créé</b> : ni commerce, ni utilisateur.
 /// </summary>
 public sealed class StartSignupHandler(
     IOwnerDirectory directory,
-    IPhoneVerificationRepository verifications,
+    IEmailVerificationRepository verifications,
     IVerificationCodes codes,
-    ISmsSender sms,
+    IEmailSender mail,
     ISignupSettings settings,
     IClock clock,
     IUnitOfWork unitOfWork)
@@ -39,13 +39,13 @@ public sealed class StartSignupHandler(
     {
         var now = clock.UtcNow;
 
-        PhoneNumber phone;
+        EmailAddress email;
         try
         {
-            phone = PhoneNumber.Parse(command.Phone);
-            // Les mêmes règles que la création définitive, vérifiées avant d'envoyer le moindre SMS.
-            Commerce.Open(TenantId.New(), command.CommerceName, command.Activity, phone, settings.CurrentTermsVersion, now, settings.TrialDays);
-            User.RegisterOwner(UserId.New(), TenantId.New(), phone, command.OwnerName, "validation", now);
+            email = EmailAddress.Parse(command.Email);
+            // Les mêmes règles que la création définitive, vérifiées avant d'envoyer le moindre e-mail.
+            Commerce.Open(TenantId.New(), command.CommerceName, command.Activity, email, settings.CurrentTermsVersion, now, settings.TrialDays);
+            User.RegisterOwner(UserId.New(), TenantId.New(), email, command.OwnerName, "validation", now);
         }
         catch (DomainException exception)
         {
@@ -58,29 +58,53 @@ public sealed class StartSignupHandler(
                 ApplicationError.RuleViolation("Vous devez accepter les conditions d'utilisation en vigueur pour vous inscrire."));
         }
 
-        if (await directory.FindAsync(phone, cancellationToken) is not null)
+        if (await directory.FindAsync(email, cancellationToken) is not null)
         {
             return Result<SignupStarted>.Failure(new ApplicationError(
-                ErrorCodes.PhoneAlreadyRegistered, "Ce numéro a déjà un compte : connectez-vous avec votre mot de passe."));
+                ErrorCodes.EmailAlreadyRegistered, "Cette adresse e-mail a déjà un compte : connectez-vous avec votre mot de passe."));
         }
 
-        var started = await verifications.CountStartedSinceAsync(phone, VerificationPurpose.Signup, now.AddDays(-1), cancellationToken);
+        var started = await verifications.CountStartedSinceAsync(email, VerificationPurpose.Signup, now.AddDays(-1), cancellationToken);
         if (started >= MaxStartsPerDay)
         {
             return Result<SignupStarted>.Failure(new ApplicationError(
-                ErrorCodes.TooManyRequests, "Trop de demandes pour ce numéro aujourd'hui. Réessayez demain."));
+                ErrorCodes.TooManyRequests, "Trop de demandes pour cette adresse aujourd'hui. Réessayez demain."));
         }
 
         var code = codes.Generate();
         var id = Guid.CreateVersion7();
         var payload = JsonSerializer.Serialize(new SignupPayload(
             command.CommerceName.Trim(), command.Activity, command.OwnerName.Trim(), settings.CurrentTermsVersion));
-        var verification = PhoneVerification.Start(id, VerificationPurpose.Signup, phone, codes.Hash(id, code), payload, now);
+        var verification = EmailVerification.Start(id, VerificationPurpose.Signup, email, codes.Hash(id, code), payload, now);
 
         await verifications.AddAsync(verification, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
-        await sms.SendAsync(phone, SignupMessages.Verification(code), cancellationToken);
+        if (!await TrySendAsync(mail, email, SignupMessages.Verification(code), cancellationToken))
+        {
+            return Result<SignupStarted>.Failure(NotSent);
+        }
 
         return Result<SignupStarted>.Success(new SignupStarted(id, verification.ExpiresAt, verification.ResendAvailableAt));
+    }
+
+    internal static ApplicationError NotSent { get; } = new(
+        ErrorCodes.EmailNotSent,
+        "Nous n'avons pas pu envoyer l'e-mail. Vérifiez l'adresse ou réessayez dans quelques minutes.");
+
+    internal static async Task<bool> TrySendAsync(
+        IEmailSender mail,
+        EmailAddress recipient,
+        EmailMessage message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await mail.SendAsync(recipient, message, cancellationToken);
+            return true;
+        }
+        catch (EmailDeliveryException)
+        {
+            return false;
+        }
     }
 }

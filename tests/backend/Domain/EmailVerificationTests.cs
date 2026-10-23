@@ -3,13 +3,13 @@ using Soro.Domain.Tenancy;
 
 namespace Soro.Domain.Tests;
 
-public class PhoneVerificationTests
+public class EmailVerificationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 23, 9, 0, 0, TimeSpan.Zero);
-    private static readonly PhoneNumber Phone = PhoneNumber.Parse("0707070707");
+    private static readonly EmailAddress Email = EmailAddress.Parse("mamadou@exemple.ci");
 
-    private static PhoneVerification Start(VerificationPurpose purpose = VerificationPurpose.Signup, string? payload = "{}") =>
-        PhoneVerification.Start(Guid.NewGuid(), purpose, Phone, "hash-1", payload, Now);
+    private static EmailVerification Start(VerificationPurpose purpose = VerificationPurpose.Signup, string? payload = "{}") =>
+        EmailVerification.Start(Guid.NewGuid(), purpose, Email, "hash-1", payload, Now);
 
     [Fact]
     public void A_new_request_lasts_ten_minutes_and_allows_five_attempts()
@@ -17,7 +17,7 @@ public class PhoneVerificationTests
         var verification = Start();
 
         Assert.Equal(Now.AddMinutes(10), verification.ExpiresAt);
-        Assert.Equal(PhoneVerification.MaxAttempts, verification.AttemptsLeft);
+        Assert.Equal(EmailVerification.MaxAttempts, verification.AttemptsLeft);
         Assert.Equal(0, verification.ResendCount);
         Assert.True(verification.IsUsable(Now));
         Assert.Equal(Now.AddSeconds(60), verification.ResendAvailableAt);
@@ -38,7 +38,7 @@ public class PhoneVerificationTests
     {
         var verification = Start();
 
-        for (var attempt = 0; attempt < PhoneVerification.MaxAttempts; attempt++)
+        for (var attempt = 0; attempt < EmailVerification.MaxAttempts; attempt++)
         {
             Assert.True(verification.IsUsable(Now));
             verification.RecordFailedAttempt();
@@ -67,7 +67,7 @@ public class PhoneVerificationTests
         Assert.Throws<DomainException>(() => expired.Consume(Now.AddMinutes(11)));
 
         var blocked = Start();
-        for (var attempt = 0; attempt < PhoneVerification.MaxAttempts; attempt++)
+        for (var attempt = 0; attempt < EmailVerification.MaxAttempts; attempt++)
         {
             blocked.RecordFailedAttempt();
         }
@@ -89,7 +89,7 @@ public class PhoneVerificationTests
 
         Assert.Equal("hash-2", verification.CodeHash);
         Assert.Equal(1, verification.ResendCount);
-        Assert.Equal(PhoneVerification.MaxAttempts, verification.AttemptsLeft);
+        Assert.Equal(EmailVerification.MaxAttempts, verification.AttemptsLeft);
         Assert.Equal(Now.AddSeconds(60).AddMinutes(10), verification.ExpiresAt);
         Assert.Equal(Now.AddSeconds(120), verification.ResendAvailableAt);
     }
@@ -100,7 +100,7 @@ public class PhoneVerificationTests
         var verification = Start();
         var at = Now;
 
-        for (var resend = 0; resend < PhoneVerification.MaxResends; resend++)
+        for (var resend = 0; resend < EmailVerification.MaxResends; resend++)
         {
             at = at.AddSeconds(61);
             verification.Reissue($"hash-{resend}", at);
@@ -123,16 +123,16 @@ public class PhoneVerificationTests
     }
 
     [Fact]
-    public void Keeps_the_purpose_the_phone_and_the_payload()
+    public void Keeps_the_purpose_the_email_and_the_payload()
     {
         var verification = Start(VerificationPurpose.PasswordReset, payload: null);
 
         Assert.Equal(VerificationPurpose.PasswordReset, verification.Purpose);
-        Assert.Equal(Phone, verification.Phone);
+        Assert.Equal(Email, verification.Email);
         Assert.Null(verification.Payload);
     }
 
     [Fact]
     public void Refuses_a_blank_code_hash() =>
-        Assert.Throws<DomainException>(() => PhoneVerification.Start(Guid.NewGuid(), VerificationPurpose.Signup, Phone, " ", null, Now));
+        Assert.Throws<DomainException>(() => EmailVerification.Start(Guid.NewGuid(), VerificationPurpose.Signup, Email, " ", null, Now));
 }

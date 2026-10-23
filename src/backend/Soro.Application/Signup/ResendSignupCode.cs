@@ -7,9 +7,9 @@ public sealed record ResendSignupCodeCommand(Guid VerificationId);
 
 /// <summary>Renvoi du code (INS-02) : au plus 3 fois, pas avant 60 secondes ; le nouveau code remplace l'ancien.</summary>
 public sealed class ResendSignupCodeHandler(
-    IPhoneVerificationRepository verifications,
+    IEmailVerificationRepository verifications,
     IVerificationCodes codes,
-    ISmsSender sms,
+    IEmailSender mail,
     IClock clock,
     IUnitOfWork unitOfWork)
 {
@@ -25,7 +25,7 @@ public sealed class ResendSignupCodeHandler(
             return Result<SignupStarted>.Failure(Expired);
         }
 
-        if (verification.ResendCount >= PhoneVerification.MaxResends)
+        if (verification.ResendCount >= EmailVerification.MaxResends)
         {
             return Result<SignupStarted>.Failure(new ApplicationError(
                 ErrorCodes.TooManyRequests, "Nombre maximal de renvois atteint : recommencez l'inscription."));
@@ -42,7 +42,10 @@ public sealed class ResendSignupCodeHandler(
         verification.Reissue(codes.Hash(verification.Id, code), now);
         await verifications.UpdateAsync(verification, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
-        await sms.SendAsync(verification.Phone, SignupMessages.Verification(code), cancellationToken);
+        if (!await StartSignupHandler.TrySendAsync(mail, verification.Email, SignupMessages.Verification(code), cancellationToken))
+        {
+            return Result<SignupStarted>.Failure(StartSignupHandler.NotSent);
+        }
 
         return Result<SignupStarted>.Success(
             new SignupStarted(verification.Id, verification.ExpiresAt, verification.ResendAvailableAt));

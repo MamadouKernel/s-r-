@@ -17,17 +17,17 @@ public class OwnerLogInTests
     {
         var world = new TestWorld();
         var started = (await world.StartSignup.HandleAsync(
-            new StartSignupCommand("0707070707", "Supérette du Carrefour", ActivityType.Supermarket, "Mamadou Konaté", "2026-10-brouillon"))).Value!;
-        var owner = (await world.CompleteSignup.HandleAsync(new CompleteSignupCommand(started.VerificationId, world.Sms.LastCode, Password))).Value!;
+            new StartSignupCommand("mamadou@exemple.ci", "Supérette du Carrefour", ActivityType.Supermarket, "Mamadou Konaté", "2026-10-brouillon"))).Value!;
+        var owner = (await world.CompleteSignup.HandleAsync(new CompleteSignupCommand(started.VerificationId, world.Mail.LastCode, Password))).Value!;
         return (world, owner);
     }
 
     [Fact]
-    public async Task The_owner_logs_in_with_the_phone_in_any_spelling_and_the_password()
+    public async Task The_owner_logs_in_with_the_email_in_any_spelling_and_the_password()
     {
         var (world, owner) = await Registered();
 
-        foreach (var spelling in new[] { "0707070707", "+225 07 07 07 07 07", "07.07.07.07.07" })
+        foreach (var spelling in new[] { "mamadou@exemple.ci", "  Mamadou@Exemple.CI ", "MAMADOU@exemple.ci" })
         {
             var result = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand(spelling, Password));
 
@@ -42,14 +42,14 @@ public class OwnerLogInTests
     }
 
     [Fact]
-    public async Task A_wrong_password_an_unknown_phone_a_malformed_phone_and_a_disabled_account_get_the_same_answer()
+    public async Task A_wrong_password_an_unknown_email_a_malformed_email_and_a_disabled_account_get_the_same_answer()
     {
         var (world, owner) = await Registered();
-        var wrongPassword = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", WrongPassword));
-        var unknown = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0505050505", Password));
-        var malformed = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("pas un numéro", Password));
+        var wrongPassword = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword));
+        var unknown = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("awa@exemple.ci", Password));
+        var malformed = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("pas une adresse", Password));
         (await world.Users.GetAsync(owner.UserId, owner.Tenant, CancellationToken.None))!.Disable();
-        var disabled = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password));
+        var disabled = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password));
 
         var answers = new[] { wrongPassword, unknown, malformed, disabled }.Select(result => (result.Error!.Code, result.Error.Message)).Distinct().ToList();
         Assert.Single(answers); // SC-I8
@@ -57,12 +57,12 @@ public class OwnerLogInTests
     }
 
     [Fact]
-    public async Task An_unknown_phone_costs_as_much_calculation_as_a_known_one()
+    public async Task An_unknown_email_costs_as_much_calculation_as_a_known_one()
     {
         var (world, _) = await Registered();
 
-        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0505050505", Password));
-        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("pas un numéro", Password));
+        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("awa@exemple.ci", Password));
+        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("pas une adresse", Password));
 
         Assert.Equal(2, world.Passwords.DummyVerifications);
     }
@@ -73,10 +73,10 @@ public class OwnerLogInTests
         var (world, _) = await Registered();
         for (var i = 0; i < User.MaxFailedAttempts; i++)
         {
-            Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", WrongPassword))).Error!.Code);
+            Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword))).Error!.Code);
         }
 
-        var locked = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password));
+        var locked = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password));
 
         Assert.Equal(ErrorCodes.AccountLocked, locked.Error!.Code);
     }
@@ -87,11 +87,11 @@ public class OwnerLogInTests
         var (world, _) = await Registered();
         for (var i = 0; i < User.MaxFailedAttempts; i++)
         {
-            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", WrongPassword));
+            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword));
         }
 
         world.Clock.UtcNow = world.Clock.UtcNow.Add(User.LockDuration).AddSeconds(1);
-        var result = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password));
+        var result = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password));
 
         Assert.True(result.IsSuccess);
     }
@@ -102,11 +102,11 @@ public class OwnerLogInTests
         var (world, owner) = await Registered();
         for (var i = 0; i < User.MaxFailedAttempts - 1; i++)
         {
-            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", WrongPassword));
+            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword));
         }
 
         world.Clock.UtcNow = world.Clock.UtcNow.AddHours(1);
-        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password));
+        await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password));
 
         var user = (await world.Users.GetAsync(owner.UserId, owner.Tenant, CancellationToken.None))!;
         Assert.Equal(0, user.FailedAttempts);
@@ -118,9 +118,9 @@ public class OwnerLogInTests
     {
         var (world, owner) = await Registered();
         var cashier = world.GivenUser("awa", "1234", Role.Cashier, owner.Tenant);
-        await world.OwnerDirectory.AddAsync(new OwnerAccount(PhoneNumber.Parse("0505050505"), owner.Tenant, cashier.Id), CancellationToken.None);
+        await world.OwnerDirectory.AddAsync(new OwnerAccount(EmailAddress.Parse("awa@exemple.ci"), owner.Tenant, cashier.Id), CancellationToken.None);
 
-        var result = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0505050505", "1234"));
+        var result = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("awa@exemple.ci", "1234"));
 
         Assert.Equal(ErrorCodes.InvalidCredentials, result.Error!.Code);
     }
@@ -136,31 +136,44 @@ public class PasswordResetTests
     {
         var world = new TestWorld();
         var started = (await world.StartSignup.HandleAsync(
-            new StartSignupCommand("0707070707", "Supérette du Carrefour", ActivityType.Supermarket, "Mamadou Konaté", "2026-10-brouillon"))).Value!;
-        var owner = (await world.CompleteSignup.HandleAsync(new CompleteSignupCommand(started.VerificationId, world.Sms.LastCode, Password))).Value!;
+            new StartSignupCommand("mamadou@exemple.ci", "Supérette du Carrefour", ActivityType.Supermarket, "Mamadou Konaté", "2026-10-brouillon"))).Value!;
+        var owner = (await world.CompleteSignup.HandleAsync(new CompleteSignupCommand(started.VerificationId, world.Mail.LastCode, Password))).Value!;
         world.Clock.UtcNow = world.Clock.UtcNow.AddHours(2);
         return (world, owner);
     }
 
     [Fact]
-    public async Task A_known_number_receives_a_code_and_an_unknown_one_gets_the_same_answer_without_any_sms()
+    public async Task A_known_email_receives_a_code_and_an_unknown_one_gets_the_same_answer_without_any_email()
     {
         var (world, _) = await Registered();
-        var before = world.Sms.Sent.Count;
+        var before = world.Mail.Sent.Count;
 
-        var known = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        var smsAfterKnown = world.Sms.Sent.Count;
-        var unknown = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0505050505"));
+        var known = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var mailAfterKnown = world.Mail.Sent.Count;
+        var unknown = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("awa@exemple.ci"));
 
         Assert.True(known.IsSuccess);
         Assert.True(unknown.IsSuccess);
         Assert.Equal(known.Value, unknown.Value); // SC-I9 : même réponse
-        Assert.Equal(before + 1, smsAfterKnown);
-        Assert.Equal(smsAfterKnown, world.Sms.Sent.Count);
+        Assert.Equal(before + 1, mailAfterKnown);
+        Assert.Equal(mailAfterKnown, world.Mail.Sent.Count);
     }
 
     [Fact]
-    public async Task A_malformed_number_is_the_only_thing_reported_and_it_reveals_nothing_about_accounts()
+    public async Task A_mail_server_failure_is_invisible_so_the_answer_never_reveals_an_account()
+    {
+        var (world, _) = await Registered();
+        world.Mail.Failing = true;
+
+        var known = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var unknown = await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("awa@exemple.ci"));
+
+        Assert.True(known.IsSuccess);
+        Assert.Equal(known.Value, unknown.Value);
+    }
+
+    [Fact]
+    public async Task A_malformed_address_is_the_only_thing_reported_and_it_reveals_nothing_about_accounts()
     {
         var (world, _) = await Registered();
 
@@ -173,27 +186,27 @@ public class PasswordResetTests
     public async Task At_most_three_requests_a_day_and_the_fourth_is_silent()
     {
         var (world, _) = await Registered();
-        var before = world.Sms.Sent.Count;
+        var before = world.Mail.Sent.Count;
 
         for (var i = 0; i < 4; i++)
         {
-            Assert.True((await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"))).IsSuccess);
+            Assert.True((await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"))).IsSuccess);
         }
 
-        Assert.Equal(before + StartSignupHandler.MaxStartsPerDay, world.Sms.Sent.Count);
+        Assert.Equal(before + StartSignupHandler.MaxStartsPerDay, world.Mail.Sent.Count);
     }
 
     [Fact]
     public async Task The_right_code_sets_the_new_password_the_old_one_stops_working_and_the_action_is_audited()
     {
         var (world, owner) = await Registered();
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
 
-        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("07 07 07 07 07", world.Sms.LastCode, NewPassword));
+        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("  Mamadou@Exemple.CI ", world.Mail.LastCode, NewPassword));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password))).Error!.Code);
-        Assert.True((await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", NewPassword))).IsSuccess);
+        Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password))).Error!.Code);
+        Assert.True((await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", NewPassword))).IsSuccess);
         Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.PasswordReset && entry.Tenant == owner.Tenant && entry.User == owner.UserId);
         Assert.DoesNotContain(NewPassword, string.Join(' ', world.Audit.Entries.Select(entry => entry.Detail)));
     }
@@ -204,24 +217,24 @@ public class PasswordResetTests
         var (world, _) = await Registered();
         for (var i = 0; i < User.MaxFailedAttempts; i++)
         {
-            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", WrongPassword));
+            await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword));
         }
 
-        Assert.Equal(ErrorCodes.AccountLocked, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", Password))).Error!.Code);
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", world.Sms.LastCode, NewPassword));
+        Assert.Equal(ErrorCodes.AccountLocked, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password))).Error!.Code);
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", world.Mail.LastCode, NewPassword));
 
-        Assert.True((await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", NewPassword))).IsSuccess);
+        Assert.True((await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", NewPassword))).IsSuccess);
     }
 
     [Fact]
     public async Task Every_code_error_gets_the_same_message_whether_or_not_a_request_exists()
     {
         var (world, _) = await Registered();
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
 
-        var wrongCode = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", "000000", NewPassword));
-        var noRequest = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0505050505", "000000", NewPassword));
+        var wrongCode = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", "000000", NewPassword));
+        var noRequest = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("awa@exemple.ci", "000000", NewPassword));
         var malformed = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("zzz", "000000", NewPassword));
 
         var messages = new[] { wrongCode, noRequest, malformed }.Select(result => (result.Error!.Code, result.Error.Message)).Distinct().ToList();
@@ -233,43 +246,43 @@ public class PasswordResetTests
     public async Task Five_wrong_codes_block_the_request_even_for_the_right_code()
     {
         var (world, _) = await Registered();
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        var right = world.Sms.LastCode;
-        for (var i = 0; i < PhoneVerification.MaxAttempts; i++)
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var right = world.Mail.LastCode;
+        for (var i = 0; i < EmailVerification.MaxAttempts; i++)
         {
-            await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", "000000", NewPassword));
+            await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", "000000", NewPassword));
         }
 
-        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", right, NewPassword));
+        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", right, NewPassword));
 
         Assert.Equal(ErrorCodes.InvalidCode, result.Error!.Code);
-        Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("0707070707", NewPassword))).Error!.Code);
+        Assert.Equal(ErrorCodes.InvalidCredentials, (await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", NewPassword))).Error!.Code);
     }
 
     [Fact]
     public async Task An_expired_code_and_a_used_code_are_refused()
     {
         var (world, _) = await Registered();
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        var code = world.Sms.LastCode;
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var code = world.Mail.LastCode;
         world.Clock.UtcNow = world.Clock.UtcNow.AddMinutes(11);
-        Assert.Equal(ErrorCodes.InvalidCode, (await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", code, NewPassword))).Error!.Code);
+        Assert.Equal(ErrorCodes.InvalidCode, (await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", code, NewPassword))).Error!.Code);
 
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        var fresh = world.Sms.LastCode;
-        Assert.True((await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", fresh, NewPassword))).IsSuccess);
-        Assert.Equal(ErrorCodes.InvalidCode, (await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", fresh, "Autre-mot-2028"))).Error!.Code);
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var fresh = world.Mail.LastCode;
+        Assert.True((await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", fresh, NewPassword))).IsSuccess);
+        Assert.Equal(ErrorCodes.InvalidCode, (await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", fresh, "Autre-mot-2028"))).Error!.Code);
     }
 
     [Fact]
     public async Task A_weak_new_password_is_refused_and_does_not_consume_the_code()
     {
         var (world, _) = await Registered();
-        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("0707070707"));
-        var code = world.Sms.LastCode;
+        await world.StartPasswordReset.HandleAsync(new StartPasswordResetCommand("mamadou@exemple.ci"));
+        var code = world.Mail.LastCode;
 
-        var weak = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", code, "court1"));
-        var strong = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", code, NewPassword));
+        var weak = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", code, "court1"));
+        var strong = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", code, NewPassword));
 
         Assert.Equal(ErrorCodes.RuleViolation, weak.Error!.Code);
         Assert.True(strong.IsSuccess);
@@ -280,14 +293,14 @@ public class PasswordResetTests
     {
         var (world, _) = await Registered();
         // La demande d'inscription (déjà consommée) ne sert à rien ici : sans demande de réinitialisation, tout code est refusé.
-        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("0707070707", "111111", NewPassword));
+        var result = await world.ConfirmPasswordReset.HandleAsync(new ConfirmPasswordResetCommand("mamadou@exemple.ci", "111111", NewPassword));
         Assert.Equal(ErrorCodes.InvalidCode, result.Error!.Code);
     }
 }
 
 public class PasswordPolicyTests
 {
-    private static readonly PhoneNumber Phone = PhoneNumber.Parse("0707070707");
+    private static readonly EmailAddress Email = EmailAddress.Parse("mamadou@exemple.ci");
 
     [Theory]
     [InlineData("Soro-caisse-2026")]
@@ -295,7 +308,7 @@ public class PasswordPolicyTests
     [InlineData("Été-chaud-2026")]
     [InlineData("1234567890a")]
     public void Accepts_a_long_enough_password_with_a_letter_and_a_digit(string password) =>
-        Assert.Null(PasswordPolicy.Check(password, Phone));
+        Assert.Null(PasswordPolicy.Check(password, Email));
 
     [Theory]
     [InlineData(null, "Choisissez")]
@@ -305,20 +318,19 @@ public class PasswordPolicyTests
     [InlineData("uniquementdeslettres", "une lettre et un chiffre")]
     [InlineData("12345678901234", "une lettre et un chiffre")]
     public void Refuses_a_short_or_single_kind_password_with_a_clear_reason(string? password, string reason) =>
-        Assert.Contains(reason, PasswordPolicy.Check(password, Phone));
+        Assert.Contains(reason, PasswordPolicy.Check(password, Email));
 
     [Theory]
-    [InlineData("Moi0707070707ici")]
-    [InlineData("+2250707070707abc")]
-    [InlineData("07-07-07-07-07-a")]
-    public void Refuses_a_password_that_contains_the_phone_number(string password) =>
-        Assert.Contains("numéro de téléphone", PasswordPolicy.Check(password, Phone));
+    [InlineData("Mamadou2026Boutique")]
+    [InlineData("x-mamadou@exemple.ci-1")]
+    public void Refuses_a_password_that_contains_the_email(string password) =>
+        Assert.Contains("adresse e-mail", PasswordPolicy.Check(password, Email));
 
     [Fact]
     public void Refuses_a_password_over_128_characters() =>
-        Assert.Contains("128", PasswordPolicy.Check(new string('a', 127) + "12", Phone));
+        Assert.Contains("128", PasswordPolicy.Check(new string('a', 127) + "12", Email));
 
     [Fact]
     public void Accepts_exactly_128_characters() =>
-        Assert.Null(PasswordPolicy.Check(new string('a', 126) + "12", Phone));
+        Assert.Null(PasswordPolicy.Check(new string('a', 126) + "12", Email));
 }

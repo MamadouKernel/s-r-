@@ -19,7 +19,7 @@ public sealed class Commerce
         TenantId id,
         string name,
         ActivityType activity,
-        PhoneNumber ownerPhone,
+        EmailAddress ownerEmail,
         string formula,
         DateTimeOffset createdAt,
         DateTimeOffset trialEndsAt,
@@ -29,7 +29,7 @@ public sealed class Commerce
         Id = id;
         Name = name;
         Activity = activity;
-        OwnerPhone = ownerPhone;
+        OwnerEmail = ownerEmail;
         Formula = formula;
         CreatedAt = createdAt;
         TrialEndsAt = trialEndsAt;
@@ -43,7 +43,7 @@ public sealed class Commerce
 
     public ActivityType Activity { get; }
 
-    public PhoneNumber OwnerPhone { get; }
+    public EmailAddress OwnerEmail { get; }
 
     public string Formula { get; }
 
@@ -60,7 +60,7 @@ public sealed class Commerce
         TenantId id,
         string name,
         ActivityType activity,
-        PhoneNumber ownerPhone,
+        EmailAddress ownerEmail,
         string termsVersion,
         DateTimeOffset now,
         int trialDays = DefaultTrialDays)
@@ -72,7 +72,7 @@ public sealed class Commerce
         Ensure.That(!string.IsNullOrWhiteSpace(termsVersion), "L'acceptation des conditions d'utilisation est obligatoire.");
         Ensure.That(trialDays is >= 1 and <= MaxTrialDays, "La durée de l'essai gratuit est invalide.");
 
-        return new Commerce(id, trimmed, activity, ownerPhone, DefaultFormula, now, now.AddDays(trialDays), termsVersion.Trim(), now);
+        return new Commerce(id, trimmed, activity, ownerEmail, DefaultFormula, now, now.AddDays(trialDays), termsVersion.Trim(), now);
     }
 
     public bool IsTrialOver(DateTimeOffset now) => now >= TrialEndsAt;
@@ -82,11 +82,11 @@ public sealed class Commerce
         TenantId id,
         string name,
         ActivityType activity,
-        PhoneNumber ownerPhone,
+        EmailAddress ownerEmail,
         string formula,
         DateTimeOffset createdAt,
         DateTimeOffset trialEndsAt,
         string termsVersion,
         DateTimeOffset termsAcceptedAt) =>
-        new(id, name, activity, ownerPhone, formula, createdAt, trialEndsAt, termsVersion, termsAcceptedAt);
+        new(id, name, activity, ownerEmail, formula, createdAt, trialEndsAt, termsVersion, termsAcceptedAt);
 }

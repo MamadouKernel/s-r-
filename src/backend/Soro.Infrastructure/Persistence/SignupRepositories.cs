@@ -5,60 +5,60 @@ using Soro.Domain.Tenancy;
 
 namespace Soro.Infrastructure.Persistence;
 
-public sealed class PhoneVerificationRepository(SoroDbContext db) : IPhoneVerificationRepository
+public sealed class EmailVerificationRepository(SoroDbContext db) : IEmailVerificationRepository
 {
-    public async Task<PhoneVerification?> GetAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<EmailVerification?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
-        var row = await db.PhoneVerifications.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var row = await db.EmailVerifications.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         return row is null ? null : Map(row);
     }
 
-    public async Task<PhoneVerification?> FindLatestPendingAsync(
-        PhoneNumber phone,
+    public async Task<EmailVerification?> FindLatestPendingAsync(
+        EmailAddress email,
         VerificationPurpose purpose,
         CancellationToken cancellationToken)
     {
-        var row = await db.PhoneVerifications
-            .Where(item => item.Phone == phone.Value && item.Purpose == purpose && item.ConsumedAt == null)
+        var row = await db.EmailVerifications
+            .Where(item => item.Email == email.Value && item.Purpose == purpose && item.ConsumedAt == null)
             .OrderByDescending(item => item.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
         return row is null ? null : Map(row);
     }
 
     public Task<int> CountStartedSinceAsync(
-        PhoneNumber phone,
+        EmailAddress email,
         VerificationPurpose purpose,
         DateTimeOffset since,
         CancellationToken cancellationToken) =>
-        db.PhoneVerifications.CountAsync(
-            item => item.Phone == phone.Value && item.Purpose == purpose && item.CreatedAt >= since.ToUniversalTime(),
+        db.EmailVerifications.CountAsync(
+            item => item.Email == email.Value && item.Purpose == purpose && item.CreatedAt >= since.ToUniversalTime(),
             cancellationToken);
 
-    public Task AddAsync(PhoneVerification verification, CancellationToken cancellationToken)
+    public Task AddAsync(EmailVerification verification, CancellationToken cancellationToken)
     {
-        db.PhoneVerifications.Add(new PhoneVerificationRow
+        db.EmailVerifications.Add(new EmailVerificationRow
         {
             Id = verification.Id,
             Purpose = verification.Purpose,
-            Phone = verification.Phone.Value,
+            Email = verification.Email.Value,
             Payload = verification.Payload,
             CreatedAt = verification.CreatedAt.ToUniversalTime(),
         }.With(verification));
         return Task.CompletedTask;
     }
 
-    public async Task UpdateAsync(PhoneVerification verification, CancellationToken cancellationToken)
+    public async Task UpdateAsync(EmailVerification verification, CancellationToken cancellationToken)
     {
-        var row = await db.PhoneVerifications.FindAsync([verification.Id], cancellationToken)
+        var row = await db.EmailVerifications.FindAsync([verification.Id], cancellationToken)
             ?? throw new InvalidOperationException($"La demande {verification.Id} n'existe pas.");
         row.With(verification);
     }
 
-    private static PhoneVerification Map(PhoneVerificationRow row) =>
-        PhoneVerification.Restore(
+    private static EmailVerification Map(EmailVerificationRow row) =>
+        EmailVerification.Restore(
             row.Id,
             row.Purpose,
-            PhoneNumber.Parse(row.Phone),
+            EmailAddress.Parse(row.Email),
             row.CodeHash,
             row.Payload,
             row.CreatedAt,
@@ -69,10 +69,10 @@ public sealed class PhoneVerificationRepository(SoroDbContext db) : IPhoneVerifi
             row.ConsumedAt);
 }
 
-internal static class PhoneVerificationRowExtensions
+internal static class EmailVerificationRowExtensions
 {
     /// <summary>Reporte l'état changeant d'une demande (code, expiration, essais, renvois, consommation).</summary>
-    public static PhoneVerificationRow With(this PhoneVerificationRow row, PhoneVerification verification)
+    public static EmailVerificationRow With(this EmailVerificationRow row, EmailVerification verification)
     {
         row.CodeHash = verification.CodeHash;
         row.ExpiresAt = verification.ExpiresAt.ToUniversalTime();
@@ -86,17 +86,17 @@ internal static class PhoneVerificationRowExtensions
 
 public sealed class OwnerDirectory(SoroDbContext db) : IOwnerDirectory
 {
-    public async Task<OwnerAccount?> FindAsync(PhoneNumber phone, CancellationToken cancellationToken)
+    public async Task<OwnerAccount?> FindAsync(EmailAddress email, CancellationToken cancellationToken)
     {
-        var row = await db.OwnerDirectory.AsNoTracking().SingleOrDefaultAsync(item => item.Phone == phone.Value, cancellationToken);
-        return row is null ? null : new OwnerAccount(phone, new TenantId(row.TenantId), new UserId(row.UserId));
+        var row = await db.OwnerDirectory.AsNoTracking().SingleOrDefaultAsync(item => item.Email == email.Value, cancellationToken);
+        return row is null ? null : new OwnerAccount(email, new TenantId(row.TenantId), new UserId(row.UserId));
     }
 
     public Task AddAsync(OwnerAccount account, CancellationToken cancellationToken)
     {
         db.OwnerDirectory.Add(new OwnerDirectoryRow
         {
-            Phone = account.Phone.Value,
+            Email = account.Email.Value,
             TenantId = account.Tenant.Value,
             UserId = account.User.Value,
         });
@@ -115,7 +115,7 @@ public sealed class CommerceRepository(SoroDbContext db) : ICommerceRepository
                 new TenantId(row.Id),
                 row.Name,
                 row.Activity,
-                PhoneNumber.Parse(row.OwnerPhone),
+                EmailAddress.Parse(row.OwnerEmail),
                 row.Formula,
                 row.CreatedAt,
                 row.TrialEndsAt,
@@ -130,7 +130,7 @@ public sealed class CommerceRepository(SoroDbContext db) : ICommerceRepository
             Id = commerce.Id.Value,
             Name = commerce.Name,
             Activity = commerce.Activity,
-            OwnerPhone = commerce.OwnerPhone.Value,
+            OwnerEmail = commerce.OwnerEmail.Value,
             Formula = commerce.Formula,
             CreatedAt = commerce.CreatedAt.ToUniversalTime(),
             TrialEndsAt = commerce.TrialEndsAt.ToUniversalTime(),

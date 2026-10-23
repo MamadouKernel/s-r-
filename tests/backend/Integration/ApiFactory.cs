@@ -29,13 +29,13 @@ internal sealed class ApiFactory(
     public Pbkdf2PinHasher PinHasher => new(_pepper);
 
     /// <summary>Les SMS « envoyés » par le serveur : le seul endroit où un test lit un code de vérification.</summary>
-    public CapturingSms Sms { get; } = new();
+    public CapturingMail Mail { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
         {
-            services.AddSingleton<ISmsSender>(Sms);
+            services.AddSingleton<IEmailSender>(Mail);
         });
 
         builder.UseEnvironment("Testing");

@@ -6,7 +6,7 @@ using Soro.Domain.Common;
 
 namespace Soro.Integration.Tests;
 
-/// <summary>L'inscription de bout en bout : API réelle, PostgreSQL réel, SMS capturé (SC-I1 à SC-I11).</summary>
+/// <summary>L'inscription de bout en bout : API réelle, PostgreSQL réel, e-mail capturé (SC-I1 à SC-I11).</summary>
 [Collection(Postgres.Collection)]
 public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
 {
@@ -19,11 +19,11 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
 
     public void Dispose() => _factory.Dispose();
 
-    /// <summary>Un numéro propre à chaque test : la base est partagée par toute la collection.</summary>
-    private static string NewPhone() => "07" + Random.Shared.Next(10_000_000, 99_999_999).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    /// <summary>Une adresse propre à chaque test : la base est partagée par toute la collection.</summary>
+    private static string NewEmail() => $"client{Random.Shared.Next(10_000_000, 99_999_999)}@exemple.ci";
 
-    private static object StartBody(string phone, string commerce = "Supérette du Carrefour", string terms = Terms) =>
-        new { phone, commerceName = commerce, activity = "Supermarket", ownerName = "Mamadou Konaté", termsVersion = terms };
+    private static object StartBody(string email, string commerce = "Supérette du Carrefour", string terms = Terms) =>
+        new { email, commerceName = commerce, activity = "Supermarket", ownerName = "Mamadou Konaté", termsVersion = terms };
 
     private static async Task<JsonElement> JsonOf(HttpResponseMessage response) => await response.Content.ReadFromJsonAsync<JsonElement>();
 
@@ -34,25 +34,25 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
         Assert.Equal(code, (await JsonOf(response)).GetProperty("code").GetString());
     }
 
-    private async Task<(HttpClient Client, JsonElement Session)> SignUpAsync(string phone, string commerce = "Supérette du Carrefour")
+    private async Task<(HttpClient Client, JsonElement Session)> SignUpAsync(string email, string commerce = "Supérette du Carrefour")
     {
         var client = _factory.CreateClient();
-        var started = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone, commerce));
+        var started = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email, commerce));
         Assert.Equal(HttpStatusCode.OK, started.StatusCode);
         var id = (await JsonOf(started)).GetProperty("verificationId").GetGuid();
         var done = await client.PostAsJsonAsync(
             "/api/v1/signup/complete",
-            new { verificationId = id, code = _factory.Sms.LastCodeFor(phone), password = Password });
+            new { verificationId = id, code = _factory.Mail.LastCodeFor(email), password = Password });
         Assert.Equal(HttpStatusCode.OK, done.StatusCode);
         return (client, await JsonOf(done));
     }
 
     [Fact]
-    public async Task A_trader_signs_up_with_a_code_received_by_sms_and_is_logged_in_as_the_owner()
+    public async Task A_trader_signs_up_with_a_code_received_by_email_and_is_logged_in_as_the_owner()
     {
-        var phone = NewPhone();
+        var email = NewEmail();
 
-        var (client, session) = await SignUpAsync(phone);
+        var (client, session) = await SignUpAsync(email);
 
         Assert.Equal("Owner", session.GetProperty("user").GetProperty("role").GetString());
         Assert.Equal("Supérette du Carrefour", session.GetProperty("commerceName").GetString());
@@ -68,17 +68,17 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task Nothing_is_created_before_the_code_is_confirmed_and_the_code_never_travels_in_a_response()
     {
-        var phone = NewPhone();
+        var email = NewEmail();
         using var client = _factory.CreateClient();
 
-        var started = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone));
+        var started = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email));
         var body = await started.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, started.StatusCode);
-        Assert.DoesNotContain(_factory.Sms.LastCodeFor(phone), body);
+        Assert.DoesNotContain(_factory.Mail.LastCodeFor(email), body);
         await using var owner = Db.Owner(fixture);
         var registered = await owner.Database
-            .SqlQuery<long>($"SELECT count(*)::bigint AS \"Value\" FROM owner_directory WHERE phone = {PhoneNumber.Parse(phone).Value}")
+            .SqlQuery<long>($"SELECT count(*)::bigint AS \"Value\" FROM owner_directory WHERE email = {EmailAddress.Parse(email).Value}")
             .SingleAsync();
         Assert.Equal(0, registered);
     }
@@ -86,10 +86,10 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task A_wrong_code_is_refused_and_the_good_one_still_works()
     {
-        var phone = NewPhone();
+        var email = NewEmail();
         using var client = _factory.CreateClient();
-        var id = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone)))).GetProperty("verificationId").GetGuid();
-        var good = _factory.Sms.LastCodeFor(phone);
+        var id = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email)))).GetProperty("verificationId").GetGuid();
+        var good = _factory.Mail.LastCodeFor(email);
         var wrong = good == "000000" ? "000001" : "000000";
 
         var refused = await client.PostAsJsonAsync("/api/v1/signup/complete", new { verificationId = id, code = wrong, password = Password });
@@ -102,24 +102,24 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task A_number_that_already_has_an_account_cannot_sign_up_again()
     {
-        var phone = NewPhone();
-        await SignUpAsync(phone);
+        var email = NewEmail();
+        await SignUpAsync(email);
         using var client = _factory.CreateClient();
 
-        var again = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody("+225 " + phone));
+        var again = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email.ToUpperInvariant()));
 
-        await AssertProblemAsync(again, HttpStatusCode.Conflict, "phone_already_registered");
+        await AssertProblemAsync(again, HttpStatusCode.Conflict, "email_already_registered");
     }
 
     [Fact]
     public async Task Terms_that_are_not_the_current_ones_and_a_weak_password_are_unprocessable()
     {
-        var phone = NewPhone();
+        var email = NewEmail();
         using var client = _factory.CreateClient();
 
-        var oldTerms = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone, terms: "2020-01"));
-        var id = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone)))).GetProperty("verificationId").GetGuid();
-        var weak = await client.PostAsJsonAsync("/api/v1/signup/complete", new { verificationId = id, code = _factory.Sms.LastCodeFor(phone), password = "court1" });
+        var oldTerms = await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email, terms: "2020-01"));
+        var id = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email)))).GetProperty("verificationId").GetGuid();
+        var weak = await client.PostAsJsonAsync("/api/v1/signup/complete", new { verificationId = id, code = _factory.Mail.LastCodeFor(email), password = "court1" });
 
         await AssertProblemAsync(oldTerms, HttpStatusCode.UnprocessableEntity, "rule_violation");
         await AssertProblemAsync(weak, HttpStatusCode.UnprocessableEntity, "rule_violation");
@@ -136,15 +136,15 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
-    public async Task The_owner_logs_in_with_the_phone_and_the_password_and_every_failure_looks_alike()
+    public async Task The_owner_logs_in_with_the_email_and_the_password_and_every_failure_looks_alike()
     {
-        var phone = NewPhone();
-        await SignUpAsync(phone);
+        var email = NewEmail();
+        await SignUpAsync(email);
         using var client = _factory.CreateClient();
 
-        var good = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone = "+225" + phone, password = Password });
-        var wrong = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone, password = WrongPassword });
-        var unknown = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone = NewPhone(), password = Password });
+        var good = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email = email.ToUpperInvariant(), password = Password });
+        var wrong = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = WrongPassword });
+        var unknown = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email = NewEmail(), password = Password });
 
         Assert.Equal(HttpStatusCode.OK, good.StatusCode);
         Assert.Equal("Owner", (await JsonOf(good)).GetProperty("user").GetProperty("role").GetString());
@@ -155,15 +155,15 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task Five_wrong_passwords_lock_the_account()
     {
-        var phone = NewPhone();
-        await SignUpAsync(phone);
+        var email = NewEmail();
+        await SignUpAsync(email);
         using var client = _factory.CreateClient();
         for (var i = 0; i < 5; i++)
         {
-            await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone, password = WrongPassword });
+            await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = WrongPassword });
         }
 
-        var locked = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone, password = Password });
+        var locked = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = Password });
 
         await AssertProblemAsync(locked, HttpStatusCode.Locked, "account_locked");
     }
@@ -171,17 +171,17 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task A_forgotten_password_is_reset_with_a_code_and_the_old_one_stops_working()
     {
-        var phone = NewPhone();
-        await SignUpAsync(phone);
+        var email = NewEmail();
+        await SignUpAsync(email);
         using var client = _factory.CreateClient();
 
-        var started = await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { phone });
-        var unknown = await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { phone = NewPhone() });
+        var started = await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { email });
+        var unknown = await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { email = NewEmail() });
         var confirmed = await client.PostAsJsonAsync(
             "/api/v1/owner/password-reset/confirm",
-            new { phone, code = _factory.Sms.LastCodeFor(phone), newPassword = NewPassword });
-        var old = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone, password = Password });
-        var fresh = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { phone, password = NewPassword });
+            new { email, code = _factory.Mail.LastCodeFor(email), newPassword = NewPassword });
+        var old = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = Password });
+        var fresh = await client.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = NewPassword });
 
         Assert.Equal(HttpStatusCode.Accepted, started.StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, unknown.StatusCode); // SC-I9
@@ -193,10 +193,10 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task Two_commerces_stay_apart_and_each_owner_only_sees_their_own_team_and_commerce_row()
     {
-        var phoneA = NewPhone();
-        var phoneB = NewPhone();
-        var (clientA, sessionA) = await SignUpAsync(phoneA, "Commerce A");
-        var (_, sessionB) = await SignUpAsync(phoneB, "Commerce B");
+        var emailA = NewEmail();
+        var emailB = NewEmail();
+        var (clientA, sessionA) = await SignUpAsync(emailA, "Commerce A");
+        var (_, sessionB) = await SignUpAsync(emailB, "Commerce B");
         clientA.DefaultRequestHeaders.Authorization = new("Bearer", sessionA.GetProperty("accessToken").GetString());
         var tenantA = new TenantId(sessionA.GetProperty("tenantId").GetGuid());
         var tenantB = new TenantId(sessionB.GetProperty("tenantId").GetGuid());
@@ -212,8 +212,8 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task The_creation_of_the_commerce_is_audited_and_the_password_is_stored_only_as_a_hash()
     {
-        var phone = NewPhone();
-        var (_, session) = await SignUpAsync(phone);
+        var email = NewEmail();
+        var (_, session) = await SignUpAsync(email);
         var tenant = new TenantId(session.GetProperty("tenantId").GetGuid());
 
         await using var asOwner = Db.App(fixture, tenant);
@@ -228,12 +228,12 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task Two_simultaneous_completions_for_the_same_number_create_one_account()
     {
-        var phone = NewPhone();
+        var email = NewEmail();
         using var client = _factory.CreateClient();
-        var first = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone)))).GetProperty("verificationId").GetGuid();
-        var firstCode = _factory.Sms.LastCodeFor(phone);
-        var second = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(phone)))).GetProperty("verificationId").GetGuid();
-        var secondCode = _factory.Sms.LastCodeFor(phone);
+        var first = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email)))).GetProperty("verificationId").GetGuid();
+        var firstCode = _factory.Mail.LastCodeFor(email);
+        var second = (await JsonOf(await client.PostAsJsonAsync("/api/v1/signup/start", StartBody(email)))).GetProperty("verificationId").GetGuid();
+        var secondCode = _factory.Mail.LastCodeFor(email);
 
         var responses = await Task.WhenAll(
             client.PostAsJsonAsync("/api/v1/signup/complete", new { verificationId = first, code = firstCode, password = Password }),
@@ -252,7 +252,7 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 5; i++)
         {
-            statuses.Add((await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { phone = NewPhone() })).StatusCode);
+            statuses.Add((await client.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { email = NewEmail() })).StatusCode);
         }
 
         Assert.Equal(HttpStatusCode.Accepted, statuses[0]);

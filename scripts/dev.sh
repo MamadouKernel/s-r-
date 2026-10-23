@@ -107,7 +107,7 @@ cat <<MSG
 ✔ Prêt
   Application : http://localhost:$WEB_PORT
   API         : http://localhost:$API_PORT
-  Codes SMS   : visibles dans .dev/api.log  (grep "SMS de développement" .dev/api.log)
+  Codes e-mail : visibles dans .dev/api.log  (grep -A3 "E-mail de développement" .dev/api.log)
 Ctrl+C pour arrêter l'API et le frontend.
 MSG
 wait

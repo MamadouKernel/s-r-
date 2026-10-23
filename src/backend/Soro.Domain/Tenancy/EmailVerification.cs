@@ -9,10 +9,10 @@ public enum VerificationPurpose
 }
 
 /// <summary>
-/// Demande de vérification d'un numéro par un code SMS (inscription ou mot de passe oublié). Elle porte le condensat du code,
+/// Demande de vérification d'une adresse e-mail par un code (inscription ou mot de passe oublié). Elle porte le condensat du code,
 /// jamais le code ; sa durée, ses essais et ses renvois sont bornés (ADR 0005).
 /// </summary>
-public sealed class PhoneVerification
+public sealed class EmailVerification
 {
     public const int MaxAttempts = 5;
     public const int MaxResends = 3;
@@ -20,17 +20,17 @@ public sealed class PhoneVerification
     public static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan ResendDelay = TimeSpan.FromSeconds(60);
 
-    private PhoneVerification(
+    private EmailVerification(
         Guid id,
         VerificationPurpose purpose,
-        PhoneNumber phone,
+        EmailAddress email,
         string codeHash,
         string? payload,
         DateTimeOffset createdAt)
     {
         Id = id;
         Purpose = purpose;
-        Phone = phone;
+        Email = email;
         CodeHash = codeHash;
         Payload = payload;
         CreatedAt = createdAt;
@@ -42,7 +42,7 @@ public sealed class PhoneVerification
 
     public VerificationPurpose Purpose { get; }
 
-    public PhoneNumber Phone { get; }
+    public EmailAddress Email { get; }
 
     public string CodeHash { get; private set; }
 
@@ -67,16 +67,16 @@ public sealed class PhoneVerification
 
     public DateTimeOffset ResendAvailableAt => LastSentAt + ResendDelay;
 
-    public static PhoneVerification Start(
+    public static EmailVerification Start(
         Guid id,
         VerificationPurpose purpose,
-        PhoneNumber phone,
+        EmailAddress email,
         string codeHash,
         string? payload,
         DateTimeOffset now)
     {
         Ensure.That(!string.IsNullOrWhiteSpace(codeHash), "Le condensat du code est obligatoire.");
-        return new PhoneVerification(id, purpose, phone, codeHash, payload, now);
+        return new EmailVerification(id, purpose, email, codeHash, payload, now);
     }
 
     public bool IsExpired(DateTimeOffset now) => now >= ExpiresAt;
@@ -108,10 +108,10 @@ public sealed class PhoneVerification
     }
 
     /// <summary>Reconstruction depuis le stockage : l'état a déjà été validé par les opérations métier.</summary>
-    internal static PhoneVerification Restore(
+    internal static EmailVerification Restore(
         Guid id,
         VerificationPurpose purpose,
-        PhoneNumber phone,
+        EmailAddress email,
         string codeHash,
         string? payload,
         DateTimeOffset createdAt,
@@ -120,7 +120,7 @@ public sealed class PhoneVerification
         int resendCount,
         DateTimeOffset lastSentAt,
         DateTimeOffset? consumedAt) =>
-        new(id, purpose, phone, codeHash, payload, createdAt)
+        new(id, purpose, email, codeHash, payload, createdAt)
         {
             ExpiresAt = expiresAt,
             Attempts = attempts,

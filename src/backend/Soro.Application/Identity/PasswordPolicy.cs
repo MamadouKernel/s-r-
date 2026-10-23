@@ -4,7 +4,7 @@ namespace Soro.Application.Identity;
 
 /// <summary>
 /// Règle du mot de passe du propriétaire (ADR 0005). Sans second facteur à la connexion, le mot de passe est plus exigeant que le PIN :
-/// 10 caractères au moins, une lettre et un chiffre, et jamais le numéro de téléphone.
+/// 10 caractères au moins, une lettre et un chiffre, et jamais l'adresse e-mail.
 /// </summary>
 public static class PasswordPolicy
 {
@@ -12,7 +12,7 @@ public static class PasswordPolicy
     public const int MaxLength = 128;
 
     /// <summary>Message en français si le mot de passe est refusé, <c>null</c> s'il est accepté.</summary>
-    public static string? Check(string? password, PhoneNumber phone)
+    public static string? Check(string? password, EmailAddress email)
     {
         if (string.IsNullOrEmpty(password))
         {
@@ -34,11 +34,11 @@ public static class PasswordPolicy
             return "Le mot de passe doit contenir au moins une lettre et un chiffre.";
         }
 
-        var digits = new string(password.Where(char.IsAsciiDigit).ToArray());
-        var local = phone.Value[^10..];
-        if (digits.Contains(local, StringComparison.Ordinal) || password.Contains(phone.Value, StringComparison.Ordinal))
+        var lowered = password.ToLowerInvariant();
+        var local = email.LocalPart;
+        if (lowered.Contains(email.Value, StringComparison.Ordinal) || (local.Length >= 4 && lowered.Contains(local, StringComparison.Ordinal)))
         {
-            return "Le mot de passe ne doit pas contenir votre numéro de téléphone.";
+            return "Le mot de passe ne doit pas contenir votre adresse e-mail.";
         }
 
         return null;

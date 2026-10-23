@@ -140,21 +140,21 @@ public class UserTests
         Assert.Equal(UserStatus.Disabled, user.Status);
     }
 
-    // ---- Propriétaire : téléphone et mot de passe (ADR 0005) ------------------------------------------
+    // ---- Propriétaire : adresse e-mail et mot de passe (ADR 0005) ------------------------------------------
 
-    private static readonly PhoneNumber OwnerPhone = PhoneNumber.Parse("0707070707");
+    private static readonly EmailAddress OwnerEmail = EmailAddress.Parse("mamadou@exemple.ci");
 
     private static User NewOwner() =>
-        User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, "  Mamadou Konaté ", "password-hash-1", Now);
+        User.RegisterOwner(UserId.New(), TenantId.New(), OwnerEmail, "  Mamadou Konaté ", "password-hash-1", Now);
 
     [Fact]
-    public void Registers_an_owner_with_a_phone_a_password_and_no_pin()
+    public void Registers_an_owner_with_an_email_a_password_and_no_pin()
     {
         var owner = NewOwner();
 
         Assert.Equal(Role.Owner, owner.Role);
         Assert.Equal("Mamadou Konaté", owner.DisplayName);
-        Assert.Equal(OwnerPhone, owner.Phone);
+        Assert.Equal(OwnerEmail, owner.Email);
         Assert.Equal("password-hash-1", owner.PasswordHash);
         Assert.Null(owner.PinHash);
         Assert.Equal("proprietaire", owner.Identifier);
@@ -165,17 +165,17 @@ public class UserTests
     [Fact]
     public void An_owner_needs_a_name_and_a_password_hash()
     {
-        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, " ", "hash", Now));
-        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, "Mamadou", " ", Now));
+        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerEmail, " ", "hash", Now));
+        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerEmail, "Mamadou", " ", Now));
     }
 
     [Fact]
-    public void A_pin_user_has_no_password_and_no_phone()
+    public void A_pin_user_has_no_password_and_no_email()
     {
         var cashier = NewUser();
 
         Assert.Null(cashier.PasswordHash);
-        Assert.Null(cashier.Phone);
+        Assert.Null(cashier.Email);
         Assert.Equal("hash-1", cashier.PinHash);
     }
 

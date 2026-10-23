@@ -5,18 +5,26 @@ using Soro.Domain.Tenancy;
 
 namespace Soro.Application.Tests;
 
-/// <summary>Retient les SMS « envoyés » : les tests y lisent le code comme le ferait le commerçant.</summary>
-internal sealed class CapturingSmsSender : ISmsSender
+/// <summary>Retient les e-mails « envoyés » : les tests y lisent le code comme le ferait le commerçant.</summary>
+internal sealed class CapturingEmailSender : IEmailSender
 {
-    private readonly List<(PhoneNumber To, string Message)> _sent = [];
+    private readonly List<(EmailAddress To, string Message)> _sent = [];
 
-    public IReadOnlyList<(PhoneNumber To, string Message)> Sent => _sent;
+    public IReadOnlyList<(EmailAddress To, string Message)> Sent => _sent;
 
     public string LastCode => new string(_sent[^1].Message.SkipWhile(c => !char.IsAsciiDigit(c)).TakeWhile(char.IsAsciiDigit).ToArray());
 
-    public Task SendAsync(PhoneNumber recipient, string message, CancellationToken cancellationToken)
+    /// <summary>Simule un serveur d'envoi en panne : le prochain envoi échoue.</summary>
+    public bool Failing { get; set; }
+
+    public Task SendAsync(EmailAddress recipient, EmailMessage message, CancellationToken cancellationToken)
     {
-        _sent.Add((recipient, message));
+        if (Failing)
+        {
+            throw new EmailDeliveryException(new InvalidOperationException("serveur d'envoi indisponible"));
+        }
+
+        _sent.Add((recipient, $"{message.Subject}\n{message.Body}"));
         return Task.CompletedTask;
     }
 }
@@ -34,47 +42,47 @@ internal sealed class SequentialCodes : IVerificationCodes
     public bool Verify(Guid verificationId, string code, string expectedHash) => Hash(verificationId, code) == expectedHash;
 }
 
-internal sealed class InMemoryPhoneVerificationRepository : IPhoneVerificationRepository
+internal sealed class InMemoryEmailVerificationRepository : IEmailVerificationRepository
 {
-    private readonly List<PhoneVerification> _all = [];
+    private readonly List<EmailVerification> _all = [];
 
-    public IReadOnlyList<PhoneVerification> All => _all;
+    public IReadOnlyList<EmailVerification> All => _all;
 
-    public Task<PhoneVerification?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+    public Task<EmailVerification?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_all.FirstOrDefault(verification => verification.Id == id));
 
-    public Task<PhoneVerification?> FindLatestPendingAsync(
-        PhoneNumber phone, VerificationPurpose purpose, CancellationToken cancellationToken) =>
+    public Task<EmailVerification?> FindLatestPendingAsync(
+        EmailAddress email, VerificationPurpose purpose, CancellationToken cancellationToken) =>
         Task.FromResult(_all
-            .Where(v => v.Phone == phone && v.Purpose == purpose && !v.IsConsumed)
+            .Where(v => v.Email == email && v.Purpose == purpose && !v.IsConsumed)
             .OrderByDescending(v => v.CreatedAt)
             .FirstOrDefault());
 
     public Task<int> CountStartedSinceAsync(
-        PhoneNumber phone, VerificationPurpose purpose, DateTimeOffset since, CancellationToken cancellationToken) =>
-        Task.FromResult(_all.Count(v => v.Phone == phone && v.Purpose == purpose && v.CreatedAt >= since));
+        EmailAddress email, VerificationPurpose purpose, DateTimeOffset since, CancellationToken cancellationToken) =>
+        Task.FromResult(_all.Count(v => v.Email == email && v.Purpose == purpose && v.CreatedAt >= since));
 
-    public Task AddAsync(PhoneVerification verification, CancellationToken cancellationToken)
+    public Task AddAsync(EmailVerification verification, CancellationToken cancellationToken)
     {
         _all.Add(verification);
         return Task.CompletedTask;
     }
 
-    public Task UpdateAsync(PhoneVerification verification, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task UpdateAsync(EmailVerification verification, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class InMemoryOwnerDirectory : IOwnerDirectory
 {
-    private readonly Dictionary<PhoneNumber, OwnerAccount> _accounts = [];
+    private readonly Dictionary<EmailAddress, OwnerAccount> _accounts = [];
 
     public int Count => _accounts.Count;
 
-    public Task<OwnerAccount?> FindAsync(PhoneNumber phone, CancellationToken cancellationToken) =>
-        Task.FromResult(_accounts.GetValueOrDefault(phone));
+    public Task<OwnerAccount?> FindAsync(EmailAddress email, CancellationToken cancellationToken) =>
+        Task.FromResult(_accounts.GetValueOrDefault(email));
 
     public Task AddAsync(OwnerAccount account, CancellationToken cancellationToken)
     {
-        _accounts[account.Phone] = account;
+        _accounts[account.Email] = account;
         return Task.CompletedTask;
     }
 }

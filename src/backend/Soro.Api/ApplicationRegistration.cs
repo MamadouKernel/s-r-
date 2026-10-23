@@ -6,6 +6,7 @@ using Soro.Application.Sales;
 using Soro.Application.Settings;
 using Soro.Application.Signup;
 using Soro.Application.Stock;
+using MailKit.Security;
 using Soro.Domain.Common;
 using Soro.Infrastructure.Security;
 
@@ -30,7 +31,7 @@ public static class ApplicationRegistration
         services.AddSingleton<ISignupSettings>(new SignupSettings(
             configuration["Signup:TermsVersion"] ?? DefaultTermsVersion,
             configuration.GetValue("Signup:TrialDays", Domain.Tenancy.Commerce.DefaultTrialDays)));
-        AddSmsSender(services, configuration, environment);
+        AddEmailSender(services, configuration, environment);
 
         services.AddScoped<OpenRegisterSessionHandler>();
         services.AddScoped<CloseRegisterSessionHandler>();
@@ -66,25 +67,42 @@ public static class ApplicationRegistration
     }
 
     /// <summary>
-    /// Le SMS réel dépend d'un fournisseur encore à choisir (ADR 0005). Hors développement et tests, le serveur refuse de démarrer
-    /// tant qu'aucun fournisseur n'est configuré : il ne faut jamais « envoyer » des codes dans un journal en production.
+    /// L'envoi réel passe par SMTP (MailKit). Hors développement et tests, le serveur refuse de démarrer sans réglages
+    /// <c>Mail:Smtp</c> : il ne faut jamais « envoyer » des codes dans un journal en production.
     /// </summary>
-    private static void AddSmsSender(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    private static void AddEmailSender(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var provider = configuration["Sms:Provider"];
-        if (string.IsNullOrWhiteSpace(provider))
+        var smtp = configuration.GetSection("Mail:Smtp");
+        if (string.IsNullOrWhiteSpace(smtp["Host"]))
         {
             if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
             {
                 throw new InvalidOperationException(
-                    "Sms:Provider est obligatoire hors développement : aucun fournisseur SMS n'est encore branché (ADR 0005).");
+                    "Mail:Smtp:Host est obligatoire hors développement : sans serveur d'envoi, aucun code de vérification ne peut partir.");
             }
 
-            services.AddSingleton<ISmsSender, LoggingSmsSender>();
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
             return;
         }
 
-        throw new InvalidOperationException($"Le fournisseur SMS « {provider} » n'est pas pris en charge.");
+        var from = smtp["FromAddress"];
+        if (!EmailAddress.TryParse(from, out _))
+        {
+            throw new InvalidOperationException("Mail:Smtp:FromAddress doit être une adresse e-mail valide (l'expéditeur des codes).");
+        }
+
+        var security = Enum.TryParse<SecureSocketOptions>(smtp["Security"], ignoreCase: true, out var parsed)
+            ? parsed
+            : SecureSocketOptions.StartTls;
+        services.AddSingleton(new SmtpSettings(
+            smtp["Host"]!,
+            smtp.GetValue("Port", 587),
+            smtp["UserName"],
+            smtp["Password"],
+            from!,
+            smtp["FromName"] ?? "Sôrô",
+            security));
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
     }
 
     /// <summary>Le poivre des PIN est un secret du serveur (jamais en base) : démarrage refusé s'il manque.</summary>
