@@ -10,7 +10,7 @@ namespace Soro.Infrastructure.Security;
 /// base, une fuite de la table ne suffirait pas à retrouver les codes, même hors ligne.
 /// Format stocké : <c>pbkdf2-sha256$itérations$sel$clé</c> (Base64), ce qui permet d'augmenter le coût plus tard.
 /// </summary>
-public sealed class Pbkdf2PinHasher : IPinHasher
+public sealed class Pbkdf2PinHasher : IPinHasher, IPasswordHasher
 {
     public const int MinimumPepperBytes = 16;
 
@@ -34,6 +34,10 @@ public sealed class Pbkdf2PinHasher : IPinHasher
 
         _pepper = (byte[])pepper.Clone();
     }
+
+    string IPasswordHasher.Hash(string password) => Hash(password);
+
+    bool IPasswordHasher.Verify(string password, string? hash) => Verify(password, hash);
 
     public string Hash(string pin)
     {

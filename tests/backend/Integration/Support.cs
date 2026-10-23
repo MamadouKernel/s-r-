@@ -84,3 +84,38 @@ internal static class Samples
             payments,
             null);
 }
+
+/// <summary>Garde chaque SMS envoyé par le serveur de test, sans rien envoyer.</summary>
+internal sealed class CapturingSms : Soro.Application.Signup.ISmsSender
+{
+    private readonly List<(PhoneNumber To, string Message)> _sent = [];
+    private readonly Lock _gate = new();
+
+    public IReadOnlyList<(PhoneNumber To, string Message)> Sent
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _sent.ToArray();
+            }
+        }
+    }
+
+    public string LastCodeFor(string phone)
+    {
+        var number = PhoneNumber.Parse(phone);
+        var message = Sent.Last(item => item.To == number).Message;
+        return new string(message.SkipWhile(c => !char.IsAsciiDigit(c)).TakeWhile(char.IsAsciiDigit).ToArray());
+    }
+
+    public Task SendAsync(PhoneNumber recipient, string message, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            _sent.Add((recipient, message));
+        }
+
+        return Task.CompletedTask;
+    }
+}

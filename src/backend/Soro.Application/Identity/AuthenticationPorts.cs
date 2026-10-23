@@ -49,3 +49,14 @@ public interface ITenantScope
 {
     void Enter(TenantId tenant);
 }
+
+/// <summary>
+/// Hachage lent et salé des mots de passe des propriétaires. Même algorithme et mêmes garanties que le PIN (secret du serveur,
+/// PBKDF2, comparaison en temps constant, même travail pour un compte inexistant).
+/// </summary>
+public interface IPasswordHasher
+{
+    string Hash(string password);
+
+    bool Verify(string password, string? hash);
+}

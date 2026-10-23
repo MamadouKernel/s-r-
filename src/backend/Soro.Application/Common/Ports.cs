@@ -38,4 +38,6 @@ public static class AuditActions
     public const string ProductUpdated = "product.updated";
     public const string ProductDeactivated = "product.deactivated";
     public const string StockLoss = "stock.loss";
+    public const string CommerceCreated = "commerce.created";
+    public const string PasswordReset = "user.password.reset";
 }

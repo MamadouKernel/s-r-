@@ -83,6 +83,14 @@ Voir `docs/specs/meilleures-ventes-journal/spec.md`.
 - [x] T092 Bloc « Meilleures ventes » du tableau de bord — MV-04
 - [x] T093 Page Journal — MV-05
 
+## Inscription, premier propriétaire et appareils (V1)
+
+Voir `docs/specs/inscription/spec.md` et `docs/decisions/0005-inscription-proprietaire-et-sms.md`.
+
+- [x] T100 Commerce, propriétaire, vérification du téléphone, connexion et mot de passe oublié (serveur) — INS-01 à INS-07
+- [ ] T101 Invitations d'enrôlement et appareils révocables (serveur) — INS-08, INS-09
+- [ ] T102 Écrans d'inscription, de connexion du propriétaire, d'enrôlement et des appareils — INS-10
+
 ## Consultation et rapports (V1)
 
 Voir `docs/specs/consultation-rapports/spec.md`.

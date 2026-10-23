@@ -24,8 +24,10 @@ internal static class ResultHttpMapping
         ErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
         ErrorCodes.RuleViolation => StatusCodes.Status422UnprocessableEntity,
         ErrorCodes.MobileMoneyReferenceUsed or ErrorCodes.RegisterAlreadyOpen or ErrorCodes.IdentifierTaken
-            or ErrorCodes.BarcodeTaken
+            or ErrorCodes.BarcodeTaken or ErrorCodes.PhoneAlreadyRegistered
             => StatusCodes.Status409Conflict,
+        ErrorCodes.InvalidCode or ErrorCodes.VerificationExpired => StatusCodes.Status422UnprocessableEntity,
+        ErrorCodes.TooManyRequests => StatusCodes.Status429TooManyRequests,
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
         ErrorCodes.AccountLocked => StatusCodes.Status423Locked,
         _ => StatusCodes.Status400BadRequest,
@@ -39,6 +41,7 @@ internal static class ResultHttpMapping
         StatusCodes.Status409Conflict => "Conflit",
         StatusCodes.Status401Unauthorized => "Identifiants invalides",
         StatusCodes.Status423Locked => "Compte verrouillé",
+        StatusCodes.Status429TooManyRequests => "Trop de demandes",
         _ => "Requête invalide",
     };
 }

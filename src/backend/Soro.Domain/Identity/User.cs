@@ -19,6 +19,9 @@ public sealed class User
 
     public static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(15);
 
+    /// <summary>Identifiant interne du propriétaire dans son commerce (jamais saisi : il se connecte par téléphone).</summary>
+    public const string OwnerIdentifier = "proprietaire";
+
     private const int MinIdentifierLength = 3;
     private const int MaxIdentifierLength = 32;
     private const int MaxDisplayNameLength = 100;
@@ -29,7 +32,7 @@ public sealed class User
         string identifier,
         string displayName,
         Role role,
-        string pinHash,
+        string? pinHash,
         DateTimeOffset createdAt)
     {
         Id = id;
@@ -53,7 +56,14 @@ public sealed class User
 
     public Role Role { get; }
 
-    public string PinHash { get; }
+    /// <summary>Condensat du PIN des caissiers et de l'équipe ; <c>null</c> pour un propriétaire, qui se connecte par mot de passe.</summary>
+    public string? PinHash { get; }
+
+    /// <summary>Téléphone du propriétaire (identifiant de connexion) ; <c>null</c> pour les profils à PIN.</summary>
+    public PhoneNumber? Phone { get; private set; }
+
+    /// <summary>Condensat du mot de passe du propriétaire ; <c>null</c> pour les profils à PIN.</summary>
+    public string? PasswordHash { get; private set; }
 
     public DateTimeOffset CreatedAt { get; }
 
@@ -80,6 +90,39 @@ public sealed class User
         Ensure.That(!string.IsNullOrWhiteSpace(pinHash), "Le condensat du code PIN est obligatoire.");
 
         return new User(id, tenant, normalized, displayName.Trim(), role, pinHash, at);
+    }
+
+    /// <summary>
+    /// Propriétaire d'un commerce, créé à l'inscription : il se connecte par téléphone et mot de passe, pas par PIN (ADR 0005).
+    /// Son identifiant interne est fixe ; il n'est jamais saisi.
+    /// </summary>
+    public static User RegisterOwner(
+        UserId id,
+        TenantId tenant,
+        PhoneNumber phone,
+        string displayName,
+        string passwordHash,
+        DateTimeOffset at)
+    {
+        Ensure.That(!string.IsNullOrWhiteSpace(displayName), "Le nom du propriétaire est obligatoire.");
+        Ensure.That(displayName.Trim().Length <= MaxDisplayNameLength, "Le nom du propriétaire est trop long.");
+        Ensure.That(!string.IsNullOrWhiteSpace(passwordHash), "Le condensat du mot de passe est obligatoire.");
+
+        return new User(id, tenant, OwnerIdentifier, displayName.Trim(), Role.Owner, null, at)
+        {
+            Phone = phone,
+            PasswordHash = passwordHash,
+        };
+    }
+
+    /// <summary>Nouveau mot de passe (réinitialisation par SMS) : lève aussi un éventuel verrouillage.</summary>
+    public void ChangePassword(string passwordHash)
+    {
+        Ensure.That(PasswordHash is not null, "Ce profil se connecte par PIN : il n'a pas de mot de passe.");
+        Ensure.That(!string.IsNullOrWhiteSpace(passwordHash), "Le condensat du mot de passe est obligatoire.");
+        PasswordHash = passwordHash;
+        FailedAttempts = 0;
+        LockedUntil = null;
     }
 
     public bool IsLocked(DateTimeOffset now) => LockedUntil is { } until && now < until;
@@ -122,14 +165,18 @@ public sealed class User
         string identifier,
         string displayName,
         Role role,
-        string pinHash,
+        string? pinHash,
         DateTimeOffset createdAt,
         UserStatus status,
         int failedAttempts,
         DateTimeOffset? lockedUntil,
-        DateTimeOffset? lastLoginAt) =>
+        DateTimeOffset? lastLoginAt,
+        PhoneNumber? phone,
+        string? passwordHash) =>
         new(id, tenant, identifier, displayName, role, pinHash, createdAt)
         {
+            Phone = phone,
+            PasswordHash = passwordHash,
             Status = status,
             FailedAttempts = failedAttempts,
             LockedUntil = lockedUntil,

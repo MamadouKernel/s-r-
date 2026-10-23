@@ -21,4 +21,8 @@ public static class ErrorCodes
     public const string AccountLocked = "account_locked";
     public const string IdentifierTaken = "identifier_taken";
     public const string BarcodeTaken = "barcode_taken";
+    public const string PhoneAlreadyRegistered = "phone_already_registered";
+    public const string InvalidCode = "invalid_code";
+    public const string VerificationExpired = "verification_expired";
+    public const string TooManyRequests = "too_many_requests";
 }
