@@ -2,6 +2,7 @@ using Soro.Application.Cash;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Application.Reporting;
+using Soro.Application.Signup;
 using Soro.Application.Stock;
 using Soro.Domain.Stock;
 using Soro.Domain.Cash;
@@ -49,6 +50,20 @@ internal sealed class TestWorld
 
     public FakeAuditLogQueries AuditLog { get; } = new();
 
+    public CapturingSmsSender Sms { get; } = new();
+
+    public SequentialCodes Codes { get; } = new();
+
+    public InMemoryPhoneVerificationRepository Verifications { get; } = new();
+
+    public InMemoryOwnerDirectory OwnerDirectory { get; } = new();
+
+    public InMemoryCommerceRepository Commerces { get; } = new();
+
+    public FakePasswordHasher Passwords { get; } = new();
+
+    private FakeSignupSettings SignupSettings { get; } = new();
+
     public InMemoryProductRepository Products { get; } = new();
 
     public InMemoryStockMovementRepository Movements { get; } = new();
@@ -72,6 +87,20 @@ internal sealed class TestWorld
     public SyncSalesHandler SyncSales => new(RecordSale);
 
     public CancelSaleHandler CancelSale => new(Current, Sales, Audit, Clock, UnitOfWork);
+
+    public StartSignupHandler StartSignup => new(OwnerDirectory, Verifications, Codes, Sms, SignupSettings, Clock, UnitOfWork);
+
+    public ResendSignupCodeHandler ResendSignupCode => new(Verifications, Codes, Sms, Clock, UnitOfWork);
+
+    public CompleteSignupHandler CompleteSignup =>
+        new(Scope, Verifications, Codes, OwnerDirectory, Commerces, Users, Passwords, Audit, Tokens, SignupSettings, Clock, UnitOfWork);
+
+    public OwnerLogInHandler OwnerLogIn => new(Scope, OwnerDirectory, Commerces, Users, Passwords, Tokens, Clock, UnitOfWork);
+
+    public StartPasswordResetHandler StartPasswordReset => new(OwnerDirectory, Verifications, Codes, Sms, Clock, UnitOfWork);
+
+    public ConfirmPasswordResetHandler ConfirmPasswordReset =>
+        new(Scope, OwnerDirectory, Verifications, Codes, Users, Passwords, Audit, Clock, UnitOfWork);
 
     public LogInHandler LogIn => new(Scope, Users, Hasher, Tokens, Clock, UnitOfWork);
 

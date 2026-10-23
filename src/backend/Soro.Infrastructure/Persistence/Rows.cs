@@ -2,6 +2,7 @@ using Soro.Domain.Cash;
 using Soro.Domain.Identity;
 using Soro.Domain.Sales;
 using Soro.Domain.Stock;
+using Soro.Domain.Tenancy;
 
 namespace Soro.Infrastructure.Persistence;
 
@@ -125,7 +126,12 @@ internal sealed class UserRow
 
     public Role Role { get; set; }
 
-    public string PinHash { get; set; } = string.Empty;
+    public string? PinHash { get; set; }
+
+    /// <summary>Numéro canonique du propriétaire ; <c>null</c> pour les profils qui se connectent par PIN.</summary>
+    public string? Phone { get; set; }
+
+    public string? PasswordHash { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 
@@ -201,4 +207,60 @@ internal sealed class StockMovementRow
     public Guid UserId { get; set; }
 
     public DateTimeOffset At { get; set; }
+}
+
+internal sealed class CommerceRow
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public ActivityType Activity { get; set; }
+
+    public string OwnerPhone { get; set; } = string.Empty;
+
+    public string Formula { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset TrialEndsAt { get; set; }
+
+    public string TermsVersion { get; set; } = string.Empty;
+
+    public DateTimeOffset TermsAcceptedAt { get; set; }
+}
+
+/// <summary>Numéro → commerce et utilisateur. Hors isolation par commerce : c'est ce qui permet de trouver le commerce avant de le connaître.</summary>
+internal sealed class OwnerDirectoryRow
+{
+    public string Phone { get; set; } = string.Empty;
+
+    public Guid TenantId { get; set; }
+
+    public Guid UserId { get; set; }
+}
+
+internal sealed class PhoneVerificationRow
+{
+    public Guid Id { get; set; }
+
+    public VerificationPurpose Purpose { get; set; }
+
+    public string Phone { get; set; } = string.Empty;
+
+    public string CodeHash { get; set; } = string.Empty;
+
+    public string? Payload { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    public int Attempts { get; set; }
+
+    public int ResendCount { get; set; }
+
+    public DateTimeOffset LastSentAt { get; set; }
+
+    public DateTimeOffset? ConsumedAt { get; set; }
 }

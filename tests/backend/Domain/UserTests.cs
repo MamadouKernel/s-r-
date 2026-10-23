@@ -139,4 +139,76 @@ public class UserTests
 
         Assert.Equal(UserStatus.Disabled, user.Status);
     }
+
+    // ---- Propriétaire : téléphone et mot de passe (ADR 0005) ------------------------------------------
+
+    private static readonly PhoneNumber OwnerPhone = PhoneNumber.Parse("0707070707");
+
+    private static User NewOwner() =>
+        User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, "  Mamadou Konaté ", "password-hash-1", Now);
+
+    [Fact]
+    public void Registers_an_owner_with_a_phone_a_password_and_no_pin()
+    {
+        var owner = NewOwner();
+
+        Assert.Equal(Role.Owner, owner.Role);
+        Assert.Equal("Mamadou Konaté", owner.DisplayName);
+        Assert.Equal(OwnerPhone, owner.Phone);
+        Assert.Equal("password-hash-1", owner.PasswordHash);
+        Assert.Null(owner.PinHash);
+        Assert.Equal("proprietaire", owner.Identifier);
+        Assert.Equal(UserStatus.Active, owner.Status);
+        Assert.True(owner.CanLogIn(Now));
+    }
+
+    [Fact]
+    public void An_owner_needs_a_name_and_a_password_hash()
+    {
+        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, " ", "hash", Now));
+        Assert.Throws<DomainException>(() => User.RegisterOwner(UserId.New(), TenantId.New(), OwnerPhone, "Mamadou", " ", Now));
+    }
+
+    [Fact]
+    public void A_pin_user_has_no_password_and_no_phone()
+    {
+        var cashier = NewUser();
+
+        Assert.Null(cashier.PasswordHash);
+        Assert.Null(cashier.Phone);
+        Assert.Equal("hash-1", cashier.PinHash);
+    }
+
+    [Fact]
+    public void Changing_the_password_replaces_the_hash_and_lifts_a_lock()
+    {
+        var owner = NewOwner();
+        Fail(owner, User.MaxFailedAttempts, Now);
+        Assert.True(owner.IsLocked(Now));
+
+        owner.ChangePassword("password-hash-2");
+
+        Assert.Equal("password-hash-2", owner.PasswordHash);
+        Assert.False(owner.IsLocked(Now));
+        Assert.Equal(0, owner.FailedAttempts);
+        Assert.True(owner.CanLogIn(Now));
+    }
+
+    [Fact]
+    public void A_password_change_cannot_use_a_blank_hash_and_a_pin_user_cannot_get_one()
+    {
+        Assert.Throws<DomainException>(() => NewOwner().ChangePassword(" "));
+        Assert.Throws<DomainException>(() => NewUser().ChangePassword("password-hash-2"));
+    }
+
+    [Fact]
+    public void An_owner_locks_after_five_failures_like_any_account()
+    {
+        var owner = NewOwner();
+
+        Fail(owner, User.MaxFailedAttempts, Now);
+
+        Assert.True(owner.IsLocked(Now));
+        Assert.False(owner.CanLogIn(Now));
+    }
 }

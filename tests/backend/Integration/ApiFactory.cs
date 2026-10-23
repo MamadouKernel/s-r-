@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.DependencyInjection;
 using Soro.Application.Identity;
+using Soro.Application.Signup;
 using Soro.Domain.Common;
 using Soro.Domain.Identity;
 using Soro.Infrastructure.Security;
@@ -14,7 +16,8 @@ namespace Soro.Integration.Tests;
 internal sealed class ApiFactory(
     PostgresFixture fixture,
     int? permitPerMinute = null,
-    int? loginPermitsPerMinute = null) : WebApplicationFactory<Program>
+    int? loginPermitsPerMinute = null,
+    int? publicPermitsPerMinute = null) : WebApplicationFactory<Program>
 {
     private const string Issuer = "https://soro.tests";
     private const string Audience = "soro-api-tests";
@@ -25,8 +28,16 @@ internal sealed class ApiFactory(
     /// <summary>Même hachage que le serveur : sert à créer des utilisateurs de test directement en base.</summary>
     public Pbkdf2PinHasher PinHasher => new(_pepper);
 
+    /// <summary>Les SMS « envoyés » par le serveur : le seul endroit où un test lit un code de vérification.</summary>
+    public CapturingSms Sms { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ISmsSender>(Sms);
+        });
+
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Soro", fixture.AppConnectionString("api-tests"));
         builder.UseSetting("Jwt:Issuer", Issuer);
@@ -36,6 +47,11 @@ internal sealed class ApiFactory(
         if (loginPermitsPerMinute is { } loginPermits)
         {
             builder.UseSetting("RateLimit:LoginPermitsPerMinute", loginPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        if (publicPermitsPerMinute is { } publicPermits)
+        {
+            builder.UseSetting("RateLimit:PublicPermitsPerMinute", publicPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         if (permitPerMinute is { } permits)

@@ -25,6 +25,12 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<StockMovementRow> StockMovements => Set<StockMovementRow>();
 
+    internal DbSet<CommerceRow> Commerces => Set<CommerceRow>();
+
+    internal DbSet<OwnerDirectoryRow> OwnerDirectory => Set<OwnerDirectoryRow>();
+
+    internal DbSet<PhoneVerificationRow> PhoneVerifications => Set<PhoneVerificationRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSessions(modelBuilder.Entity<SessionRow>());
@@ -35,6 +41,9 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureUsers(modelBuilder.Entity<UserRow>());
         ConfigureProducts(modelBuilder.Entity<ProductRow>());
         ConfigureStockMovements(modelBuilder.Entity<StockMovementRow>());
+        ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
+        ConfigureOwnerDirectory(modelBuilder.Entity<OwnerDirectoryRow>());
+        ConfigurePhoneVerifications(modelBuilder.Entity<PhoneVerificationRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
     }
 
@@ -98,16 +107,53 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     private static void ConfigureUsers(EntityTypeBuilder<UserRow> user)
     {
-        user.ToTable("users", table => table.HasCheckConstraint("ck_users_attempts", "failed_attempts >= 0"));
+        user.ToTable("users", table =>
+        {
+            table.HasCheckConstraint("ck_users_attempts", "failed_attempts >= 0");
+            // Un profil se connecte par PIN (équipe) ou par mot de passe (propriétaire), jamais sans rien.
+            table.HasCheckConstraint("ck_users_credential", "pin_hash IS NOT NULL OR password_hash IS NOT NULL");
+        });
         user.HasKey(row => row.Id);
         user.Property(row => row.Identifier).HasMaxLength(32);
         user.Property(row => row.DisplayName).HasMaxLength(100);
         user.Property(row => row.PinHash).HasMaxLength(200);
+        user.Property(row => row.Phone).HasMaxLength(16);
+        user.Property(row => row.PasswordHash).HasMaxLength(200);
         user.Property(row => row.Role).HasConversion<string>().HasMaxLength(16);
         user.Property(row => row.Status).HasConversion<string>().HasMaxLength(16);
 
         // Un identifiant de connexion est unique dans un commerce, jamais entre commerces.
         user.HasIndex(row => new { row.TenantId, row.Identifier }).IsUnique();
+    }
+
+    private static void ConfigureCommerces(EntityTypeBuilder<CommerceRow> commerce)
+    {
+        commerce.ToTable("commerces");
+        commerce.HasKey(row => row.Id);
+        commerce.Property(row => row.Name).HasMaxLength(100);
+        commerce.Property(row => row.Activity).HasConversion<string>().HasMaxLength(16);
+        commerce.Property(row => row.OwnerPhone).HasMaxLength(16);
+        commerce.Property(row => row.Formula).HasMaxLength(32);
+        commerce.Property(row => row.TermsVersion).HasMaxLength(32);
+    }
+
+    private static void ConfigureOwnerDirectory(EntityTypeBuilder<OwnerDirectoryRow> directory)
+    {
+        directory.ToTable("owner_directory");
+        directory.HasKey(row => row.Phone);
+        directory.Property(row => row.Phone).HasMaxLength(16);
+    }
+
+    private static void ConfigurePhoneVerifications(EntityTypeBuilder<PhoneVerificationRow> verification)
+    {
+        verification.ToTable("phone_verifications", table =>
+            table.HasCheckConstraint("ck_phone_verifications_counters", "attempts >= 0 AND resend_count >= 0"));
+        verification.HasKey(row => row.Id);
+        verification.Property(row => row.Purpose).HasConversion<string>().HasMaxLength(16);
+        verification.Property(row => row.Phone).HasMaxLength(16);
+        verification.Property(row => row.CodeHash).HasMaxLength(100);
+        verification.Property(row => row.Payload).HasMaxLength(1000);
+        verification.HasIndex(row => new { row.Phone, row.Purpose, row.CreatedAt });
     }
 
     private static void ConfigureProducts(EntityTypeBuilder<ProductRow> product)

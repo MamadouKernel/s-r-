@@ -6,6 +6,7 @@ using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Application.Reporting;
 using Soro.Application.Sales;
+using Soro.Application.Signup;
 using Soro.Application.Stock;
 using Soro.Infrastructure.Persistence;
 
@@ -39,6 +40,9 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserDirectory, UserDirectory>();
+        services.AddScoped<IPhoneVerificationRepository, PhoneVerificationRepository>();
+        services.AddScoped<IOwnerDirectory, OwnerDirectory>();
+        services.AddScoped<ICommerceRepository, CommerceRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         return services;
     }

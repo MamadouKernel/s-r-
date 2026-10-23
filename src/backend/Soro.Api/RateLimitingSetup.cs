@@ -7,9 +7,11 @@ namespace Soro.Api;
 public static class RateLimitingSetup
 {
     public const string LoginPolicy = "login";
+    public const string PublicPolicy = "public";
 
     private const int DefaultPermitsPerMinute = 600;
     private const int DefaultLoginPermitsPerMinute = 10;
+    private const int DefaultPublicPermitsPerMinute = 10;
 
     /// <summary>
     /// Deux plafonds. Global : par utilisateur (par adresse pour les non authentifiés), large pour qu'une caisse qui
@@ -19,6 +21,7 @@ public static class RateLimitingSetup
     {
         var permits = configuration.GetValue("RateLimit:PermitsPerMinute", DefaultPermitsPerMinute);
         var loginPermits = configuration.GetValue("RateLimit:LoginPermitsPerMinute", DefaultLoginPermitsPerMinute);
+        var publicPermits = configuration.GetValue("RateLimit:PublicPermitsPerMinute", DefaultPublicPermitsPerMinute);
 
         services.AddRateLimiter(options =>
         {
@@ -27,6 +30,9 @@ public static class RateLimitingSetup
                 RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => PerMinute(permits)));
             options.AddPolicy(LoginPolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(Address(context), _ => PerMinute(loginPermits)));
+            // Inscription et mot de passe oublié : chaque appel peut coûter un SMS, donc un plafond par adresse.
+            options.AddPolicy(PublicPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(Address(context), _ => PerMinute(publicPermits)));
         });
         return services;
     }

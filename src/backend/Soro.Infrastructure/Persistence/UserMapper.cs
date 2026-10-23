@@ -15,6 +15,7 @@ internal static class UserMapper
             DisplayName = user.DisplayName,
             Role = user.Role,
             PinHash = user.PinHash,
+            Phone = user.Phone?.Value,
             CreatedAt = user.CreatedAt.ToUniversalTime(),
         };
         Apply(row, user);
@@ -24,6 +25,7 @@ internal static class UserMapper
     /// <summary>Reporte l'état changeant (statut, compteur d'échecs, verrou, dernière connexion).</summary>
     public static void Apply(UserRow row, User user)
     {
+        row.PasswordHash = user.PasswordHash;
         row.Status = user.Status;
         row.FailedAttempts = user.FailedAttempts;
         row.LockedUntil = user.LockedUntil?.ToUniversalTime();
@@ -42,5 +44,7 @@ internal static class UserMapper
             row.Status,
             row.FailedAttempts,
             row.LockedUntil,
-            row.LastLoginAt);
+            row.LastLoginAt,
+            row.Phone is null ? null : PhoneNumber.Parse(row.Phone),
+            row.PasswordHash);
 }
