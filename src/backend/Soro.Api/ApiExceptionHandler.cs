@@ -21,7 +21,16 @@ public sealed partial class ApiExceptionHandler(ILogger<ApiExceptionHandler> log
         CancellationToken cancellationToken)
     {
         IResult problem;
-        if (PersistenceErrors.IsUniqueViolation(exception) || PersistenceErrors.IsConcurrencyConflict(exception))
+        if (exception is BadHttpRequestException bad)
+        {
+            // Corps illisible (JSON invalide, identifiant mal formé) : une erreur du client, jamais du serveur.
+            problem = Results.Problem(
+                title: "Requête invalide",
+                detail: "Le contenu de la requête est illisible ou incomplet.",
+                statusCode: bad.StatusCode,
+                extensions: new Dictionary<string, object?> { ["code"] = "bad_request" });
+        }
+        else if (PersistenceErrors.IsUniqueViolation(exception) || PersistenceErrors.IsConcurrencyConflict(exception))
         {
             LogConcurrentWrite(exception, httpContext.Request.Path);
             problem = Results.Problem(
