@@ -56,4 +56,5 @@ public sealed record RecordStockLossRequest
 
 public sealed record ProductCreatedResponse(Guid ProductId, bool AlreadyProcessed);
 
-public sealed record StockChangedResponse(Guid MovementId, int QuantityOnHand, bool AlreadyProcessed);
+/// <param name="PurchasePriceFcfa">Le prix d'achat moyen après une réception (RG-11) ; absent après une perte.</param>
+public sealed record StockChangedResponse(Guid MovementId, int QuantityOnHand, bool AlreadyProcessed, long? PurchasePriceFcfa = null);

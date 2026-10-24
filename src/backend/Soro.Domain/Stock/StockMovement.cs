@@ -12,7 +12,7 @@ public enum StockMovementKind
 
 /// <summary>
 /// Variation de stock signée, attribuée à une personne (STK-03). Jamais modifiée ni supprimée :
-/// une correction est un mouvement inverse motivé.
+/// une correction est un mouvement inverse motivé. Une réception garde le prix d'achat unitaire de sa livraison (<see cref="UnitCost"/>).
 /// </summary>
 public sealed record StockMovement(
     StockMovementId Id,
@@ -23,4 +23,5 @@ public sealed record StockMovement(
     string? Reason,
     Guid? SourceId,
     UserId User,
-    DateTimeOffset At);
+    DateTimeOffset At,
+    Money? UnitCost = null);

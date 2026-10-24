@@ -295,7 +295,7 @@ describe('DashboardPage', () => {
 
   describe('best sellers', () => {
     const item = (name: string, quantity: number, revenueFcfa: number, marginFcfa: number | null): ProductRanking => ({
-      productId: name, name, quantity, revenueFcfa, marginFcfa,
+      productId: name, name, quantity, revenueFcfa, marginFcfa, marginIsEstimate: false,
     });
     const ranking = [item('Savon', 30, 7_500, 4_500), item('Jus', 10, 6_000, 2_000), item('Fantôme', 2, 200, null)];
 
@@ -343,7 +343,25 @@ describe('DashboardPage', () => {
       const rows = [...page.root.querySelectorAll('#classement-titre ~ ol li')].map((li) => li.textContent!.replace(/\s+/g, ' ').replace(/\u00a0/g, ' '));
       expect(rows[0]).toContain('4 500 FCFA');
       expect(rows[2]).toContain('marge inconnue'); // SC-M4 : jamais une fausse marge
-      expect(page.has('Marge estimée d’après le prix d’achat actuel')).toBe(true);
+      expect(page.has('ce que le produit vous avait coûté')).toBe(true);
+      expect(page.has('s’affiche « estimée »')).toBe(true);
+    });
+
+    it('marks a margin as estimated when some sales have no kept cost, and says nothing for an exact one (CM-03)', async () => {
+      const mixed = [
+        { ...item('Jus', 10, 6_000, 2_000), marginIsEstimate: true },
+        item('Savon', 30, 7_500, 4_500),
+        { ...item('Fantôme', 2, 200, null), marginIsEstimate: true },
+      ];
+      const { page } = await open({ ranking: mixed });
+      await page.click('Plus rentables');
+
+      const rows = [...page.root.querySelectorAll('#classement-titre ~ ol li')].map((li) => li.textContent!.replace(/\s+/g, ' ').replace(/\u00a0/g, ' '));
+      expect(rows[0]).toContain('2 000 FCFA (estimée)');
+      expect(rows[1]).toContain('4 500 FCFA');
+      expect(rows[1]).not.toContain('estimée');
+      expect(rows[2]).toContain('marge inconnue');
+      expect(rows[2]).not.toContain('estimée');
     });
 
     it('marks the chosen criterion and period for assistive technologies, not only by colour', async () => {

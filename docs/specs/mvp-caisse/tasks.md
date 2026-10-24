@@ -103,3 +103,9 @@ Voir `docs/specs/consultation-rapports/spec.md`.
 ## Points bloquants non tranchés
 
 Voir `spec.md` (questions ouvertes) et `docs/analyse-merise.md` §11. Le domaine de la phase 1 n'impose aucun de ces choix : numérotation de ticket (OP-1), validité du Mobile Money hors ligne (OP-3) et politique de conflit de stock (OP-4) restent hors du modèle.
+
+## Prix d'achat moyen et marge exacte (V1)
+
+Voir `docs/specs/cout-moyen/spec.md` et `docs/decisions/0007-cout-moyen-pondere.md`.
+
+- [x] T110 Prix d'achat moyen pondéré à la réception, coût figé à la vente, marge exacte ou estimée, écrans — CM-01 à CM-05 (RG-11)

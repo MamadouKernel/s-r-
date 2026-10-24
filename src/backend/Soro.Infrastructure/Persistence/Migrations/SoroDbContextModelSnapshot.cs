@@ -461,6 +461,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<long?>("UnitCost")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_cost");
+
                     b.Property<long>("UnitPrice")
                         .HasColumnType("bigint")
                         .HasColumnName("unit_price");
@@ -469,7 +473,7 @@ namespace Soro.Infrastructure.Persistence.Migrations
 
                     b.ToTable("sale_lines", null, t =>
                         {
-                            t.HasCheckConstraint("ck_sale_lines_values", "quantity > 0 AND unit_price >= 0");
+                            t.HasCheckConstraint("ck_sale_lines_values", "quantity > 0 AND unit_price >= 0 AND (unit_cost IS NULL OR unit_cost >= 0)");
                         });
                 });
 
@@ -663,6 +667,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<long?>("UnitCost")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_cost");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -675,7 +683,7 @@ namespace Soro.Infrastructure.Persistence.Migrations
 
                     b.ToTable("stock_movements", null, t =>
                         {
-                            t.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0");
+                            t.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0 AND (unit_cost IS NULL OR unit_cost >= 0)");
                         });
                 });
 

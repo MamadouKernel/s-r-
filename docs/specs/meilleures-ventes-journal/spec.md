@@ -7,7 +7,7 @@ Chacune a un endpoint serveur, puis un écran. Les maquettes ne sont pas validé
 
 - **Meilleures ventes : trois classements** : les plus vendus (quantité), ceux qui rapportent le plus de chiffre d'affaires, et les plus rentables (marge).
 - **La marge est une estimation, et le dit** : une ligne de vente fige son prix de vente mais pas le coût. La marge est calculée avec le **prix d'achat actuel** de la fiche
-  (prix de vente figé − prix d'achat actuel) × quantité. Le prix d'achat *moyen* (RG-11) n'existe pas encore, donc la marge peut s'écarter de la réalité si le prix d'achat a changé.
+  (prix de vente figé − prix d'achat actuel) × quantité. Le prix d'achat *moyen* (RG-11) n'existait pas à l'origine : voir `docs/specs/cout-moyen/spec.md`, qui rend la marge exacte pour les ventes enregistrées depuis (coût retenu à la vente) et la signale « estimée » pour les plus anciennes.
   Un produit sans fiche (ou sans prix d'achat connu) n'a pas de marge plutôt qu'une marge fausse.
 - **Droits de la marge** : seuls les profils qui voient les prix d'achat (propriétaire, gérant) peuvent classer par marge ou la lire ; un comptable reçoit 403 pour ce classement.
 - **Le chiffre d'affaires d'un produit est la somme de ses lignes** (prix figé × quantité), **avant** une éventuelle remise accordée sur l'ensemble de la vente : la remise globale n'est pas ventilée par produit.

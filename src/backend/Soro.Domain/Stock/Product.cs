@@ -134,16 +134,35 @@ public sealed class Product
     /// <summary>Un produit désactivé reste lisible dans l'historique mais n'est plus proposé à la vente.</summary>
     public void Deactivate() => IsActive = false;
 
-    /// <summary>Entrée de marchandise (STK-01).</summary>
+    /// <summary>
+    /// Entrée de marchandise (STK-01). Avec le prix d'achat unitaire de la livraison, le prix d'achat du produit devient la moyenne pondérée
+    /// (RG-11, docs/decisions/0007) ; sans prix, il ne change pas.
+    /// </summary>
     public StockMovement Receive(
         int quantity,
         string? supplier,
         UserId user,
         DateTimeOffset at,
-        StockMovementId? movementId = null)
+        StockMovementId? movementId = null,
+        Money? unitCost = null)
     {
         EnsureStockOperation(quantity);
-        return Apply(movementId, StockMovementKind.Reception, quantity, Clean(supplier), null, user, at);
+        var average = unitCost is { } cost ? WeightedAverage(cost, quantity) : PurchasePrice;
+        var movement = Apply(movementId, StockMovementKind.Reception, quantity, Clean(supplier), null, user, at, unitCost);
+        PurchasePrice = average;
+        return movement;
+    }
+
+    /// <summary>
+    /// Moyenne pondérée à l'FCFA le plus proche (0,5 vers le haut). Le stock négatif (ventes hors ligne passées avant la réception, déjà
+    /// valorisées) ne pèse pas : le stock utile est au moins 0.
+    /// </summary>
+    private Money WeightedAverage(Money deliveryCost, int deliveredQuantity)
+    {
+        var useful = Math.Max(QuantityOnHand, 0);
+        var total = (decimal)useful * PurchasePrice.Amount + (decimal)deliveredQuantity * deliveryCost.Amount;
+        var average = Math.Round(total / (useful + (decimal)deliveredQuantity), MidpointRounding.AwayFromZero);
+        return Money.Fcfa((long)average);
     }
 
     /// <summary>Sortie hors vente : périmé, cassé, consommation interne (STK-02).</summary>
@@ -184,11 +203,12 @@ public sealed class Product
         string? reason,
         Guid? sourceId,
         UserId user,
-        DateTimeOffset at)
+        DateTimeOffset at,
+        Money? unitCost = null)
     {
         Ensure.That((reason?.Length ?? 0) <= MaxReasonLength, $"Le motif ne peut pas dépasser {MaxReasonLength} caractères.");
         QuantityOnHand = checked(QuantityOnHand + delta);
-        return new StockMovement(movementId ?? StockMovementId.New(), Tenant, Id, kind, delta, reason, sourceId, user, at);
+        return new StockMovement(movementId ?? StockMovementId.New(), Tenant, Id, kind, delta, reason, sourceId, user, at, unitCost);
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

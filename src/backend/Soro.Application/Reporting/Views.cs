@@ -81,7 +81,9 @@ public enum RankingCriterion
 /// Un produit au classement. La marge est une <b>estimation</b> : prix de vente figé de la ligne moins le prix d'achat actuel de la fiche.
 /// Elle vaut <c>null</c> quand elle n'est pas permise au profil ou quand la fiche du produit n'existe plus.
 /// </summary>
-public sealed record ProductRanking(Guid ProductId, string Name, int Quantity, long RevenueFcfa, long? MarginFcfa);
+/// <param name="MarginFcfa">Chiffre d'affaires moins les coûts retenus à la vente ; <c>null</c> sans droit de voir les prix d'achat.</param>
+/// <param name="MarginIsEstimate">Vrai si au moins une ligne de la période n'a pas de coût retenu (vente antérieure à RG-11) : la marge utilise alors le prix d'achat actuel.</param>
+public sealed record ProductRanking(Guid ProductId, string Name, int Quantity, long RevenueFcfa, long? MarginFcfa, bool MarginIsEstimate = false);
 
 /// <summary>Une entrée du journal des actions sensibles (MV-02).</summary>
 public sealed record AuditEntryView(Guid Id, DateTimeOffset At, Guid UserId, string Action, Guid ResourceId, string Detail);

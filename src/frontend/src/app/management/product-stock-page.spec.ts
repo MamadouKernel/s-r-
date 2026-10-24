@@ -4,13 +4,13 @@ import { fakeApi, fakeTeamApi, product, render } from './test-support';
 
 const movement = (overrides = {}) => ({
   id: 'm-1', kind: 'Reception', quantityDelta: 24, reason: 'Grossiste Koné', sourceId: null,
-  userId: '0a1b2c3d-aaaa-bbbb-cccc-111122223333', at: '2026-10-23T09:00:00.000Z', ...overrides,
+  userId: '0a1b2c3d-aaaa-bbbb-cccc-111122223333', at: '2026-10-23T09:00:00.000Z', unitCostFcfa: null, ...overrides,
 });
 
-async function open(role = 'StockKeeper', stock = 24) {
+async function open(role = 'StockKeeper', stock = 24, history: ReturnType<typeof movement>[] = [movement()]) {
   const api = fakeApi();
   api.list.mockResolvedValue([product({ id: 'p-1', quantityOnHand: stock })]);
-  api.movements.mockResolvedValue([movement()]);
+  api.movements.mockResolvedValue(history);
   const page = await render(ProductStockPage, { api, role, params: { id: 'p-1' } });
   return { api, page };
 }
@@ -29,7 +29,7 @@ describe('ProductStockPage', () => {
 
   it('receives goods with a stable movement id, confirms the new stock and refreshes (SC-G3)', async () => {
     const { api, page } = await open();
-    api.receive.mockResolvedValue({ movementId: 'm', quantityOnHand: 48, alreadyProcessed: false });
+    api.receive.mockResolvedValue({ movementId: 'm', quantityOnHand: 48, alreadyProcessed: false, purchasePriceFcfa: 425 });
     api.list.mockResolvedValue([product({ id: 'p-1', quantityOnHand: 48 })]);
     await page.type('#reception-quantite', '24');
     await page.type('#reception-fournisseur', ' Grossiste Koné ');
@@ -41,8 +41,40 @@ describe('ProductStockPage', () => {
       movementId: expect.stringMatching(/^[0-9a-f-]{36}$/), quantity: 24, supplier: 'Grossiste Koné', purchasePriceFcfa: 450,
     });
     expect(page.has('Réception enregistrée. Stock : 48.')).toBe(true);
+    expect(page.has('Prix d’achat moyen : 425')).toBe(true);
     expect(page.has('Stock : 48')).toBe(true);
     expect(page.root.querySelector<HTMLInputElement>('#reception-quantite')!.value).toBe('');
+  });
+
+  it('explains that the price is the one of the delivery and that the average will be recomputed (CM-05)', async () => {
+    const { page } = await open();
+
+    expect(page.has('Prix d’achat de cette livraison')).toBe(true);
+    expect(page.has('Prix d’achat moyen actuel')).toBe(true);
+    expect(page.has('Il sera recalculé avec cette livraison.')).toBe(true);
+    expect(page.has('Nouveau prix d’achat')).toBe(false);
+  });
+
+  it('does not mention an average when the reception had no price', async () => {
+    const { api, page } = await open();
+    api.receive.mockResolvedValue({ movementId: 'm', quantityOnHand: 30, alreadyProcessed: false, purchasePriceFcfa: 400 });
+    await page.type('#reception-quantite', '6');
+
+    await page.submit(0);
+
+    expect(page.has('Réception enregistrée. Stock : 30.')).toBe(true);
+    expect(page.has('Prix d’achat moyen :')).toBe(false);
+  });
+
+  it('shows the price of each delivery in the history, and nothing for a movement without one', async () => {
+    const { page } = await open('Manager', 24, [
+      movement({ id: 'a', quantityDelta: 10, unitCostFcfa: 500 }),
+      movement({ id: 'b', kind: 'Loss', quantityDelta: -1, reason: 'cassé', unitCostFcfa: null }),
+    ]);
+
+    const text = page.root.textContent!.replace(/\u00a0/g, ' ');
+    expect(text).toContain('à 500 FCFA l’unité');
+    expect(text.match(/l’unité/g)).toHaveLength(1);
   });
 
   it('refuses a missing or zero quantity on a reception', async () => {

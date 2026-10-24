@@ -28,6 +28,8 @@ export interface StockMovement {
   sourceId: string | null;
   userId: string;
   at: string;
+  /** Prix d'achat unitaire d'une livraison (réception qui l'a indiqué), sinon `null`. */
+  unitCostFcfa: number | null;
 }
 
 export interface ProductInput {
@@ -43,6 +45,8 @@ export interface StockChange {
   movementId: string;
   quantityOnHand: number;
   alreadyProcessed: boolean;
+  /** Prix d'achat moyen après une réception (RG-11), absent après une perte. */
+  purchasePriceFcfa?: number | null;
 }
 
 /** Appels de gestion : directs au serveur, sans file locale (écrans en ligne seulement). Toute erreur devient une `ApiError`. */

@@ -50,9 +50,9 @@ const KIND_LABEL: Record<MovementKind, string> = {
             <label class="field-label mt-3" for="reception-fournisseur">Fournisseur ou référence (facultatif)</label>
             <input id="reception-fournisseur" class="field" type="text" maxlength="500" autocomplete="off" [value]="supplier()" (input)="supplier.set($any($event.target).value)" />
             @if (current.purchasePriceFcfa !== null) {
-              <label class="field-label mt-3" for="reception-prix">Nouveau prix d’achat (FCFA, facultatif)</label>
-              <input id="reception-prix" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="newPurchasePrice()" (input)="newPurchasePrice.set($any($event.target).value)" />
-              <p class="field-help">Prix actuel : {{ format(current.purchasePriceFcfa) }}</p>
+              <label class="field-label mt-3" for="reception-prix">Prix d’achat de cette livraison (FCFA, facultatif)</label>
+              <input id="reception-prix" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="newPurchasePrice()" (input)="newPurchasePrice.set($any($event.target).value)" aria-describedby="reception-prix-aide" />
+              <p id="reception-prix-aide" class="field-help">Prix d’achat moyen actuel : {{ format(current.purchasePriceFcfa) }}. Il sera recalculé avec cette livraison.</p>
             }
             @if (receiveError()) {
               <p class="field-error" role="alert">{{ receiveError() }}</p>
@@ -99,7 +99,12 @@ const KIND_LABEL: Record<MovementKind, string> = {
                       <td class="px-3 py-2">{{ date(movement.at) }}</td>
                       <td class="px-3 py-2 font-semibold">{{ kind(movement) }}</td>
                       <td class="amount px-3 py-2 text-right font-bold">{{ movement.quantityDelta > 0 ? '+' : '' }}{{ movement.quantityDelta }}</td>
-                      <td class="px-3 py-2">{{ movement.reason || '—' }}</td>
+                      <td class="px-3 py-2">
+                        {{ movement.reason || '—' }}
+                        @if (movement.unitCostFcfa != null) {
+                          <span class="block text-sm text-ardoise">à {{ format(movement.unitCostFcfa) }} l’unité</span>
+                        }
+                      </td>
                       <td class="px-3 py-2">{{ author(movement) }}</td>
                     </tr>
                   }
@@ -165,7 +170,7 @@ export class ProductStockPage implements OnInit {
     const priceText = this.newPurchasePrice().trim();
     const price = priceText === '' ? null : parseFcfa(priceText);
     if (priceText !== '' && price === null) {
-      this.receiveError.set('Le nouveau prix d’achat doit être un montant entier en FCFA.');
+      this.receiveError.set('Le prix d’achat de la livraison doit être un montant entier en FCFA.');
       return;
     }
 
@@ -181,7 +186,11 @@ export class ProductStockPage implements OnInit {
         this.receiveQuantity.set('');
         this.supplier.set('');
         this.newPurchasePrice.set('');
-        this.notice.set(`Réception enregistrée. Stock : ${result.quantityOnHand}.`);
+        const average = result.purchasePriceFcfa;
+        this.notice.set(
+          `Réception enregistrée. Stock : ${result.quantityOnHand}.` +
+            (price !== null && average != null ? ` Prix d’achat moyen : ${formatFcfa(average)}.` : ''),
+        );
       },
       (message) => this.receiveError.set(message),
     );

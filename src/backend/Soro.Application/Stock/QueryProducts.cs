@@ -46,7 +46,8 @@ public sealed record StockMovementView(
     string? Reason,
     Guid? SourceId,
     Guid UserId,
-    DateTimeOffset At);
+    DateTimeOffset At,
+    long? UnitCostFcfa);
 
 public sealed record ListStockMovementsQuery(ProductId Product, int Limit);
 
@@ -79,7 +80,7 @@ public sealed class ListStockMovementsHandler(
             found
                 .Select(movement => new StockMovementView(
                     movement.Id.Value, movement.Kind, movement.QuantityDelta, movement.Reason,
-                    movement.SourceId, movement.User.Value, movement.At))
+                    movement.SourceId, movement.User.Value, movement.At, movement.UnitCost?.Amount))
                 .ToArray());
     }
 }

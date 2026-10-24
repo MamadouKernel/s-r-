@@ -58,6 +58,7 @@ internal static class ProductMapper
             SourceId = movement.SourceId,
             UserId = movement.User.Value,
             At = movement.At.ToUniversalTime(),
+            UnitCost = movement.UnitCost?.Amount,
         };
 
     public static StockMovement ToDomain(StockMovementRow row) =>
@@ -70,5 +71,6 @@ internal static class ProductMapper
             row.Reason,
             row.SourceId,
             new UserId(row.UserId),
-            row.At);
+            row.At,
+            row.UnitCost is { } cost ? Money.Fcfa(cost) : null);
 }

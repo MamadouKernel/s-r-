@@ -90,7 +90,7 @@ public sealed class RecordSaleHandler(
         CashRegisterSession session,
         CancellationToken cancellationToken)
     {
-        var draft = ToDraft(command);
+        var draft = await WithCostsAsync(ToDraft(command), cancellationToken);
 
         var discountError = await CheckDiscountAsync(command, draft, cancellationToken);
         if (discountError is not null)
@@ -128,6 +128,27 @@ public sealed class RecordSaleHandler(
                 await products.UpdateAsync(product!, cancellationToken);
             }
         }
+    }
+
+    /// <summary>
+    /// Fige sur chaque ligne le prix d'achat moyen du produit à cet instant (RG-11, docs/decisions/0007) : la marge d'une vente ne bougera plus
+    /// quand les prix des fournisseurs changeront. Un produit inconnu du commerce n'a pas de coût.
+    /// </summary>
+    private async Task<SaleDraft> WithCostsAsync(SaleDraft draft, CancellationToken cancellationToken)
+    {
+        var costs = new Dictionary<ProductId, Money?>();
+        foreach (var productId in draft.Lines.Select(line => line.ProductId).Distinct())
+        {
+            var product = await products.GetAsync(productId, user.Tenant, cancellationToken);
+            costs[productId] = product?.PurchasePrice;
+        }
+
+        return draft with
+        {
+            Lines = draft.Lines
+                .Select(line => SaleLine.Create(line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, costs[line.ProductId]))
+                .ToArray(),
+        };
     }
 
     private async Task<ApplicationError?> CheckDiscountAsync(

@@ -41,6 +41,8 @@ export interface ProductRanking {
   quantity: number;
   revenueFcfa: number;
   marginFcfa: number | null;
+  /** Vrai si une ligne de la période n'a pas de coût retenu : la marge utilise alors le prix d'achat actuel (RG-11). */
+  marginIsEstimate: boolean;
 }
 
 /** Lectures du tableau de bord : directes au serveur, sans file locale (écran en ligne seulement). */

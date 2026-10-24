@@ -83,6 +83,7 @@ internal static class SaleMapper
             ProductName = line.ProductName,
             Quantity = line.Quantity,
             UnitPrice = line.UnitPrice.Amount,
+            UnitCost = line.UnitCost?.Amount,
         };
 
     private static PaymentRow ToRow(Payment payment, Guid saleId, Guid tenant, int position) =>
@@ -100,7 +101,8 @@ internal static class SaleMapper
         };
 
     private static SaleLine ToDomain(SaleLineRow row) =>
-        SaleLine.Restore(new ProductId(row.ProductId), row.ProductName, row.Quantity, Money.Fcfa(row.UnitPrice));
+        SaleLine.Restore(
+            new ProductId(row.ProductId), row.ProductName, row.Quantity, Money.Fcfa(row.UnitPrice), row.UnitCost is { } cost ? Money.Fcfa(cost) : null);
 
     private static Payment ToDomain(PaymentRow row) =>
         Payment.Restore(

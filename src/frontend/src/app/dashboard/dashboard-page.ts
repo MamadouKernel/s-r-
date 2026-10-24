@@ -189,7 +189,7 @@ interface SessionsBlock {
                 }
               </ol>
               @if (criterion() === 'margin') {
-                <p class="field-help">Marge estimée d’après le prix d’achat actuel de chaque produit : elle peut s’écarter de la réalité si ce prix a changé.</p>
+                <p class="field-help">Marge = ce que vous avez encaissé moins ce que le produit vous avait coûté (son prix d’achat moyen) au moment de chaque vente. Pour les ventes plus anciennes, le coût n’est pas connu : la marge utilise alors le prix d’achat actuel et s’affiche « estimée ».</p>
               }
             }
           } @else if (ranking().error) {
@@ -374,7 +374,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       case 'revenue':
         return formatFcfa(item.revenueFcfa);
       case 'margin':
-        return item.marginFcfa === null ? 'marge inconnue' : formatFcfa(item.marginFcfa);
+        return item.marginFcfa === null ? 'marge inconnue' : formatFcfa(item.marginFcfa) + (item.marginIsEstimate ? ' (estimée)' : '');
       default:
         return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
     }
