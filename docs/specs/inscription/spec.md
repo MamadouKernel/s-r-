@@ -66,8 +66,18 @@ Tracé : `device.invited`. Un caissier ne peut pas créer d'invitation (403).
 - Conséquence assumée : les ventes encore non envoyées d'un appareil révoqué ne partent plus (à signaler dans l'écran de révocation, PR 3).
 
 ### INS-10 Écrans (PR 3)
-Inscription en trois étapes (commerce, vérification du code, mot de passe), connexion du propriétaire, mot de passe oublié, invitation d'appareil (lien et QR), configuration d'une caisse par lien ou QR,
-liste des appareils avec révocation. États : chargement, erreur, hors ligne ; 320 px sans débordement.
+Principe : **personne ne saisit ni ne voit jamais un identifiant technique**. L'utilisateur tape son adresse e-mail, un code de 6 chiffres reçu par e-mail, un nom, un mot de passe ou un PIN ; tout le reste (identifiants de demande, de commerce, d'appareil, secrets) reste dans l'application.
+Chaque écran : chargement, erreur (en français simple, avec ce qu'il faut faire), hors ligne, 320 px sans défilement horizontal, cibles de 48 px, état jamais porté par la seule couleur.
+
+- **Bienvenue** (`/bienvenue`, appareil non configuré) : trois choix en grands boutons : « Créer ma boutique », « J'ai déjà une boutique » (propriétaire), « J'ai reçu un lien » (explique : ouvrez le lien ou scannez le QR reçu du propriétaire). Si l'appareil a été retiré, un message le dit et dit quoi faire.
+- **Inscription** (`/inscription`), deux écrans : (1) la boutique : nom, type d'activité en mots (« Supérette », « Boutique », « Quincaillerie »…), nom du propriétaire, adresse e-mail, case « J'accepte les conditions d'utilisation » ; (2) la vérification : « Nous avons envoyé un code à… », code, mot de passe (règle écrite avant la saisie, affichage possible), « Renvoyer le code » (compte à rebours de 60 s puis actif), « Changer d'adresse e-mail ». Un code faux ramène au champ du code avec le nombre d'essais restants. Au succès, le propriétaire est connecté et arrive sur son tableau de bord (30 jours d'essai).
+- **Connexion du propriétaire** (`/connexion-proprietaire`) : adresse e-mail, mot de passe (affichage possible), « Mot de passe oublié ? », « Créer ma boutique ».
+- **Mot de passe oublié** (`/mot-de-passe-oublie`) : adresse e-mail ; réponse toujours la même (« Si cette adresse a un compte, un code vient d'être envoyé ») ; puis code et nouveau mot de passe ; au succès retour à la connexion avec « Mot de passe changé ».
+- **Ajouter un appareil** (`/gestion/appareils`, propriétaire et gérant) : liste des appareils (nom, état en toutes lettres, dernière activité) ; « Ajouter un appareil » : nom facultatif, puis **QR code et lien** à envoyer (« Valable 24 heures, une seule fois »), boutons « Copier le lien » et « Partager » (le partage système, par la messagerie que la personne choisit) ; « Retirer » avec confirmation qui dit ce que cela implique (appareil coupé, ventes non envoyées perdues).
+- **Rejoindre** (`/rejoindre#…`) : le lien du propriétaire ; le jeton se lit dans la partie `#` de l'adresse (jamais envoyée à un serveur) ; l'écran demande seulement le nom de l'appareil (« Caisse » proposé) et un bouton « Configurer cet appareil » ; lien utilisé, expiré ou incomplet : message clair et quoi faire.
+- **Connexion des caissiers** : inchangée (identifiant et PIN) ; l'appareil enrôlé est joint automatiquement ; un appareil retiré affiche « Cet appareil n'est plus autorisé » et ramène à Bienvenue en gardant les ventes déjà enregistrées sur l'appareil.
+- Le « Code du commerce » de 36 caractères de l'ancien écran de configuration **disparaît**.
+- Conditions d'utilisation : une page provisoire (`/conditions`) marquée comme à valider ; la version acceptée est celle que le serveur attend.
 
 ## Scénarios d'acceptation (PR 1)
 
@@ -93,6 +103,15 @@ liste des appareils avec révocation. États : chargement, erreur, hors ligne ; 
 - **SC-A6** Après révocation, le jeton d'accès déjà émis ne passe plus (401) et la connexion est refusée ; les autres appareils continuent.
 - **SC-A7** Un autre commerce ne voit ni les appareils ni les invitations de celui-ci et ne peut pas les révoquer.
 - **SC-A8** Création, enrôlement et révocation sont dans le journal des actions sensibles (catégorie « appareils »).
+
+## Scénarios d'acceptation des écrans (PR 3)
+
+- **SC-U1** Un commerçant crée sa boutique de bout en bout depuis un téléphone de 320 px sans voir un seul identifiant ni terme technique, et arrive sur son tableau de bord.
+- **SC-U2** Un code faux, un code expiré, une adresse déjà inscrite, un mot de passe trop faible, un serveur d'envoi en panne et une coupure réseau donnent chacun un message clair qui dit quoi faire.
+- **SC-U3** Le gérant ajoute un appareil, obtient un QR et un lien, le caissier ouvre le lien, nomme l'appareil et se connecte avec son PIN ; l'appareil apparaît dans la liste.
+- **SC-U4** Un lien déjà utilisé ou expiré est expliqué en mots simples ; un lien incomplet aussi.
+- **SC-U5** Le gérant retire un appareil après confirmation ; sur cet appareil, la requête suivante le renvoie à Bienvenue avec un message, sans perdre les ventes enregistrées.
+- **SC-U6** « Mot de passe oublié » : même message que l'adresse existe ou non ; avec le code, nouveau mot de passe, retour à la connexion.
 
 ## Hors lot
 

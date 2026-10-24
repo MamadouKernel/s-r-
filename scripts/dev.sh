@@ -82,8 +82,6 @@ trap cleanup EXIT INT TERM
 
 export ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:$API_PORT"
 export ConnectionStrings__Soro="Host=localhost;Port=$DB_PORT;Database=soro;Username=soro_app;Password=app"
-# Tant que les écrans d'enrôlement n'existent pas (PR 3), la connexion sans appareil reste permise en développement.
-export Devices__Required=false
 export Jwt__Issuer=soro-dev Jwt__Audience=soro-dev Jwt__SigningKey="$JWT_KEY" Security__PinPepper="$PIN_PEPPER"
 echo "▶ API sur http://localhost:$API_PORT (journal : .dev/api.log)"
 setsid bash -c 'cd "$1" && exec dotnet run --no-launch-profile' _ "$ROOT/src/backend/Soro.Api" \

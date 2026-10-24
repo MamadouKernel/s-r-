@@ -6,6 +6,7 @@ import { AuthService } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { SyncService } from '../services/sync.service';
+import { FlashService } from '../management/flash.service';
 import { LoginPage } from './login-page';
 
 async function render(login = vi.fn().mockResolvedValue(undefined), session: unknown = null, role: string | undefined = 'Cashier') {
@@ -83,5 +84,69 @@ describe('LoginPage', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Identifiant ou code PIN incorrect');
     expect(root.querySelector<HTMLInputElement>('#pin')!.value).toBe('');
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('LoginPage and the device', () => {
+  async function renderWith(login: ReturnType<typeof vi.fn>, device: object | null, flash = '') {
+    const markDeviceRefused = vi.fn().mockResolvedValue(undefined);
+    const flashService = new FlashService();
+    if (flash) {
+      flashService.show(flash);
+    }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: FlashService, useValue: flashService },
+        { provide: AuthService, useValue: { login, markDeviceRefused, device: () => device, user: () => ({ id: 'u', displayName: 'X', role: 'Cashier' }) } },
+        { provide: CashService, useValue: { session: signal(null).asReadonly() } },
+        { provide: CatalogueService, useValue: { refresh: vi.fn().mockResolvedValue(undefined) } },
+        { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null) } },
+      ],
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(LoginPage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const type = async (selector: string, value: string) => {
+      const input = root.querySelector<HTMLInputElement>(selector)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+    };
+    await type('#identifiant', 'awa');
+    await type('#pin', '4321');
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return { root, navigate, markDeviceRefused };
+  }
+
+  it('forgets a device the server removed and goes to the welcome screen, which explains it (SC-U5)', async () => {
+    const { markDeviceRefused, navigate, root } = await renderWith(
+      vi.fn().mockRejectedValue(new ApiError(403, 'device_not_authorized', 'x')), { tenantId: 't', deviceId: 'd', deviceSecret: 's' },
+    );
+
+    expect(markDeviceRefused).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith('/bienvenue');
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('nouveau lien');
+  });
+
+  it('only explains when the browser never had device credentials (owner browser), without forgetting anything', async () => {
+    const { markDeviceRefused, navigate, root } = await renderWith(
+      vi.fn().mockRejectedValue(new ApiError(403, 'device_not_authorized', 'x')), { tenantId: 't' },
+    );
+
+    expect(markDeviceRefused).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('nouveau lien');
+  });
+
+  it('shows the message left by the device setup, and a way for the owner to sign in', async () => {
+    const { root } = await renderWith(vi.fn().mockResolvedValue(undefined), { tenantId: 't' }, 'Cet appareil est prêt pour « Ma Boutique ».');
+
+    expect(root.querySelector('[role="status"]')?.textContent).toContain('Cet appareil est prêt');
+    expect(root.querySelector('a[href="/connexion-proprietaire"]')).toBeTruthy();
   });
 });

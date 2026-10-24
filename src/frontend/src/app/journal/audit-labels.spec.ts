@@ -12,6 +12,13 @@ describe('actionLabel', () => {
     ]);
   });
 
+  it('names the account and device actions without any technical word', () => {
+    const labels = ['commerce.created', 'user.password.reset', 'device.invited', 'device.enrolled', 'device.revoked'].map(actionLabel);
+    expect(labels).toEqual([
+      'Boutique créée', 'Mot de passe du propriétaire changé', 'Lien d’ajout d’appareil créé', 'Appareil ajouté', 'Appareil retiré',
+    ]);
+  });
+
   it('keeps an action the client does not know as the server sent it', () => {
     expect(actionLabel('user.created')).toBe('user.created');
   });
@@ -20,6 +27,6 @@ describe('actionLabel', () => {
 describe('CATEGORIES', () => {
   it('starts with “all” and uses the values the server understands', () => {
     expect(CATEGORIES[0]).toEqual({ value: null, label: 'Toutes' });
-    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team']);
+    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices']);
   });
 });

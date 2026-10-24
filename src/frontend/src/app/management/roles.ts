@@ -31,3 +31,8 @@ export function canSeeMargin(role: string | undefined): boolean {
 export function canReadAuditLog(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Accountant';
 }
+
+/** Écran Appareils (inviter, retirer) : propriétaire et gérant, comme le serveur. */
+export function canManageDevices(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager';
+}

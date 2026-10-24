@@ -20,6 +20,12 @@ describe('ManagementShell', () => {
     expect(await render('Manager')).toContain('Équipe');
   });
 
+  it('shows the devices section to the owner and the manager only', async () => {
+    expect(await render('Owner')).toContain('Appareils');
+    expect(await render('Manager')).toContain('Appareils');
+    expect(await render('StockKeeper')).not.toContain('Appareils');
+  });
+
   it('keeps the team section away from the stock keeper, who still sees the products (SC-E3)', async () => {
     const text = await render('StockKeeper');
     expect(text).toContain('Produits et stock');

@@ -1,5 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { FlashService } from '../management/flash.service';
+import { ApiError } from '../sync/sync-api';
 import { AuthService, loginErrorMessage } from '../services/auth.service';
 import { landingPath } from './landing';
 import { CashService } from '../services/cash.service';
@@ -9,9 +11,13 @@ import { SyncService } from '../services/sync.service';
 /** S2 : identifiant et code PIN (PWA-01). Le PIN n'est jamais conservé. */
 @Component({
   selector: 'app-login-page',
+  imports: [RouterLink],
   template: `
     <section class="mx-auto max-w-md panel">
       <h2 class="mb-4 text-xl font-bold">Connexion</h2>
+      @if (notice()) {
+        <p class="mb-4 font-semibold text-succes" role="status">{{ notice() }}</p>
+      }
       <form (submit)="submit($event)" novalidate>
         <label class="field-label" for="identifiant">Identifiant</label>
         <input
@@ -44,6 +50,7 @@ import { SyncService } from '../services/sync.service';
           {{ busy() ? 'Connexion…' : 'Se connecter' }}
         </button>
       </form>
+      <p class="mt-4 text-center text-base">Vous êtes le propriétaire ? <a class="font-semibold text-feuille underline" routerLink="/connexion-proprietaire">Connexion du propriétaire</a></p>
     </section>
   `,
 })
@@ -54,6 +61,7 @@ export class LoginPage {
   private readonly sync = inject(SyncService);
   private readonly router = inject(Router);
 
+  protected readonly notice = signal(inject(FlashService).consume());
   protected readonly identifier = signal('');
   protected readonly pin = signal('');
   protected readonly error = signal('');
@@ -80,6 +88,11 @@ export class LoginPage {
     } catch (error) {
       this.pin.set('');
       this.error.set(loginErrorMessage(error));
+      // Le serveur ne reconnaît plus cet appareil : on l'oublie, les ventes déjà enregistrées restent dans le journal.
+      if (error instanceof ApiError && error.code === 'device_not_authorized' && this.auth.device()?.deviceId) {
+        await this.auth.markDeviceRefused();
+        await this.router.navigateByUrl('/bienvenue');
+      }
     } finally {
       this.busy.set(false);
     }
