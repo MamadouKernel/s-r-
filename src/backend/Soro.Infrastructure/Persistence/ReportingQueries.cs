@@ -172,10 +172,13 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 FrozenName = group.Max(line => line.ProductName)!,
                 Quantity = group.Sum(line => line.Quantity),
                 Revenue = group.Sum(line => line.UnitPrice * line.Quantity),
+                // RG-11 : coût retenu à la vente ; les lignes sans coût (ventes antérieures) sont comptées à part pour l'estimation.
+                KnownCost = group.Sum(line => line.UnitCost != null ? line.UnitCost.Value * line.Quantity : 0L),
+                UncostedQuantity = group.Sum(line => line.UnitCost == null ? line.Quantity : 0),
             })
             .ToListAsync(cancellationToken);
 
-        // Fiches des produits vendus : nom actuel et, si permis, prix d'achat actuel (estimation de marge).
+        // Fiches des produits vendus : nom actuel et prix d'achat actuel, utilisé seulement pour les lignes sans coût retenu (estimation).
         var ids = sold.Select(item => item.ProductId).ToList();
         var products = ids.Count == 0
             ? []
@@ -187,8 +190,12 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         var ranking = sold.Select(item =>
         {
             products.TryGetValue(item.ProductId, out var product);
-            long? margin = includeMargin && product is not null ? item.Revenue - (long)item.Quantity * product.PurchasePrice : null;
-            return new ProductRanking(item.ProductId, product?.Name ?? item.FrozenName, item.Quantity, item.Revenue, margin);
+            // Sans fiche, des lignes sans coût n'ont rien pour s'estimer : marge inconnue. Sinon : coûts retenus + estimation du reste.
+            long? margin = includeMargin && (item.UncostedQuantity == 0 || product is not null)
+                ? item.Revenue - item.KnownCost - (long)item.UncostedQuantity * (product?.PurchasePrice ?? 0)
+                : null;
+            return new ProductRanking(
+                item.ProductId, product?.Name ?? item.FrozenName, item.Quantity, item.Revenue, margin, includeMargin && item.UncostedQuantity > 0);
         });
 
         // Critère décroissant, puis le nom pour un ordre stable ; sans marge connue, un produit passe après ceux qui en ont une.

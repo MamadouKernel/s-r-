@@ -90,6 +90,9 @@ internal sealed class SaleLineRow
     public int Quantity { get; set; }
 
     public long UnitPrice { get; set; }
+
+    /// <summary>Prix d'achat moyen retenu à la vente (RG-11) ; <c>null</c> pour un produit inconnu ou une vente antérieure.</summary>
+    public long? UnitCost { get; set; }
 }
 
 internal sealed class PaymentRow
@@ -207,6 +210,9 @@ internal sealed class StockMovementRow
     public Guid UserId { get; set; }
 
     public DateTimeOffset At { get; set; }
+
+    /// <summary>Prix d'achat unitaire de la livraison, pour une réception qui l'a indiqué.</summary>
+    public long? UnitCost { get; set; }
 }
 
 internal sealed class CommerceRow

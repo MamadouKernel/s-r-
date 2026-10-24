@@ -12,9 +12,16 @@ public sealed record ReceiveStockCommand(
     string? Supplier,
     long? PurchasePriceFcfa);
 
-public sealed record StockResult(StockMovementId MovementId, int QuantityOnHand, bool AlreadyProcessed);
+/// <param name="MovementId">Le mouvement créé (ou déjà traité).</param>
+/// <param name="QuantityOnHand">Le stock après l'opération.</param>
+/// <param name="AlreadyProcessed">Vrai si l'identifiant avait déjà été traité : rien n'est recalculé.</param>
+/// <param name="PurchasePriceFcfa">Le prix d'achat moyen après une réception (RG-11) ; <c>null</c> pour une perte.</param>
+public sealed record StockResult(StockMovementId MovementId, int QuantityOnHand, bool AlreadyProcessed, long? PurchasePriceFcfa = null);
 
-/// <summary>Réception fournisseur (STK-01). Rejouable par identifiant de mouvement ; peut mettre à jour le prix d'achat.</summary>
+/// <summary>
+/// Réception fournisseur (STK-01). Rejouable par identifiant de mouvement. Le prix indiqué est celui de la <b>livraison</b> : le prix d'achat
+/// du produit devient la moyenne pondérée (RG-11, docs/decisions/0007).
+/// </summary>
 public sealed class ReceiveStockHandler(
     ICurrentUser user,
     IProductRepository products,
@@ -39,23 +46,20 @@ public sealed class ReceiveStockHandler(
 
         if (await movements.ExistsAsync(command.MovementId, user.Tenant, cancellationToken))
         {
-            return Result<StockResult>.Success(new(command.MovementId, product.QuantityOnHand, AlreadyProcessed: true));
+            return Result<StockResult>.Success(
+                new(command.MovementId, product.QuantityOnHand, AlreadyProcessed: true, product.PurchasePrice.Amount));
         }
 
         try
         {
-            var movement = product.Receive(command.Quantity, command.Supplier, user.User, clock.UtcNow, command.MovementId);
-            if (command.PurchasePriceFcfa is { } purchase)
-            {
-                product.Edit(
-                    product.Name, product.Barcode, product.Category,
-                    Money.Fcfa(purchase), product.SalePrice, product.AlertThreshold);
-            }
+            var deliveryCost = command.PurchasePriceFcfa is { } purchase ? Money.Fcfa(purchase) : (Money?)null;
+            var movement = product.Receive(command.Quantity, command.Supplier, user.User, clock.UtcNow, command.MovementId, deliveryCost);
 
             await movements.AddAsync(movement, cancellationToken);
             await products.UpdateAsync(product, cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
-            return Result<StockResult>.Success(new(movement.Id, product.QuantityOnHand, AlreadyProcessed: false));
+            return Result<StockResult>.Success(
+                new(movement.Id, product.QuantityOnHand, AlreadyProcessed: false, product.PurchasePrice.Amount));
         }
         catch (DomainException exception)
         {

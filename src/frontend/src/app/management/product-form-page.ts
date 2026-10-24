@@ -47,8 +47,9 @@ interface FieldErrors {
           <input id="prix-vente" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="salePrice()" (input)="salePrice.set($any($event.target).value)" [attr.aria-invalid]="errors().salePrice ? 'true' : null" aria-describedby="prix-vente-erreur" />
           <p id="prix-vente-erreur" class="field-error">{{ errors().salePrice }}</p>
 
-          <label class="field-label mt-4" for="prix-achat">Prix d’achat (FCFA)</label>
-          <input id="prix-achat" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="purchasePrice()" (input)="purchasePrice.set($any($event.target).value)" [attr.aria-invalid]="errors().purchasePrice ? 'true' : null" aria-describedby="prix-achat-erreur" />
+          <label class="field-label mt-4" for="prix-achat">Prix d’achat moyen (FCFA)</label>
+          <input id="prix-achat" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="purchasePrice()" (input)="purchasePrice.set($any($event.target).value)" [attr.aria-invalid]="errors().purchasePrice ? 'true' : null" aria-describedby="prix-achat-aide prix-achat-erreur" />
+          <p id="prix-achat-aide" class="field-help">Recalculé à chaque réception où vous indiquez le prix de la livraison. Le modifier ici le remplace.</p>
           <p id="prix-achat-erreur" class="field-error">{{ errors().purchasePrice }}</p>
 
           <label class="field-label mt-4" for="seuil">Seuil d’alerte de stock</label>

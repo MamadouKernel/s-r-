@@ -89,7 +89,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
     private static void ConfigureSaleLines(EntityTypeBuilder<SaleLineRow> line)
     {
         line.ToTable("sale_lines", table =>
-            table.HasCheckConstraint("ck_sale_lines_values", "quantity > 0 AND unit_price >= 0"));
+            table.HasCheckConstraint("ck_sale_lines_values", "quantity > 0 AND unit_price >= 0 AND (unit_cost IS NULL OR unit_cost >= 0)"));
         line.HasKey(row => new { row.SaleId, row.Position });
         line.Property(row => row.ProductName).HasMaxLength(200);
     }
@@ -205,7 +205,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
     private static void ConfigureStockMovements(EntityTypeBuilder<StockMovementRow> movement)
     {
         movement.ToTable("stock_movements", table =>
-            table.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0"));
+            table.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0 AND (unit_cost IS NULL OR unit_cost >= 0)"));
         movement.HasKey(row => row.Id);
         movement.Property(row => row.Kind).HasConversion<string>().HasMaxLength(24);
         movement.Property(row => row.Reason).HasMaxLength(500);

@@ -128,5 +128,6 @@ internal static class ProductEndpoints
     }
 
     private static IResult ToResponse(StockResult result) =>
-        Results.Ok(new StockChangedResponse(result.MovementId.Value, result.QuantityOnHand, result.AlreadyProcessed));
+        Results.Ok(new StockChangedResponse(
+            result.MovementId.Value, result.QuantityOnHand, result.AlreadyProcessed, result.PurchasePriceFcfa));
 }
