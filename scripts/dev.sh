@@ -83,10 +83,18 @@ trap cleanup EXIT INT TERM
 # Envoi réel des e-mails (facultatif) : si .dev/mail.env existe, ses réglages Mail__Smtp__* sont transmis à l'API. Sans lui, les e-mails
 # s'écrivent dans .dev/api.log. Modèle : scripts/mail.env.example. Ce fichier contient un mot de passe : il ne part jamais sur GitHub (.dev/ est ignoré).
 if [ -f "$STATE/mail.env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$STATE/mail.env"
-  set +a
+  # Lecture ligne par ligne, valeurs prises telles quelles : un mot de passe avec des espaces ou des caractères spéciaux ne casse rien.
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|\#*) continue ;; esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && [ "$key" != "$line" ]; then
+      export "$key=$value"
+    else
+      echo "⚠ .dev/mail.env : ligne ignorée (elle doit être de la forme NOM=valeur) : ${line:0:40}"
+    fi
+  done < "$STATE/mail.env"
   echo "▶ E-mails réels : réglages lus dans .dev/mail.env"
 else
   echo "▶ E-mails : écrits dans .dev/api.log (aucun envoi réel ; voir scripts/mail.env.example)"
