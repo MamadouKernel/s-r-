@@ -13,6 +13,7 @@ public sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUse
     public const string TenantClaim = "tenant_id";
     public const string SubjectClaim = "sub";
     public const string RoleClaim = "role";
+    public const string DeviceClaim = "device_id";
 
     public TenantId Tenant => Identity.Tenant;
 
@@ -37,6 +38,10 @@ public sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUse
 
         return new CurrentIdentity(new TenantId(tenant), new UserId(user), role);
     }
+
+    /// <summary>L'appareil d'où vient le jeton, s'il en porte un.</summary>
+    public static DeviceId? ReadDevice(ClaimsPrincipal? principal) =>
+        principal is not null && TryGuid(principal.FindFirstValue(DeviceClaim), out var device) ? new DeviceId(device) : null;
 
     private static bool TryGuid(string? value, out Guid result) =>
         Guid.TryParse(value, out result) && result != Guid.Empty;

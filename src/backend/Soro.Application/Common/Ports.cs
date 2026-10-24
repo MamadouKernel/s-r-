@@ -40,4 +40,7 @@ public static class AuditActions
     public const string StockLoss = "stock.loss";
     public const string CommerceCreated = "commerce.created";
     public const string PasswordReset = "user.password.reset";
+    public const string DeviceInvited = "device.invited";
+    public const string DeviceEnrolled = "device.enrolled";
+    public const string DeviceRevoked = "device.revoked";
 }

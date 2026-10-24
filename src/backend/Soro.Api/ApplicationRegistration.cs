@@ -1,5 +1,6 @@
 using Soro.Application.Cash;
 using Soro.Application.Common;
+using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Reporting;
 using Soro.Application.Sales;
@@ -28,6 +29,8 @@ public static class ApplicationRegistration
         services.AddSingleton<IPinHasher>(hasher);
         services.AddSingleton<IPasswordHasher>(hasher);
         services.AddSingleton<IVerificationCodes>(new VerificationCodes(pepper));
+        services.AddSingleton<IDeviceSecrets>(new DeviceSecrets(pepper));
+        services.AddSingleton<IDevicePolicy>(new DevicePolicy(configuration.GetValue("Devices:Required", true)));
         services.AddSingleton<ISignupSettings>(new SignupSettings(
             configuration["Signup:TermsVersion"] ?? DefaultTermsVersion,
             configuration.GetValue("Signup:TrialDays", Domain.Tenancy.Commerce.DefaultTrialDays)));
@@ -39,6 +42,11 @@ public static class ApplicationRegistration
         services.AddScoped<SyncSalesHandler>();
         services.AddScoped<CancelSaleHandler>();
         services.AddScoped<LogInHandler>();
+        services.AddScoped<CreateDeviceInvitationHandler>();
+        services.AddScoped<EnrollDeviceHandler>();
+        services.AddScoped<ListDevicesHandler>();
+        services.AddScoped<RevokeDeviceHandler>();
+        services.AddScoped<CheckDeviceAccessHandler>();
         services.AddScoped<StartSignupHandler>();
         services.AddScoped<ResendSignupCodeHandler>();
         services.AddScoped<CompleteSignupHandler>();
@@ -129,6 +137,9 @@ public static class ApplicationRegistration
         }
     }
 }
+
+/// <summary>Réglage <c>Devices:Required</c> : vrai par défaut (ADR 0006).</summary>
+public sealed record DevicePolicy(bool Required) : IDevicePolicy;
 
 public sealed class SystemClock : IClock
 {

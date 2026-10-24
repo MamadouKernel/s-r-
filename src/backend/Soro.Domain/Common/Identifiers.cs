@@ -23,6 +23,16 @@ public readonly record struct UserId(Guid Value)
     public static UserId New() => new(Guid.CreateVersion7());
 }
 
+public readonly record struct DeviceId(Guid Value)
+{
+    public static DeviceId New() => new(Guid.CreateVersion7());
+}
+
+public readonly record struct DeviceInvitationId(Guid Value)
+{
+    public static DeviceInvitationId New() => new(Guid.CreateVersion7());
+}
+
 public readonly record struct SessionId(Guid Value)
 {
     public static SessionId New() => new(Guid.CreateVersion7());

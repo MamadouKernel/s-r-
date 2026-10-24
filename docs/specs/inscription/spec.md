@@ -49,12 +49,21 @@ seul un compte verrouillé reçoit une réponse distincte (423). Verrouillage : 
 ### INS-07 Protection contre les abus (PR 1)
 Limitation de débit par adresse sur toutes les routes publiques d'inscription et de réinitialisation ; plafond par adresse et par jour ; aucun e-mail n'est envoyé pour une adresse invalide ou déjà inscrit.
 
-### INS-08 Invitation d'enrôlement (PR 2)
-Un propriétaire ou un gérant crée une invitation d'appareil : jeton aléatoire à usage unique, valable 24 heures, stocké sous forme de condensat. Réponse : lien et contenu du QR.
+### INS-08 Invitation d'appareil (PR 2)
+`POST /api/v1/devices/invitations` (propriétaire ou gérant) : crée une invitation à usage unique, valable **24 heures**, avec un nom d'appareil suggéré facultatif (« Caisse 1 », 2 à 50 caractères).
+Réponse : un **jeton** (long, aléatoire) et son heure d'expiration. Le jeton ne contient aucun secret lisible, n'est stocké que sous forme de condensat, et n'apparaît jamais dans les journaux. Le client en fait un **lien** et un **QR** (le jeton va dans la partie `#` du lien, qui n'est jamais envoyée à un serveur).
+Tracé : `device.invited`. Un caissier ne peut pas créer d'invitation (403).
 
-### INS-09 Enrôlement et appareils révocables (PR 2)
-L'appareil présente le jeton : il devient un **appareil** du commerce (nom, date, dernière activité) et reçoit un secret propre, conservé sur l'appareil. La connexion d'un caissier exige un appareil valide ;
-la **révocation** d'un appareil refuse immédiatement ses connexions et ses requêtes en cours de session. Liste des appareils, révocation par le propriétaire ou le gérant, traces dans le journal.
+### INS-09 Enrôlement, appareils et révocation (PR 2)
+- `POST /api/v1/devices/enroll` (sans jeton d'accès) : jeton d'invitation et nom d'appareil facultatif. Si l'invitation est valide, elle est **consommée** et l'appareil est créé ; la réponse donne l'identifiant de l'appareil, **son secret (montré une seule fois)**, le commerce et son nom.
+  Le secret n'est stocké que sous forme de condensat. Refus : lien invalide, **déjà utilisé** ou **expiré** (422, messages distincts et clairs, sans jargon). Deux appareils qui présentent le même lien en même temps : un seul gagne.
+  Plafond de débit par adresse. Tracé : `device.enrolled`.
+- **Connexion par PIN** : la requête porte l'appareil (identifiant et secret). Appareil inconnu, secret faux ou appareil révoqué : 403 `device_not_authorized` (« Cet appareil n'est plus autorisé… »), **avant** de toucher au compteur d'échecs du compte.
+  Le jeton d'accès porte l'appareil. Réglage `Devices:Required` (vrai par défaut) ; faux seulement le temps que les écrans arrivent (PR 3), jamais en production.
+- **Révocation** : `POST /api/v1/devices/{id}/revoke` (propriétaire ou gérant, idempotent, tracé `device.revoked`). Dès la révocation, **chaque requête** portant un jeton de cet appareil est refusée (401 `device_not_authorized`), même si le jeton n'a pas expiré, et aucune connexion n'est plus possible.
+- `GET /api/v1/devices` : nom, date d'enrôlement, dernière activité (mise à jour au plus toutes les 5 minutes), état (actif ou révoqué).
+- Le propriétaire (connexion par mot de passe) n'a pas besoin d'appareil.
+- Conséquence assumée : les ventes encore non envoyées d'un appareil révoqué ne partent plus (à signaler dans l'écran de révocation, PR 3).
 
 ### INS-10 Écrans (PR 3)
 Inscription en trois étapes (commerce, vérification du code, mot de passe), connexion du propriétaire, mot de passe oublié, invitation d'appareil (lien et QR), configuration d'une caisse par lien ou QR,
@@ -73,6 +82,17 @@ liste des appareils avec révocation. États : chargement, erreur, hors ligne ; 
 - **SC-I9** « Mot de passe oublié » répond pareil pour une adresse inconnue ; avec le bon code, le nouveau mot de passe fonctionne, l'ancien non, et le verrouillage est levé.
 - **SC-I10** Un autre commerce ne voit jamais le commerce, ses utilisateurs ni ses données ; le jeton du nouveau propriétaire est limité à son commerce.
 - **SC-I11** Hors développement, le serveur refuse de démarrer sans serveur d'envoi réel.
+
+## Scénarios d'acceptation des appareils (PR 2)
+
+- **SC-A1** Le gérant crée une invitation ; un caissier ne le peut pas (403) ; le jeton n'est jamais journalisé et n'est stocké que sous forme de condensat.
+- **SC-A2** Un appareil présente le jeton : il est enrôlé, reçoit son secret une seule fois, l'invitation est consommée ; le même jeton une seconde fois est refusé (« déjà utilisé »).
+- **SC-A3** Une invitation de plus de 24 heures est refusée (« expiré ») ; un jeton falsifié ou tronqué est refusé sans détail.
+- **SC-A4** Deux appareils présentant le même jeton en même temps : un seul est enrôlé.
+- **SC-A5** La connexion par PIN exige un appareil valide ; sans appareil, avec un mauvais secret ou un appareil d'un autre commerce : refus 403, et le compteur d'échecs du compte ne bouge pas.
+- **SC-A6** Après révocation, le jeton d'accès déjà émis ne passe plus (401) et la connexion est refusée ; les autres appareils continuent.
+- **SC-A7** Un autre commerce ne voit ni les appareils ni les invitations de celui-ci et ne peut pas les révoquer.
+- **SC-A8** Création, enrôlement et révocation sont dans le journal des actions sensibles (catégorie « appareils »).
 
 ## Hors lot
 

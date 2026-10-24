@@ -17,7 +17,8 @@ internal sealed class ApiFactory(
     PostgresFixture fixture,
     int? permitPerMinute = null,
     int? loginPermitsPerMinute = null,
-    int? publicPermitsPerMinute = null) : WebApplicationFactory<Program>
+    int? publicPermitsPerMinute = null,
+    bool devicesRequired = false) : WebApplicationFactory<Program>
 {
     private const string Issuer = "https://soro.tests";
     private const string Audience = "soro-api-tests";
@@ -49,6 +50,8 @@ internal sealed class ApiFactory(
             builder.UseSetting("RateLimit:LoginPermitsPerMinute", loginPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
+        // Les tests d'identité d'avant les appareils se connectent sans appareil ; les tests d'appareils l'exigent.
+        builder.UseSetting("Devices:Required", devicesRequired ? "true" : "false");
         if (publicPermitsPerMinute is { } publicPermits)
         {
             builder.UseSetting("RateLimit:PublicPermitsPerMinute", publicPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));

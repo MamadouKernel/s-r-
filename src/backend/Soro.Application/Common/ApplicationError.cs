@@ -26,4 +26,6 @@ public static class ErrorCodes
     public const string VerificationExpired = "verification_expired";
     public const string TooManyRequests = "too_many_requests";
     public const string EmailNotSent = "email_not_sent";
+    public const string InvalidInvitation = "invalid_invitation";
+    public const string DeviceNotAuthorized = "device_not_authorized";
 }
