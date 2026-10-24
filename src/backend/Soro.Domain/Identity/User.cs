@@ -19,7 +19,7 @@ public sealed class User
 
     public static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(15);
 
-    /// <summary>Identifiant interne du propriétaire dans son commerce (jamais saisi : il se connecte par téléphone).</summary>
+    /// <summary>Identifiant interne du propriétaire dans son commerce (jamais saisi : il se connecte par adresse e-mail).</summary>
     public const string OwnerIdentifier = "proprietaire";
 
     private const int MinIdentifierLength = 3;
@@ -59,8 +59,8 @@ public sealed class User
     /// <summary>Condensat du PIN des caissiers et de l'équipe ; <c>null</c> pour un propriétaire, qui se connecte par mot de passe.</summary>
     public string? PinHash { get; }
 
-    /// <summary>Téléphone du propriétaire (identifiant de connexion) ; <c>null</c> pour les profils à PIN.</summary>
-    public PhoneNumber? Phone { get; private set; }
+    /// <summary>Adresse e-mail du propriétaire (identifiant de connexion) ; <c>null</c> pour les profils à PIN.</summary>
+    public EmailAddress? Email { get; private set; }
 
     /// <summary>Condensat du mot de passe du propriétaire ; <c>null</c> pour les profils à PIN.</summary>
     public string? PasswordHash { get; private set; }
@@ -93,13 +93,13 @@ public sealed class User
     }
 
     /// <summary>
-    /// Propriétaire d'un commerce, créé à l'inscription : il se connecte par téléphone et mot de passe, pas par PIN (ADR 0005).
+    /// Propriétaire d'un commerce, créé à l'inscription : il se connecte par adresse e-mail et mot de passe, pas par PIN (ADR 0005).
     /// Son identifiant interne est fixe ; il n'est jamais saisi.
     /// </summary>
     public static User RegisterOwner(
         UserId id,
         TenantId tenant,
-        PhoneNumber phone,
+        EmailAddress email,
         string displayName,
         string passwordHash,
         DateTimeOffset at)
@@ -110,12 +110,12 @@ public sealed class User
 
         return new User(id, tenant, OwnerIdentifier, displayName.Trim(), Role.Owner, null, at)
         {
-            Phone = phone,
+            Email = email,
             PasswordHash = passwordHash,
         };
     }
 
-    /// <summary>Nouveau mot de passe (réinitialisation par SMS) : lève aussi un éventuel verrouillage.</summary>
+    /// <summary>Nouveau mot de passe (réinitialisation par e-mail) : lève aussi un éventuel verrouillage.</summary>
     public void ChangePassword(string passwordHash)
     {
         Ensure.That(PasswordHash is not null, "Ce profil se connecte par PIN : il n'a pas de mot de passe.");
@@ -171,11 +171,11 @@ public sealed class User
         int failedAttempts,
         DateTimeOffset? lockedUntil,
         DateTimeOffset? lastLoginAt,
-        PhoneNumber? phone,
+        EmailAddress? email,
         string? passwordHash) =>
         new(id, tenant, identifier, displayName, role, pinHash, createdAt)
         {
-            Phone = phone,
+            Email = email,
             PasswordHash = passwordHash,
             Status = status,
             FailedAttempts = failedAttempts,

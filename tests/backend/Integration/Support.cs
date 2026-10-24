@@ -85,13 +85,13 @@ internal static class Samples
             null);
 }
 
-/// <summary>Garde chaque SMS envoyé par le serveur de test, sans rien envoyer.</summary>
-internal sealed class CapturingSms : Soro.Application.Signup.ISmsSender
+/// <summary>Garde chaque e-mail envoyé par le serveur de test, sans rien envoyer.</summary>
+internal sealed class CapturingMail : Soro.Application.Signup.IEmailSender
 {
-    private readonly List<(PhoneNumber To, string Message)> _sent = [];
+    private readonly List<(EmailAddress To, string Message)> _sent = [];
     private readonly Lock _gate = new();
 
-    public IReadOnlyList<(PhoneNumber To, string Message)> Sent
+    public IReadOnlyList<(EmailAddress To, string Message)> Sent
     {
         get
         {
@@ -102,18 +102,18 @@ internal sealed class CapturingSms : Soro.Application.Signup.ISmsSender
         }
     }
 
-    public string LastCodeFor(string phone)
+    public string LastCodeFor(string email)
     {
-        var number = PhoneNumber.Parse(phone);
+        var number = EmailAddress.Parse(email);
         var message = Sent.Last(item => item.To == number).Message;
         return new string(message.SkipWhile(c => !char.IsAsciiDigit(c)).TakeWhile(char.IsAsciiDigit).ToArray());
     }
 
-    public Task SendAsync(PhoneNumber recipient, string message, CancellationToken cancellationToken)
+    public Task SendAsync(EmailAddress recipient, Soro.Application.Signup.EmailMessage message, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
-            _sent.Add((recipient, message));
+            _sent.Add((recipient, $"{message.Subject}\n{message.Body}"));
         }
 
         return Task.CompletedTask;

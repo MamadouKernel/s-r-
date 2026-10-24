@@ -29,7 +29,7 @@ internal static class SignupEndpoints
     private static async Task<IResult> StartAsync(StartSignupRequest request, StartSignupHandler handler, CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(
-            new StartSignupCommand(request.Phone, request.CommerceName, request.Activity, request.OwnerName, request.TermsVersion),
+            new StartSignupCommand(request.Email, request.CommerceName, request.Activity, request.OwnerName, request.TermsVersion),
             cancellationToken);
         return result.ToHttp(started => Results.Ok(new SignupStartedResponse(started.VerificationId, started.ExpiresAt, started.ResendAvailableAt)));
     }
@@ -56,7 +56,7 @@ internal static class SignupEndpoints
 
     private static async Task<IResult> LogInAsync(OwnerLogInRequest request, OwnerLogInHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(new OwnerLogInCommand(request.Phone, request.Password), cancellationToken);
+        var result = await handler.HandleAsync(new OwnerLogInCommand(request.Email, request.Password), cancellationToken);
         return result.ToHttp(login => Results.Ok(new OwnerSessionResponse(
             login.Token.Value,
             "Bearer",
@@ -70,14 +70,14 @@ internal static class SignupEndpoints
     private static async Task<IResult> StartResetAsync(StartPasswordResetRequest request, StartPasswordResetHandler handler, CancellationToken cancellationToken)
     {
         // 202 que le numéro ait un compte ou non : la réponse ne révèle rien (SC-I9).
-        var result = await handler.HandleAsync(new StartPasswordResetCommand(request.Phone), cancellationToken);
+        var result = await handler.HandleAsync(new StartPasswordResetCommand(request.Email), cancellationToken);
         return result.ToHttp(_ => Results.Accepted());
     }
 
     private static async Task<IResult> ConfirmResetAsync(ConfirmPasswordResetRequest request, ConfirmPasswordResetHandler handler, CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(
-            new ConfirmPasswordResetCommand(request.Phone, request.Code, request.NewPassword), cancellationToken);
+            new ConfirmPasswordResetCommand(request.Email, request.Code, request.NewPassword), cancellationToken);
         return result.ToHttp(_ => Results.NoContent());
     }
 }

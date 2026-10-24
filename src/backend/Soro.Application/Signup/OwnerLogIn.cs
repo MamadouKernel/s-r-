@@ -5,12 +5,12 @@ using Soro.Domain.Identity;
 
 namespace Soro.Application.Signup;
 
-public sealed record OwnerLogInCommand(string Phone, string Password);
+public sealed record OwnerLogInCommand(string Email, string Password);
 
 public sealed record OwnerLogInResult(AccessToken Token, UserId UserId, string DisplayName, TenantId Tenant, string CommerceName);
 
 /// <summary>
-/// Connexion du propriétaire par téléphone et mot de passe (INS-05). Une seule réponse pour un numéro inconnu, mal écrit, un compte désactivé ou
+/// Connexion du propriétaire par adresse e-mail et mot de passe (INS-05). Une seule réponse pour une adresse inconnue, mal écrit, un compte désactivé ou
 /// un mauvais mot de passe, avec le même travail de calcul ; seul un compte verrouillé reçoit une réponse distincte (comme pour le PIN, ADR 0003).
 /// </summary>
 public sealed class OwnerLogInHandler(
@@ -24,7 +24,7 @@ public sealed class OwnerLogInHandler(
     IUnitOfWork unitOfWork)
 {
     private static readonly ApplicationError Refused =
-        new(ErrorCodes.InvalidCredentials, "Numéro de téléphone ou mot de passe incorrect.");
+        new(ErrorCodes.InvalidCredentials, "Adresse e-mail ou mot de passe incorrect.");
 
     private static readonly ApplicationError Locked =
         new(ErrorCodes.AccountLocked, "Compte verrouillé temporairement. Réessayez dans quelques minutes.");
@@ -36,12 +36,12 @@ public sealed class OwnerLogInHandler(
         var now = clock.UtcNow;
         var password = command.Password ?? string.Empty;
 
-        if (!PhoneNumber.TryParse(command.Phone, out var phone))
+        if (!EmailAddress.TryParse(command.Email, out var email))
         {
             return Refuse(password);
         }
 
-        var account = await directory.FindAsync(phone, cancellationToken);
+        var account = await directory.FindAsync(email, cancellationToken);
         if (account is null)
         {
             return Refuse(password);
@@ -82,7 +82,7 @@ public sealed class OwnerLogInHandler(
             tokens.Issue(user.Tenant, user.Id, user.Role, now), user.Id, user.DisplayName, user.Tenant, commerce?.Name ?? string.Empty));
     }
 
-    /// <summary>Même travail de calcul qu'un compte réel : on ne devine pas l'existence d'un numéro au temps de réponse.</summary>
+    /// <summary>Même travail de calcul qu'un compte réel : on ne devine pas l'existence d'une adresse au temps de réponse.</summary>
     private Result<OwnerLogInResult> Refuse(string password)
     {
         passwords.Verify(password, null);

@@ -4,7 +4,7 @@ namespace Soro.Api.Contracts;
 
 public sealed record StartSignupRequest
 {
-    public required string Phone { get; init; }
+    public required string Email { get; init; }
 
     public required string CommerceName { get; init; }
 
@@ -33,7 +33,7 @@ public sealed record CompleteSignupRequest
 
 public sealed record OwnerLogInRequest
 {
-    public required string Phone { get; init; }
+    public required string Email { get; init; }
 
     public required string Password { get; init; }
 }
@@ -50,12 +50,12 @@ public sealed record OwnerSessionResponse(
 
 public sealed record StartPasswordResetRequest
 {
-    public required string Phone { get; init; }
+    public required string Email { get; init; }
 }
 
 public sealed record ConfirmPasswordResetRequest
 {
-    public required string Phone { get; init; }
+    public required string Email { get; init; }
 
     public required string Code { get; init; }
 

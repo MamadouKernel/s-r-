@@ -40,7 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserDirectory, UserDirectory>();
-        services.AddScoped<IPhoneVerificationRepository, PhoneVerificationRepository>();
+        services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
         services.AddScoped<IOwnerDirectory, OwnerDirectory>();
         services.AddScoped<ICommerceRepository, CommerceRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();

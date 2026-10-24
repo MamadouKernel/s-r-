@@ -15,7 +15,7 @@ internal static class UserMapper
             DisplayName = user.DisplayName,
             Role = user.Role,
             PinHash = user.PinHash,
-            Phone = user.Phone?.Value,
+            Email = user.Email?.Value,
             CreatedAt = user.CreatedAt.ToUniversalTime(),
         };
         Apply(row, user);
@@ -45,6 +45,6 @@ internal static class UserMapper
             row.FailedAttempts,
             row.LockedUntil,
             row.LastLoginAt,
-            row.Phone is null ? null : PhoneNumber.Parse(row.Phone),
+            row.Email is null ? null : EmailAddress.Parse(row.Email),
             row.PasswordHash);
 }

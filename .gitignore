@@ -9,3 +9,6 @@ dist/
 .angular/
 .env
 .env.*
+
+# Environnement de développement local (scripts/dev.sh)
+.dev/

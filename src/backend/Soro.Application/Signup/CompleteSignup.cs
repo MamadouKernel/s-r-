@@ -23,7 +23,7 @@ public sealed record CompleteSignupResult(
 /// </summary>
 public sealed class CompleteSignupHandler(
     ITenantScope scope,
-    IPhoneVerificationRepository verifications,
+    IEmailVerificationRepository verifications,
     IVerificationCodes codes,
     IOwnerDirectory directory,
     ICommerceRepository commerces,
@@ -58,7 +58,7 @@ public sealed class CompleteSignupHandler(
                 : new ApplicationError(ErrorCodes.VerificationExpired, "Trop d'essais : recommencez l'inscription."));
         }
 
-        if (PasswordPolicy.Check(command.Password, verification.Phone) is { } weak)
+        if (PasswordPolicy.Check(command.Password, verification.Email) is { } weak)
         {
             // Le code est exact : on ne le consomme pas, le commerçant peut choisir un autre mot de passe.
             return Result<CompleteSignupResult>.Failure(ApplicationError.RuleViolation(weak));
@@ -82,10 +82,10 @@ public sealed class CompleteSignupHandler(
             return Result<CompleteSignupResult>.Failure(ResendSignupCodeHandler.Expired);
         }
 
-        if (await directory.FindAsync(verification.Phone, cancellationToken) is not null)
+        if (await directory.FindAsync(verification.Email, cancellationToken) is not null)
         {
             return Result<CompleteSignupResult>.Failure(new ApplicationError(
-                ErrorCodes.PhoneAlreadyRegistered, "Ce numéro a déjà un compte : connectez-vous avec votre mot de passe."));
+                ErrorCodes.EmailAlreadyRegistered, "Cette adresse e-mail a déjà un compte : connectez-vous avec votre mot de passe."));
         }
 
         try
@@ -93,13 +93,13 @@ public sealed class CompleteSignupHandler(
             var tenant = TenantId.New();
             scope.Enter(tenant);
             var commerce = Commerce.Open(
-                tenant, payload.CommerceName, payload.Activity, verification.Phone, payload.TermsVersion, now, settings.TrialDays);
-            var owner = User.RegisterOwner(UserId.New(), tenant, verification.Phone, payload.OwnerName, passwords.Hash(command.Password), now);
+                tenant, payload.CommerceName, payload.Activity, verification.Email, payload.TermsVersion, now, settings.TrialDays);
+            var owner = User.RegisterOwner(UserId.New(), tenant, verification.Email, payload.OwnerName, passwords.Hash(command.Password), now);
             owner.RecordSuccessfulLogin(now);
 
             await commerces.AddAsync(commerce, cancellationToken);
             await users.AddAsync(owner, cancellationToken);
-            await directory.AddAsync(new OwnerAccount(verification.Phone, tenant, owner.Id), cancellationToken);
+            await directory.AddAsync(new OwnerAccount(verification.Email, tenant, owner.Id), cancellationToken);
             await audit.RecordAsync(
                 new AuditEntry(tenant, owner.Id, AuditActions.CommerceCreated, tenant.Value, commerce.Name, now), cancellationToken);
             verification.Consume(now);

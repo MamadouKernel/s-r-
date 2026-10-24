@@ -6,18 +6,18 @@ namespace Soro.Domain.Tests;
 public class CommerceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 23, 9, 0, 0, TimeSpan.Zero);
-    private static readonly PhoneNumber Phone = PhoneNumber.Parse("0707070707");
+    private static readonly EmailAddress Email = EmailAddress.Parse("mamadou@exemple.ci");
 
     private static Commerce Open(string name = "  Supérette du Carrefour ", string terms = "2026-10-brouillon", int trialDays = 30) =>
-        Commerce.Open(TenantId.New(), name, ActivityType.Supermarket, Phone, terms, Now, trialDays);
+        Commerce.Open(TenantId.New(), name, ActivityType.Supermarket, Email, terms, Now, trialDays);
 
     [Fact]
-    public void Opens_with_a_trimmed_name_the_owner_phone_and_a_thirty_day_trial()
+    public void Opens_with_a_trimmed_name_the_owner_email_and_a_thirty_day_trial()
     {
         var commerce = Open();
 
         Assert.Equal("Supérette du Carrefour", commerce.Name);
-        Assert.Equal(Phone, commerce.OwnerPhone);
+        Assert.Equal(Email, commerce.OwnerEmail);
         Assert.Equal(ActivityType.Supermarket, commerce.Activity);
         Assert.Equal(Now, commerce.CreatedAt);
         Assert.Equal(Now.AddDays(30), commerce.TrialEndsAt);

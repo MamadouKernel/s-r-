@@ -5,17 +5,17 @@ using Soro.Domain.Tenancy;
 
 namespace Soro.Application.Signup;
 
-public sealed record StartPasswordResetCommand(string Phone);
+public sealed record StartPasswordResetCommand(string Email);
 
 /// <summary>
-/// Mot de passe oublié, première étape (INS-06) : la réponse est la même que le numéro ait un compte ou non, pour ne pas révéler
-/// quels propriétaires existent. Seul un numéro mal écrit est signalé, ce qui ne dit rien d'un compte. 3 demandes par jour au plus, en silence au-delà.
+/// Mot de passe oublié, première étape (INS-06) : la réponse est la même que l'adresse ait un compte ou non, pour ne pas révéler
+/// quels propriétaires existent. Seule une adresse mal écrite est signalé, ce qui ne dit rien d'un compte. 3 demandes par jour au plus, en silence au-delà.
 /// </summary>
 public sealed class StartPasswordResetHandler(
     IOwnerDirectory directory,
-    IPhoneVerificationRepository verifications,
+    IEmailVerificationRepository verifications,
     IVerificationCodes codes,
-    ISmsSender sms,
+    IEmailSender mail,
     IClock clock,
     IUnitOfWork unitOfWork)
 {
@@ -23,19 +23,19 @@ public sealed class StartPasswordResetHandler(
         StartPasswordResetCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!PhoneNumber.TryParse(command.Phone, out var phone))
+        if (!EmailAddress.TryParse(command.Email, out var email))
         {
             return Result<bool>.Failure(ApplicationError.RuleViolation(
-                "Le numéro de téléphone n'est pas valide : saisissez un numéro ivoirien à 10 chiffres."));
+                "L'adresse e-mail n'est pas valide : vérifiez-la, par exemple nom@exemple.ci."));
         }
 
         var now = clock.UtcNow;
-        if (await directory.FindAsync(phone, cancellationToken) is null)
+        if (await directory.FindAsync(email, cancellationToken) is null)
         {
             return Result<bool>.Success(true);
         }
 
-        var started = await verifications.CountStartedSinceAsync(phone, VerificationPurpose.PasswordReset, now.AddDays(-1), cancellationToken);
+        var started = await verifications.CountStartedSinceAsync(email, VerificationPurpose.PasswordReset, now.AddDays(-1), cancellationToken);
         if (started >= StartSignupHandler.MaxStartsPerDay)
         {
             return Result<bool>.Success(true);
@@ -44,23 +44,24 @@ public sealed class StartPasswordResetHandler(
         var code = codes.Generate();
         var id = Guid.CreateVersion7();
         await verifications.AddAsync(
-            PhoneVerification.Start(id, VerificationPurpose.PasswordReset, phone, codes.Hash(id, code), null, now), cancellationToken);
+            EmailVerification.Start(id, VerificationPurpose.PasswordReset, email, codes.Hash(id, code), null, now), cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
-        await sms.SendAsync(phone, SignupMessages.PasswordReset(code), cancellationToken);
+        // Un envoi raté ne doit pas se voir : la réponse serait différente pour un compte existant (SC-I9). Le détail est dans les journaux.
+        await StartSignupHandler.TrySendAsync(mail, email, SignupMessages.PasswordReset(code), cancellationToken);
         return Result<bool>.Success(true);
     }
 }
 
-public sealed record ConfirmPasswordResetCommand(string Phone, string Code, string NewPassword);
+public sealed record ConfirmPasswordResetCommand(string Email, string Code, string NewPassword);
 
 /// <summary>
 /// Mot de passe oublié, seconde étape (INS-06) : un code exact et un mot de passe accepté changent le mot de passe, lèvent le verrouillage
-/// et sont tracés. Toute erreur de code donne le même message, qu'il y ait ou non une demande en cours pour ce numéro.
+/// et sont tracés. Toute erreur de code donne le même message, qu'il y ait ou non une demande en cours pour cette adresse.
 /// </summary>
 public sealed class ConfirmPasswordResetHandler(
     ITenantScope scope,
     IOwnerDirectory directory,
-    IPhoneVerificationRepository verifications,
+    IEmailVerificationRepository verifications,
     IVerificationCodes codes,
     IUserRepository users,
     IPasswordHasher passwords,
@@ -75,13 +76,13 @@ public sealed class ConfirmPasswordResetHandler(
         ConfirmPasswordResetCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!PhoneNumber.TryParse(command.Phone, out var phone))
+        if (!EmailAddress.TryParse(command.Email, out var email))
         {
             return Result<bool>.Failure(WrongCode);
         }
 
         var now = clock.UtcNow;
-        var verification = await verifications.FindLatestPendingAsync(phone, VerificationPurpose.PasswordReset, cancellationToken);
+        var verification = await verifications.FindLatestPendingAsync(email, VerificationPurpose.PasswordReset, cancellationToken);
         if (verification is null || !verification.IsUsable(now))
         {
             return Result<bool>.Failure(WrongCode);
@@ -95,12 +96,12 @@ public sealed class ConfirmPasswordResetHandler(
             return Result<bool>.Failure(WrongCode);
         }
 
-        if (PasswordPolicy.Check(command.NewPassword, phone) is { } weak)
+        if (PasswordPolicy.Check(command.NewPassword, email) is { } weak)
         {
             return Result<bool>.Failure(ApplicationError.RuleViolation(weak));
         }
 
-        var account = await directory.FindAsync(phone, cancellationToken);
+        var account = await directory.FindAsync(email, cancellationToken);
         if (account is null)
         {
             return Result<bool>.Failure(WrongCode);
@@ -126,7 +127,7 @@ public sealed class ConfirmPasswordResetHandler(
         await users.UpdateAsync(user, cancellationToken);
         await verifications.UpdateAsync(verification, cancellationToken);
         await audit.RecordAsync(
-            new AuditEntry(account.Tenant, user.Id, AuditActions.PasswordReset, user.Id.Value, "Mot de passe réinitialisé par SMS", now),
+            new AuditEntry(account.Tenant, user.Id, AuditActions.PasswordReset, user.Id.Value, "Mot de passe réinitialisé par e-mail", now),
             cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
         return Result<bool>.Success(true);

@@ -129,7 +129,7 @@ internal sealed class UserRow
     public string? PinHash { get; set; }
 
     /// <summary>Numéro canonique du propriétaire ; <c>null</c> pour les profils qui se connectent par PIN.</summary>
-    public string? Phone { get; set; }
+    public string? Email { get; set; }
 
     public string? PasswordHash { get; set; }
 
@@ -217,7 +217,7 @@ internal sealed class CommerceRow
 
     public ActivityType Activity { get; set; }
 
-    public string OwnerPhone { get; set; } = string.Empty;
+    public string OwnerEmail { get; set; } = string.Empty;
 
     public string Formula { get; set; } = string.Empty;
 
@@ -233,20 +233,20 @@ internal sealed class CommerceRow
 /// <summary>Numéro → commerce et utilisateur. Hors isolation par commerce : c'est ce qui permet de trouver le commerce avant de le connaître.</summary>
 internal sealed class OwnerDirectoryRow
 {
-    public string Phone { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 
     public Guid TenantId { get; set; }
 
     public Guid UserId { get; set; }
 }
 
-internal sealed class PhoneVerificationRow
+internal sealed class EmailVerificationRow
 {
     public Guid Id { get; set; }
 
     public VerificationPurpose Purpose { get; set; }
 
-    public string Phone { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 
     public string CodeHash { get; set; } = string.Empty;
 

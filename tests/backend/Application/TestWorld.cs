@@ -50,11 +50,11 @@ internal sealed class TestWorld
 
     public FakeAuditLogQueries AuditLog { get; } = new();
 
-    public CapturingSmsSender Sms { get; } = new();
+    public CapturingEmailSender Mail { get; } = new();
 
     public SequentialCodes Codes { get; } = new();
 
-    public InMemoryPhoneVerificationRepository Verifications { get; } = new();
+    public InMemoryEmailVerificationRepository Verifications { get; } = new();
 
     public InMemoryOwnerDirectory OwnerDirectory { get; } = new();
 
@@ -88,16 +88,16 @@ internal sealed class TestWorld
 
     public CancelSaleHandler CancelSale => new(Current, Sales, Audit, Clock, UnitOfWork);
 
-    public StartSignupHandler StartSignup => new(OwnerDirectory, Verifications, Codes, Sms, SignupSettings, Clock, UnitOfWork);
+    public StartSignupHandler StartSignup => new(OwnerDirectory, Verifications, Codes, Mail, SignupSettings, Clock, UnitOfWork);
 
-    public ResendSignupCodeHandler ResendSignupCode => new(Verifications, Codes, Sms, Clock, UnitOfWork);
+    public ResendSignupCodeHandler ResendSignupCode => new(Verifications, Codes, Mail, Clock, UnitOfWork);
 
     public CompleteSignupHandler CompleteSignup =>
         new(Scope, Verifications, Codes, OwnerDirectory, Commerces, Users, Passwords, Audit, Tokens, SignupSettings, Clock, UnitOfWork);
 
     public OwnerLogInHandler OwnerLogIn => new(Scope, OwnerDirectory, Commerces, Users, Passwords, Tokens, Clock, UnitOfWork);
 
-    public StartPasswordResetHandler StartPasswordReset => new(OwnerDirectory, Verifications, Codes, Sms, Clock, UnitOfWork);
+    public StartPasswordResetHandler StartPasswordReset => new(OwnerDirectory, Verifications, Codes, Mail, Clock, UnitOfWork);
 
     public ConfirmPasswordResetHandler ConfirmPasswordReset =>
         new(Scope, OwnerDirectory, Verifications, Codes, Users, Passwords, Audit, Clock, UnitOfWork);

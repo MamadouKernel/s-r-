@@ -29,7 +29,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<OwnerDirectoryRow> OwnerDirectory => Set<OwnerDirectoryRow>();
 
-    internal DbSet<PhoneVerificationRow> PhoneVerifications => Set<PhoneVerificationRow>();
+    internal DbSet<EmailVerificationRow> EmailVerifications => Set<EmailVerificationRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,7 +43,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureStockMovements(modelBuilder.Entity<StockMovementRow>());
         ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
         ConfigureOwnerDirectory(modelBuilder.Entity<OwnerDirectoryRow>());
-        ConfigurePhoneVerifications(modelBuilder.Entity<PhoneVerificationRow>());
+        ConfigureEmailVerifications(modelBuilder.Entity<EmailVerificationRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
     }
 
@@ -117,7 +117,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         user.Property(row => row.Identifier).HasMaxLength(32);
         user.Property(row => row.DisplayName).HasMaxLength(100);
         user.Property(row => row.PinHash).HasMaxLength(200);
-        user.Property(row => row.Phone).HasMaxLength(16);
+        user.Property(row => row.Email).HasMaxLength(254);
         user.Property(row => row.PasswordHash).HasMaxLength(200);
         user.Property(row => row.Role).HasConversion<string>().HasMaxLength(16);
         user.Property(row => row.Status).HasConversion<string>().HasMaxLength(16);
@@ -132,7 +132,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         commerce.HasKey(row => row.Id);
         commerce.Property(row => row.Name).HasMaxLength(100);
         commerce.Property(row => row.Activity).HasConversion<string>().HasMaxLength(16);
-        commerce.Property(row => row.OwnerPhone).HasMaxLength(16);
+        commerce.Property(row => row.OwnerEmail).HasMaxLength(254);
         commerce.Property(row => row.Formula).HasMaxLength(32);
         commerce.Property(row => row.TermsVersion).HasMaxLength(32);
     }
@@ -140,20 +140,20 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
     private static void ConfigureOwnerDirectory(EntityTypeBuilder<OwnerDirectoryRow> directory)
     {
         directory.ToTable("owner_directory");
-        directory.HasKey(row => row.Phone);
-        directory.Property(row => row.Phone).HasMaxLength(16);
+        directory.HasKey(row => row.Email);
+        directory.Property(row => row.Email).HasMaxLength(254);
     }
 
-    private static void ConfigurePhoneVerifications(EntityTypeBuilder<PhoneVerificationRow> verification)
+    private static void ConfigureEmailVerifications(EntityTypeBuilder<EmailVerificationRow> verification)
     {
-        verification.ToTable("phone_verifications", table =>
-            table.HasCheckConstraint("ck_phone_verifications_counters", "attempts >= 0 AND resend_count >= 0"));
+        verification.ToTable("email_verifications", table =>
+            table.HasCheckConstraint("ck_email_verifications_counters", "attempts >= 0 AND resend_count >= 0"));
         verification.HasKey(row => row.Id);
         verification.Property(row => row.Purpose).HasConversion<string>().HasMaxLength(16);
-        verification.Property(row => row.Phone).HasMaxLength(16);
+        verification.Property(row => row.Email).HasMaxLength(254);
         verification.Property(row => row.CodeHash).HasMaxLength(100);
         verification.Property(row => row.Payload).HasMaxLength(1000);
-        verification.HasIndex(row => new { row.Phone, row.Purpose, row.CreatedAt });
+        verification.HasIndex(row => new { row.Email, row.Purpose, row.CreatedAt });
     }
 
     private static void ConfigureProducts(EntityTypeBuilder<ProductRow> product)
