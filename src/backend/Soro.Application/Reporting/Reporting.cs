@@ -190,6 +190,7 @@ public static class AuditCategories
         ["stock"] = ["stock."],
         ["team"] = ["user."],
         ["devices"] = ["device."],
+        ["credit"] = ["credit.", "debt."],
     };
 
     public static IReadOnlyCollection<string> Names => Prefixes.Keys;

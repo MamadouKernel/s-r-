@@ -13,6 +13,10 @@ const ACTIONS: Record<string, string> = {
   'device.invited': 'Lien d’ajout d’appareil créé',
   'device.enrolled': 'Appareil ajouté',
   'device.revoked': 'Appareil retiré',
+  'debt.repaid': 'Versement d’un client',
+  'credit.limit.approved': 'Crédit au-delà du plafond validé',
+  'credit.limit.refused': 'Crédit refusé : plafond atteint',
+  'credit.limit.exceeded': 'Plafond de crédit dépassé',
 };
 
 /** Action en français ; une action que le client ne connaît pas (ajoutée plus tard par le serveur) est montrée telle quelle. */
@@ -28,4 +32,5 @@ export const CATEGORIES: readonly { value: string | null; label: string }[] = [
   { value: 'stock', label: 'Pertes de stock' },
   { value: 'team', label: 'Équipe' },
   { value: 'devices', label: 'Appareils' },
+  { value: 'credit', label: 'Crédit et dettes' },
 ];

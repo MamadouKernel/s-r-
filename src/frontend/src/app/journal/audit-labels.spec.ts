@@ -19,6 +19,13 @@ describe('actionLabel', () => {
     ]);
   });
 
+  it('names the credit and debt actions in plain words', () => {
+    const labels = ['debt.repaid', 'credit.limit.approved', 'credit.limit.refused', 'credit.limit.exceeded'].map(actionLabel);
+    expect(labels).toEqual([
+      'Versement d’un client', 'Crédit au-delà du plafond validé', 'Crédit refusé : plafond atteint', 'Plafond de crédit dépassé',
+    ]);
+  });
+
   it('keeps an action the client does not know as the server sent it', () => {
     expect(actionLabel('user.created')).toBe('user.created');
   });
@@ -27,6 +34,6 @@ describe('actionLabel', () => {
 describe('CATEGORIES', () => {
   it('starts with “all” and uses the values the server understands', () => {
     expect(CATEGORIES[0]).toEqual({ value: null, label: 'Toutes' });
-    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices']);
+    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit']);
   });
 });

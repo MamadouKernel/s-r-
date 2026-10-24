@@ -40,6 +40,10 @@ public static class AuditActions
     public const string StockLoss = "stock.loss";
     public const string CommerceCreated = "commerce.created";
     public const string PasswordReset = "user.password.reset";
+    public const string DebtRepaid = "debt.repaid";
+    public const string CreditApproved = "credit.limit.approved";
+    public const string CreditRefused = "credit.limit.refused";
+    public const string CreditExceeded = "credit.limit.exceeded";
     public const string DeviceInvited = "device.invited";
     public const string DeviceEnrolled = "device.enrolled";
     public const string DeviceRevoked = "device.revoked";

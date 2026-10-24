@@ -118,6 +118,123 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.ToTable("commerces", (string)null);
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.CustomerRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("CreditCeiling")
+                        .HasColumnType("bigint")
+                        .HasColumnName("credit_ceiling");
+
+                    b.Property<long>("Debt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("debt");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("phone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.HasIndex("TenantId", "Phone")
+                        .IsUnique()
+                        .HasFilter("phone IS NOT NULL");
+
+                    b.ToTable("customers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_customers_amounts", "credit_ceiling >= 0 AND debt >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.DebtRepaymentRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("ReferenceKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("TenantId", "CustomerId", "At");
+
+                    b.HasIndex("TenantId", "Method", "ReferenceKey")
+                        .IsUnique()
+                        .HasFilter("reference_key IS NOT NULL");
+
+                    b.ToTable("debt_repayments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_debt_repayments_values", "amount > 0 AND method <> 'Credit' AND ((method = 'Cash') = (reference IS NULL))");
+                        });
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.DeviceInvitationRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -764,6 +881,15 @@ namespace Soro.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_users_credential", "pin_hash IS NOT NULL OR password_hash IS NOT NULL");
                         });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.DebtRepaymentRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.CustomerRow", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.PaymentRow", b =>

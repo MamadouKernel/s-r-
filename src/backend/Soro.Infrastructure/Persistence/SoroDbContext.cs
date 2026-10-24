@@ -31,6 +31,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<EmailVerificationRow> EmailVerifications => Set<EmailVerificationRow>();
 
+    internal DbSet<CustomerRow> Customers => Set<CustomerRow>();
+
+    internal DbSet<DebtRepaymentRow> DebtRepayments => Set<DebtRepaymentRow>();
+
     internal DbSet<DeviceRow> Devices => Set<DeviceRow>();
 
     internal DbSet<DeviceInvitationRow> DeviceInvitations => Set<DeviceInvitationRow>();
@@ -48,6 +52,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
         ConfigureOwnerDirectory(modelBuilder.Entity<OwnerDirectoryRow>());
         ConfigureEmailVerifications(modelBuilder.Entity<EmailVerificationRow>());
+        ConfigureCustomers(modelBuilder.Entity<CustomerRow>());
+        ConfigureDebtRepayments(modelBuilder.Entity<DebtRepaymentRow>());
         ConfigureDevices(modelBuilder.Entity<DeviceRow>());
         ConfigureDeviceInvitations(modelBuilder.Entity<DeviceInvitationRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
@@ -160,6 +166,41 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         verification.Property(row => row.CodeHash).HasMaxLength(100);
         verification.Property(row => row.Payload).HasMaxLength(1000);
         verification.HasIndex(row => new { row.Email, row.Purpose, row.CreatedAt });
+    }
+
+    private static void ConfigureCustomers(EntityTypeBuilder<CustomerRow> customer)
+    {
+        customer.ToTable("customers", table =>
+            table.HasCheckConstraint("ck_customers_amounts", "credit_ceiling >= 0 AND debt >= 0"));
+        customer.HasKey(row => row.Id);
+        customer.Property(row => row.Name).HasMaxLength(100);
+        customer.Property(row => row.Phone).HasMaxLength(16);
+
+        // Deux ventes à crédit simultanées pour un même client : la seconde échoue (xmin) et est rejouée, aucune écriture de dette ne se perd (CRD-07).
+        customer.Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+
+        // Un numéro ne sert qu'à un client du commerce (jamais entre commerces).
+        customer.HasIndex(row => new { row.TenantId, row.Phone }).IsUnique().HasFilter("phone IS NOT NULL");
+        customer.HasIndex(row => new { row.TenantId, row.Name });
+    }
+
+    private static void ConfigureDebtRepayments(EntityTypeBuilder<DebtRepaymentRow> repayment)
+    {
+        repayment.ToTable("debt_repayments", table =>
+            table.HasCheckConstraint(
+                "ck_debt_repayments_values",
+                "amount > 0 AND method <> 'Credit' AND ((method = 'Cash') = (reference IS NULL))"));
+        repayment.HasKey(row => row.Id);
+        repayment.Property(row => row.Method).HasConversion<string>().HasMaxLength(16);
+        repayment.Property(row => row.Reference).HasMaxLength(100);
+        repayment.Property(row => row.ReferenceKey).HasMaxLength(100);
+        repayment.HasIndex(row => new { row.TenantId, row.CustomerId, row.At });
+
+        // RG-04 appliquée aux versements : une référence Mobile Money ne sert qu'une fois par commerce et par opérateur.
+        repayment.HasIndex(row => new { row.TenantId, row.Method, row.ReferenceKey })
+            .IsUnique()
+            .HasFilter("reference_key IS NOT NULL");
+        repayment.HasOne<CustomerRow>().WithMany().HasForeignKey(row => row.CustomerId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureDevices(EntityTypeBuilder<DeviceRow> device)

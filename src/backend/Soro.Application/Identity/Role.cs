@@ -31,6 +31,12 @@ public static class RolePolicy
 
     public static bool CanSeePurchasePrice(Role role) => CanManageStock(role);
 
+    /// <summary>Clients, dettes et plafonds : la caisse (qui vend à crédit), le gérant et le comptable (qui lit les comptes).</summary>
+    public static bool CanReadCustomers(Role role) => CanOperateRegister(role) || role == Role.Accountant;
+
+    /// <summary>Historique des versements d'un client : ceux qui gèrent et celui qui surveille.</summary>
+    public static bool CanSeeRepayments(Role role) => IsManager(role) || role == Role.Accountant;
+
     public static bool CanOperateRegister(Role role) => role is Role.Owner or Role.Manager or Role.Cashier;
 
     /// <summary>

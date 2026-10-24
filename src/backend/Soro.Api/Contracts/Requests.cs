@@ -69,6 +69,9 @@ public sealed record RecordSaleRequest
     public Guid? CustomerId { get; init; }
 
     public Guid? DiscountApproverId { get; init; }
+
+    /// <summary>Le gérant qui a validé un dépassement du plafond de crédit du client (CRD-04), comme pour une remise.</summary>
+    public Guid? CreditApproverId { get; init; }
 }
 
 public sealed record SyncSalesRequest
