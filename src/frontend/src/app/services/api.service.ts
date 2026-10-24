@@ -48,8 +48,15 @@ export function toApiError(error: unknown): ApiError {
 export class ApiService implements SyncApi {
   private readonly http = inject(HttpClient);
 
-  async login(tenantId: string, identifier: string, pin: string): Promise<LoginResponse> {
-    return this.call(this.http.post<LoginResponse>(`${API_ROOT}/auth/login`, { tenantId, identifier, pin }));
+  async login(tenantId: string, identifier: string, pin: string, device?: { id: string; secret: string }): Promise<LoginResponse> {
+    return this.call(
+      this.http.post<LoginResponse>(`${API_ROOT}/auth/login`, {
+        tenantId,
+        identifier,
+        pin,
+        ...(device ? { deviceId: device.id, deviceSecret: device.secret } : {}),
+      }),
+    );
   }
 
   async products(): Promise<CatalogueProduct[]> {

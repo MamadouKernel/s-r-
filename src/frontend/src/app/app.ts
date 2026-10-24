@@ -25,7 +25,8 @@ export class App {
   protected readonly showMenu = computed(() => this.auth.device() !== null && (this.auth.signedIn() || this.hasSession()));
 
   protected async logout(): Promise<void> {
+    const role = this.auth.user()?.role;
     await this.auth.logout();
-    await this.router.navigateByUrl('/connexion');
+    await this.router.navigateByUrl(role === 'Owner' ? '/connexion-proprietaire' : '/connexion');
   }
 }

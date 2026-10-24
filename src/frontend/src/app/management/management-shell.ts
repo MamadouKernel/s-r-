@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../services/auth.service';
-import { canManageTeam } from './roles';
+import { canManageDevices, canManageTeam } from './roles';
 
 /** Espace « Gestion » : un titre, une navigation entre ses sections et la section courante. */
 @Component({
@@ -13,6 +13,9 @@ import { canManageTeam } from './roles';
       @if (showTeam()) {
         <a class="btn" routerLink="/gestion/equipe" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Équipe</a>
       }
+      @if (showDevices()) {
+        <a class="btn" routerLink="/gestion/appareils" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Appareils</a>
+      }
     </nav>
     <router-outlet />
   `,
@@ -20,4 +23,5 @@ import { canManageTeam } from './roles';
 export class ManagementShell {
   private readonly auth = inject(AuthService);
   protected readonly showTeam = computed(() => canManageTeam(this.auth.user()?.role));
+  protected readonly showDevices = computed(() => canManageDevices(this.auth.user()?.role));
 }

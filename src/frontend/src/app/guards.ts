@@ -1,13 +1,31 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
-import { canManageCatalogue, canManageStock, canManageTeam, canReadAuditLog, canViewReports } from './management/roles';
+import { canManageCatalogue, canManageDevices, canManageStock, canManageTeam, canReadAuditLog, canViewReports } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
 export const deviceGuard: CanActivateFn = () => {
   const router = inject(Router);
-  return inject(AuthService).device() ? true : router.parseUrl('/appareil');
+  const device = inject(AuthService).device();
+  return device && !device.revoked ? true : router.parseUrl('/bienvenue');
+};
+
+/** L'écran Bienvenue n'a de sens que pour un appareil pas encore configuré, ou retiré (il le dit alors). */
+export const welcomeGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const device = inject(AuthService).device();
+  return device && !device.revoked ? router.parseUrl('/connexion') : true;
+};
+
+/** Écran Appareils : propriétaire et gérant seulement ; les autres profils retombent sur la liste des produits. */
+export const devicesGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canManageDevices(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
 };
 
 /**

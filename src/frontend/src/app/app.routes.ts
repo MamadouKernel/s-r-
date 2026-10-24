@@ -1,8 +1,18 @@
 import { Routes } from '@angular/router';
-import { auditGuard, catalogueGuard, deviceGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard } from './guards';
+import { auditGuard, catalogueGuard, deviceGuard, devicesGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
 
 export const routes: Routes = [
-  { path: 'appareil', loadComponent: () => import('./pages/device-page').then((m) => m.DevicePage) },
+  { path: 'appareil', pathMatch: 'full', redirectTo: 'bienvenue' },
+  {
+    path: 'bienvenue',
+    canActivate: [welcomeGuard],
+    loadComponent: () => import('./onboarding/welcome-page').then((m) => m.WelcomePage),
+  },
+  { path: 'inscription', loadComponent: () => import('./onboarding/signup-page').then((m) => m.SignupPage) },
+  { path: 'connexion-proprietaire', loadComponent: () => import('./onboarding/owner-login-page').then((m) => m.OwnerLoginPage) },
+  { path: 'mot-de-passe-oublie', loadComponent: () => import('./onboarding/password-reset-page').then((m) => m.PasswordResetPage) },
+  { path: 'rejoindre', loadComponent: () => import('./onboarding/join-page').then((m) => m.JoinPage) },
+  { path: 'conditions', loadComponent: () => import('./onboarding/conditions-page').then((m) => m.ConditionsPage) },
   {
     path: 'connexion',
     canActivate: [deviceGuard],
@@ -66,6 +76,11 @@ export const routes: Routes = [
         path: 'equipe',
         canActivate: [teamGuard],
         loadComponent: () => import('./management/team-page').then((m) => m.TeamPage),
+      },
+      {
+        path: 'appareils',
+        canActivate: [devicesGuard],
+        loadComponent: () => import('./management/devices-page').then((m) => m.DevicesPage),
       },
       {
         path: 'equipe/nouveau',

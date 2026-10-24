@@ -91,8 +91,9 @@ describe('SalePage: held sales', () => {
 
     await ui.click('Reprendre');
 
+    // La reprise passe par IndexedDB : sous charge, l'écran se stabilise avant la fin de l'écriture, on attend donc le résultat.
+    await vi.waitFor(() => expect(cash.held()).toEqual([]));
     expect(cash.cart()).toEqual([{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 3 }]);
-    expect(cash.held()).toEqual([]);
   });
 
   it('explains why a held sale cannot be resumed over a non empty cart, and keeps everything', async () => {

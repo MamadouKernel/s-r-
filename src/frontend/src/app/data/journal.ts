@@ -45,10 +45,20 @@ export interface CloseSessionOperation extends OperationBase {
 
 export type Operation = OpenSessionOperation | SaleOperation | CloseSessionOperation;
 
+/**
+ * L'appareil tel que l'application le retient : jamais montré à l'utilisateur. `deviceId` et `deviceSecret` viennent de l'enrôlement
+ * (lien ou QR du propriétaire) ; ils manquent sur un navigateur où seul le propriétaire s'est connecté. `revoked` : le serveur a retiré cet
+ * appareil, les ventes déjà enregistrées restent dans le journal.
+ */
 export interface Device {
   tenantId: string;
   registerId: string;
   pointOfSaleId: string;
+  deviceId?: string;
+  deviceSecret?: string;
+  name?: string;
+  commerceName?: string;
+  revoked?: boolean;
 }
 
 export interface StoredToken {

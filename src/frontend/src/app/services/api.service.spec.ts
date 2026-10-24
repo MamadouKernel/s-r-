@@ -66,6 +66,20 @@ describe('ApiService', () => {
     await expect(result).rejects.toMatchObject({ status: 401, code: 'invalid_credentials', message: 'Identifiant ou PIN incorrect.' });
   });
 
+  it('sends the device identity with the login when the device has one, and nothing otherwise', async () => {
+    const withDevice = api.login('tenant', 'awa', '1234', { id: 'dev', secret: 'sec' });
+    const request = http.expectOne('/api/v1/auth/login');
+    expect(request.request.body).toEqual({ tenantId: 'tenant', identifier: 'awa', pin: '1234', deviceId: 'dev', deviceSecret: 'sec' });
+    request.flush({ accessToken: 'jwt' });
+    await withDevice;
+
+    const without = api.login('tenant', 'awa', '1234');
+    const second = http.expectOne('/api/v1/auth/login');
+    expect(second.request.body).toEqual({ tenantId: 'tenant', identifier: 'awa', pin: '1234' });
+    second.flush({ accessToken: 'jwt' });
+    await without;
+  });
+
   it('reports an unreachable server as status 0', async () => {
     const result = api.products();
     http.expectOne('/api/v1/products').error(new ProgressEvent('error'));

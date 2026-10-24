@@ -8,6 +8,11 @@ const ACTIONS: Record<string, string> = {
   'product.deactivated': 'Produit désactivé',
   'stock.loss': 'Perte de stock',
   'user.disabled': 'Compte désactivé',
+  'user.password.reset': 'Mot de passe du propriétaire changé',
+  'commerce.created': 'Boutique créée',
+  'device.invited': 'Lien d’ajout d’appareil créé',
+  'device.enrolled': 'Appareil ajouté',
+  'device.revoked': 'Appareil retiré',
 };
 
 /** Action en français ; une action que le client ne connaît pas (ajoutée plus tard par le serveur) est montrée telle quelle. */
@@ -22,4 +27,5 @@ export const CATEGORIES: readonly { value: string | null; label: string }[] = [
   { value: 'catalogue', label: 'Produits et prix' },
   { value: 'stock', label: 'Pertes de stock' },
   { value: 'team', label: 'Équipe' },
+  { value: 'devices', label: 'Appareils' },
 ];

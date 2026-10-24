@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
-import { auditGuard, catalogueGuard, managementGuard, reportsGuard, teamGuard } from './guards';
+import { auditGuard, catalogueGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, teamGuard, welcomeGuard } from './guards';
 import { AuthService } from './services/auth.service';
 
 function run(signedIn: boolean, role: string | undefined, guard = managementGuard) {
@@ -92,5 +92,41 @@ describe('auditGuard', () => {
 
   it('sends a signed out visitor to the login', () => {
     expect(run(false, undefined, auditGuard)).toBe('/connexion');
+  });
+});
+
+function runWithDevice(device: object | null, guard: typeof deviceGuard) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AuthService, useValue: { device: signal(device) } }] });
+  const result = TestBed.runInInjectionContext(() => guard({} as never, {} as never));
+  return result instanceof UrlTree ? TestBed.inject(Router).serializeUrl(result) : result;
+}
+
+describe('deviceGuard', () => {
+  it('lets a configured device through and sends the others to the welcome screen', () => {
+    expect(runWithDevice({ tenantId: 't' }, deviceGuard)).toBe(true);
+    expect(runWithDevice(null, deviceGuard)).toBe('/bienvenue');
+  });
+
+  it('sends a device the server removed back to the welcome screen, which tells it so', () => {
+    expect(runWithDevice({ tenantId: 't', revoked: true }, deviceGuard)).toBe('/bienvenue');
+  });
+});
+
+describe('welcomeGuard', () => {
+  it('shows the welcome screen to a new or removed device and skips it for a configured one', () => {
+    expect(runWithDevice(null, welcomeGuard)).toBe(true);
+    expect(runWithDevice({ tenantId: 't', revoked: true }, welcomeGuard)).toBe(true);
+    expect(runWithDevice({ tenantId: 't' }, welcomeGuard)).toBe('/connexion');
+  });
+});
+
+describe('devicesGuard', () => {
+  it('lets only the owner and the manager manage devices', () => {
+    expect(['Owner', 'Manager'].map((role) => run(true, role, devicesGuard))).toEqual([true, true]);
+    expect(['Cashier', 'StockKeeper', 'Accountant'].map((role) => run(true, role, devicesGuard))).toEqual([
+      '/gestion/produits', '/gestion/produits', '/gestion/produits',
+    ]);
+    expect(run(false, undefined, devicesGuard)).toBe('/connexion');
   });
 });
