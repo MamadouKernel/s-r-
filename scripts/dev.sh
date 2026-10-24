@@ -80,6 +80,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Envoi réel des e-mails (facultatif) : si .dev/mail.env existe, ses réglages Mail__Smtp__* sont transmis à l'API. Sans lui, les e-mails
+# s'écrivent dans .dev/api.log. Modèle : scripts/mail.env.example. Ce fichier contient un mot de passe : il ne part jamais sur GitHub (.dev/ est ignoré).
+if [ -f "$STATE/mail.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$STATE/mail.env"
+  set +a
+  echo "▶ E-mails réels : réglages lus dans .dev/mail.env"
+else
+  echo "▶ E-mails : écrits dans .dev/api.log (aucun envoi réel ; voir scripts/mail.env.example)"
+fi
+
 export ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="http://localhost:$API_PORT"
 export ConnectionStrings__Soro="Host=localhost;Port=$DB_PORT;Database=soro;Username=soro_app;Password=app"
 export Jwt__Issuer=soro-dev Jwt__Audience=soro-dev Jwt__SigningKey="$JWT_KEY" Security__PinPepper="$PIN_PEPPER"
