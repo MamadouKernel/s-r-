@@ -1,4 +1,5 @@
-import { PaymentDraft, PaymentMethod } from './types';
+import { formatFcfa } from '../core/money';
+import { CustomerSnapshot, PaymentDraft, PaymentMethod } from './types';
 
 /** Monnaie à rendre pour un paiement espèces (REQ-03). */
 export function cashChange(dueFcfa: number, tenderedFcfa: number): number {
@@ -15,12 +16,14 @@ export function referenceKey(method: PaymentMethod, reference: string): string {
 
 /**
  * Contrôles de paiement avant enregistrement (PWA-05). Renvoie les messages d'erreur en français, vide si tout est valide.
- * `usedReferences` contient les clés déjà utilisées sur l'appareil ; le serveur reste l'arbitre global (SC-05).
+* `usedReferences` contient les clés déjà utilisées sur l'appareil ; le serveur reste l'arbitre global (SC-05).
+ * Un paiement à crédit exige un client (`customerId`) ; le plafond, lui, se contrôle avec `creditProblem` car il dépend du profil.
  */
 export function validatePayments(
   totalFcfa: number,
   payments: readonly PaymentDraft[],
   usedReferences: ReadonlySet<string>,
+  customerId?: string | null,
 ): string[] {
   const errors: string[] = [];
   if (payments.length === 0) {
@@ -37,7 +40,9 @@ export function validatePayments(
     sum += payment.amountFcfa;
 
     if (payment.method === 'Credit') {
-      errors.push("Le paiement à crédit n'est pas encore disponible.");
+      if (!customerId) {
+        errors.push('Choisissez le client à qui vous vendez à crédit.');
+      }
     } else if (payment.method === 'Cash') {
       if ((payment.tenderedFcfa ?? payment.amountFcfa) < payment.amountFcfa) {
         errors.push('Le montant remis est inférieur au montant dû en espèces.');
@@ -60,4 +65,16 @@ export function validatePayments(
     errors.push('Le total des paiements doit être égal au montant à payer.');
   }
   return errors;
+}
+
+/**
+ * Le crédit demandé tient-il dans ce que le client peut encore prendre ? Renvoie le message en français s'il le dépasse, `null` sinon.
+ * Au-delà du plafond, seul un gérant (qui valide en vendant) peut passer ; la caisse refuse pour un caissier (CRD-04, RG-06).
+ */
+export function creditProblem(customer: CustomerSnapshot, creditFcfa: number, canExceed: boolean): string | null {
+  if (creditFcfa <= customer.availableCreditFcfa) {
+    return null;
+  }
+  const detail = `${customer.name} doit déjà ${formatFcfa(customer.debtFcfa)} pour un plafond de ${formatFcfa(customer.creditCeilingFcfa)} : il reste ${formatFcfa(customer.availableCreditFcfa)} de crédit.`;
+  return canExceed ? null : `${detail} Seul un gérant peut valider un crédit plus grand : appelez-le.`;
 }

@@ -73,8 +73,9 @@ describe('SalePage: held sales', () => {
     await ui.type('#attente-nom', 'Mme Koné');
     await ui.submit();
 
+    // La mise en attente passe par IndexedDB : sous charge, l'écran se stabilise avant la fin de l'écriture, on attend donc le résultat.
+    await vi.waitFor(() => expect(root.textContent).toContain('Ventes en attente (1)'));
     expect(cash.cart()).toEqual([]);
-    expect(root.textContent).toContain('Ventes en attente (1)');
     expect(root.textContent).toContain('Mme Koné');
     expect(root.textContent).toContain('2 articles');
     expect(root.textContent).toContain('1\u00a0200'); // espace insécable des milliers
@@ -127,12 +128,12 @@ describe('SalePage: held sales', () => {
     expect(cash.held()).toHaveLength(1);
 
     await ui.click('Non, la garder');
-    expect(root.textContent).not.toContain('Supprimer cette vente en attente ?');
+    await vi.waitFor(() => expect(root.textContent).not.toContain('Supprimer cette vente en attente ?'));
     expect(cash.held()).toHaveLength(1);
 
     await ui.click('Supprimer la vente en attente');
     await ui.click('Oui, supprimer');
-    expect(cash.held()).toEqual([]);
+    await vi.waitFor(() => expect(cash.held()).toEqual([]));
   });
 });
 

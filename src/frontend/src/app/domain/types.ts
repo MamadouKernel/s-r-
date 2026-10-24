@@ -30,6 +30,20 @@ export interface CartLine {
   quantity: number;
 }
 
+/**
+ * Client tel que la caisse le connaît : copie locale de la liste du serveur, avec sa dette et son plafond au dernier chargement. Les ventes à crédit
+ * faites hors ligne s'y ajoutent localement, pour que le plafond tienne d'une vente à l'autre sans réseau (docs/specs/clients-credit).
+ */
+export interface CustomerSnapshot {
+  id: string;
+  name: string;
+  phone: string | null;
+  creditCeilingFcfa: number;
+  debtFcfa: number;
+  availableCreditFcfa: number;
+  isActive: boolean;
+}
+
 export interface PaymentDraft {
   id: string;
   method: PaymentMethod;

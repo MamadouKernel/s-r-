@@ -1,4 +1,5 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, Injector, signal } from '@angular/core';
+import { CustomerService } from '../customers/customer.service';
 import { OperationStatus } from '../data/journal';
 import { nextDelayMs } from '../sync/backoff';
 import { FlushOutcome, SyncEngine } from '../sync/sync-engine';
@@ -19,6 +20,7 @@ export class SyncService {
   private readonly api = inject(ApiService);
   private readonly network = inject(NetworkService);
   private readonly auth = inject(AuthService);
+  private readonly injector = inject(Injector);
 
   private readonly stateSignal = signal<SyncState>('idle');
   private readonly countsSignal = signal<Record<OperationStatus, number>>({ pending: 0, synced: 0, rejected: 0 });
@@ -87,6 +89,7 @@ export class SyncService {
       case 'none':
         this.failedAttempts = 0;
         this.stateSignal.set('idle');
+        this.refreshCustomers();
         break;
       case 'network':
         this.stateSignal.set('waiting');
@@ -98,6 +101,18 @@ export class SyncService {
       case 'blocked':
         this.stateSignal.set('blocked');
         break;
+    }
+  }
+
+  /**
+   * Les ventes à crédit viennent d'être envoyées : on recale les dettes locales sur celles du serveur. Sans effet visible si cela échoue : la
+   * caisse garde sa copie, qui tient compte des ventes de cet appareil.
+   */
+  private refreshCustomers(): void {
+    try {
+      void this.injector.get(CustomerService).refresh();
+    } catch {
+      // Pas de client HTTP ou pas de réseau : la copie locale reste utilisable.
     }
   }
 

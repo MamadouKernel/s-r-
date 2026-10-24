@@ -32,7 +32,7 @@ describe('ApiService', () => {
     const request = http.expectOne('/api/v1/sales/sync');
     expect(request.request.method).toBe('POST');
     expect(request.request.body.sales[0]).toEqual({
-      saleId: 'sale-1', sessionId: 's-1', localSequence: 7, at: '2026-10-23T08:10:00.000Z', discountFcfa: 0,
+      saleId: 'sale-1', sessionId: 's-1', localSequence: 7, at: '2026-10-23T08:10:00.000Z', discountFcfa: 0, customerId: null,
       lines: [
         { productId: 'p', name: 'Jus', quantity: 3, unitPriceFcfa: 600 },
         { productId: 'q', name: 'Savon', quantity: 1, unitPriceFcfa: 300 },

@@ -1,5 +1,5 @@
 import { HELD, inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
-import { CartLine, CatalogueProduct, PaymentDraft } from '../domain/types';
+import { CartLine, CatalogueProduct, CustomerSnapshot, PaymentDraft } from '../domain/types';
 import { cartTotal } from '../domain/cart';
 import { referenceKey, validatePayments } from '../domain/payment';
 
@@ -31,6 +31,8 @@ export interface SaleOperation extends OperationBase {
   lines: CartLine[];
   discountFcfa: number;
   payments: PaymentDraft[];
+  /** Le client d'une vente à crédit (ou d'une vente que le caissier lui a rattachée). */
+  customerId?: string;
   netTotalFcfa: number;
   changeFcfa: number;
 }
@@ -80,6 +82,7 @@ export interface SaleInput {
   at: string;
   lines: CartLine[];
   payments: PaymentDraft[];
+  customerId?: string | null;
 }
 
 export interface SessionSummary {
@@ -101,6 +104,11 @@ export interface HeldCart {
 interface MetaEntry<T> {
   key: string;
   value: T;
+}
+
+/** Le même client avec une autre dette : le crédit disponible suit, jamais négatif. */
+function withDebt(customer: CustomerSnapshot, debtFcfa: number): CustomerSnapshot {
+  return { ...customer, debtFcfa, availableCreditFcfa: Math.max(customer.creditCeilingFcfa - debtFcfa, 0) };
 }
 
 /** Texte de recherche : minuscules, sans accents. */
@@ -171,6 +179,48 @@ export class Journal {
     });
   }
 
+  // ---- Clients (copie locale pour vendre à crédit sans réseau) -----------------------------------------
+
+  /**
+   * Remplace la copie locale par la liste du serveur. Les ventes à crédit encore en attente d'envoi n'y figurent pas : leurs montants sont
+   * ajoutés de nouveau aux dettes pour que le plafond reste juste (même principe que pour le stock).
+   */
+  async replaceCustomers(customers: CustomerSnapshot[]): Promise<void> {
+    await inTransaction(this.db, [OPERATIONS, META], 'readwrite', async (tx) => {
+      const pending = (await promisify(tx.objectStore(OPERATIONS).getAll())) as Operation[];
+      const owed = new Map<string, number>();
+      for (const operation of pending) {
+        if (operation.kind === 'sale' && operation.status === 'pending' && operation.customerId) {
+          const credit = operation.payments.filter((payment) => payment.method === 'Credit').reduce((sum, payment) => sum + payment.amountFcfa, 0);
+          owed.set(operation.customerId, (owed.get(operation.customerId) ?? 0) + credit);
+        }
+      }
+      const adjusted = customers.map((customer) => (owed.has(customer.id) ? withDebt(customer, customer.debtFcfa + owed.get(customer.id)!) : customer));
+      await promisify(tx.objectStore(META).put({ key: 'customers', value: adjusted } satisfies MetaEntry<CustomerSnapshot[]>));
+    });
+  }
+
+  /** Ajoute ou met à jour un client dans la copie locale (création à la caisse, en ligne). */
+  async upsertCustomer(customer: CustomerSnapshot): Promise<void> {
+    await inTransaction(this.db, [META], 'readwrite', async (tx) => {
+      const known = (await this.metaIn<CustomerSnapshot[]>(tx, 'customers')) ?? [];
+      const next = [...known.filter((item) => item.id !== customer.id), customer];
+      await promisify(tx.objectStore(META).put({ key: 'customers', value: next } satisfies MetaEntry<CustomerSnapshot[]>));
+    });
+  }
+
+  /** Clients actifs, par nom ; le texte cherche dans le nom (sans accents ni casse) ou dans les chiffres du téléphone. */
+  async listCustomers(term?: string): Promise<CustomerSnapshot[]> {
+    const all = ((await this.getMeta<CustomerSnapshot[]>('customers')) ?? [])
+      .filter((customer) => customer.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    const needle = term ? fold(term.trim()) : '';
+    const digits = (term ?? '').replace(/\D/g, '');
+    return needle === ''
+      ? all
+      : all.filter((customer) => fold(customer.name).includes(needle) || (digits.length > 0 && (customer.phone ?? '').includes(digits)));
+  }
+
   async listProducts(term?: string): Promise<CatalogueProduct[]> {
     const all = (await this.readAll<CatalogueProduct>(PRODUCTS)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     const needle = term ? fold(term.trim()) : '';
@@ -231,7 +281,7 @@ export class Journal {
       }
 
       const used = this.referencesOf((await promisify(operations.getAll())) as Operation[]);
-      const errors = validatePayments(netTotal, input.payments, used);
+      const errors = validatePayments(netTotal, input.payments, used, input.customerId);
       if (errors.length > 0) {
         throw new Error(errors.join(' '));
       }
@@ -251,11 +301,13 @@ export class Journal {
         lines: input.lines,
         discountFcfa: 0,
         payments: input.payments,
+        ...(input.customerId ? { customerId: input.customerId } : {}),
         netTotalFcfa: netTotal,
         changeFcfa: change,
       };
       await promisify(operations.put(sale));
       await this.decrementStock(tx, input.lines);
+      await this.chargeCustomer(tx, input);
       return sale;
     });
   }
@@ -429,6 +481,17 @@ export class Journal {
       }
       await promisify(store.put({ ...current, ...patch }));
     });
+  }
+
+  /** Une vente à crédit alourdit tout de suite la dette de la copie locale : le plafond tient d'une vente à l'autre, même sans réseau. */
+  private async chargeCustomer(tx: IDBTransaction, input: SaleInput): Promise<void> {
+    const credit = input.payments.filter((payment) => payment.method === 'Credit').reduce((sum, payment) => sum + payment.amountFcfa, 0);
+    if (credit === 0 || !input.customerId) {
+      return;
+    }
+    const customers = (await this.metaIn<CustomerSnapshot[]>(tx, 'customers')) ?? [];
+    const updated = customers.map((customer) => (customer.id === input.customerId ? withDebt(customer, customer.debtFcfa + credit) : customer));
+    await promisify(tx.objectStore(META).put({ key: 'customers', value: updated } satisfies MetaEntry<CustomerSnapshot[]>));
   }
 
   private async decrementStock(tx: IDBTransaction, lines: CartLine[]): Promise<void> {

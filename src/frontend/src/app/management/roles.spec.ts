@@ -1,4 +1,4 @@
-import { canManageCatalogue, canManageDevices, canManageStock, canManageTeam, canReadAuditLog, canSeeMargin, canViewReports } from './roles';
+import { canManageCatalogue, canManageCustomers, canManageDevices, canOperateCustomers, canReadCustomers, canSeeRepayments, canManageStock, canManageTeam, canReadAuditLog, canSeeMargin, canViewReports } from './roles';
 
 describe('roles', () => {
   it('lets only the owner and the manager manage the catalogue', () => {
@@ -44,5 +44,25 @@ describe('canManageDevices', () => {
     expect(['Owner', 'Manager', 'StockKeeper', 'Cashier', 'Accountant', undefined].map(canManageDevices)).toEqual([
       true, true, false, false, false, false,
     ]);
+  });
+});
+
+describe('customer rights', () => {
+  const roles = ['Owner', 'Manager', 'Cashier', 'StockKeeper', 'Accountant', undefined];
+
+  it('lets the till, the manager and the accountant read customers', () => {
+    expect(roles.map(canReadCustomers)).toEqual([true, true, true, false, true, false]);
+  });
+
+  it('lets the till profiles create customers and collect repayments, not the accountant', () => {
+    expect(roles.map(canOperateCustomers)).toEqual([true, true, true, false, false, false]);
+  });
+
+  it('lets only the owner and the manager edit ceilings and deactivate', () => {
+    expect(roles.map(canManageCustomers)).toEqual([true, true, false, false, false, false]);
+  });
+
+  it('keeps the repayment history to those who manage or watch', () => {
+    expect(roles.map(canSeeRepayments)).toEqual([true, true, false, false, true, false]);
   });
 });

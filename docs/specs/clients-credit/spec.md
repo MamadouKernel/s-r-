@@ -40,6 +40,12 @@ La dette d'un client est toujours égale à la somme des paiements « Crédit »
 ### CRD-08 Droits et isolation
 Un autre commerce ne voit ni les clients, ni les dettes, ni les versements ; un identifiant de client d'un autre commerce est introuvable. Un caissier ne peut ni changer un plafond, ni désactiver un client, ni lire l'historique des versements.
 
+### CRD-09 Écrans (lot 2)
+- **Clients** (`/clients`, propriétaire, gérant, caissier, comptable) : liste (nom, téléphone, « Doit X » ou « À jour », plafond, crédit disponible), total des dettes à recouvrer, recherche par nom ou téléphone, ajout d'un client, « Encaisser un versement » (montant, espèces ou Mobile Money avec référence ; au plus la dette ; un message dit ce qu'il reste à payer), « Historique » (propriétaire, gérant, comptable), « Modifier » et « Désactiver » avec confirmation (propriétaire, gérant). En ligne seulement ; rien d'écrit n'est possible hors ligne et l'écran le dit.
+- **Caisse** : le mode « Crédit (le client paiera plus tard) » s'ajoute aux modes de paiement, y compris dans un paiement mixte. Il demande un client, choisi dans la **copie locale** (nom, dette, crédit disponible), ou créé sur place (en ligne). Hors ligne la copie suffit pour vendre ; la dette locale monte à chaque vente à crédit pour que le plafond tienne d'une vente à l'autre, et se recale sur le serveur dès que la file est envoyée.
+- **Plafond à la caisse** : un caissier est arrêté avec les chiffres et « appelez un gérant » ; un gérant ou le propriétaire passe après un avertissement (« en validant, vous l'autorisez »), tracé par le serveur. Une validation par code du gérant sur la caisse d'un caissier est **hors lot**.
+- Le propriétaire qui se connecte reçoit aussitôt catalogue et clients à jour, car il peut vendre depuis ce navigateur.
+
 ## Scénarios d'acceptation
 
 - **SC-C1** Créer un client avec nom et téléphone : plafond par défaut, dette 0 ; le même téléphone (autre écriture) est refusé (409).
@@ -55,4 +61,4 @@ Un autre commerce ne voit ni les clients, ni les dettes, ni les versements ; un 
 
 ## Hors lot
 
-Écrans et mode hors ligne (lot 2), relances (SMS/WhatsApp exclus ; autre canal à choisir), échéancier, intérêts, points de fidélité, regroupement de clients, fusion de doublons, export, crédit fournisseur.
+Validation du dépassement par le code du gérant sur la caisse d'un caissier, relances (SMS/WhatsApp exclus ; autre canal à choisir), échéancier, intérêts, points de fidélité, regroupement de clients, fusion de doublons, export, crédit fournisseur.

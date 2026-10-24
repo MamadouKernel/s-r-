@@ -101,6 +101,7 @@ export class ApiService implements SyncApi {
             unitPriceFcfa: line.unitPriceFcfa,
           })),
           discountFcfa: sale.discountFcfa,
+          customerId: sale.customerId ?? null,
           payments: sale.payments.map((payment) => ({
             paymentId: payment.id,
             method: payment.method,

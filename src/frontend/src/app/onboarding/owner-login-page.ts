@@ -1,9 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { CustomerService } from '../customers/customer.service';
 import { FlashService } from '../management/flash.service';
 import { landingPath } from '../pages/landing';
 import { AuthService } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
+import { CatalogueService } from '../services/catalogue.service';
+import { SyncService } from '../services/sync.service';
 import { OnboardingApi } from './onboarding-api';
 import { looksLikeEmail, onboardingError } from './wording';
 
@@ -40,6 +43,9 @@ export class OwnerLoginPage {
   private readonly api = inject(OnboardingApi);
   private readonly auth = inject(AuthService);
   private readonly cash = inject(CashService);
+  private readonly catalogue = inject(CatalogueService);
+  private readonly customers = inject(CustomerService);
+  private readonly sync = inject(SyncService);
   private readonly router = inject(Router);
 
   protected readonly notice = signal(inject(FlashService).consume());
@@ -65,6 +71,10 @@ export class OwnerLoginPage {
       const session = await this.api.ownerLogin(this.email().trim(), this.password());
       await this.auth.acceptOwnerSession(session);
       this.password.set('');
+      // Le propriétaire peut aussi vendre depuis ce navigateur : catalogue et clients frais, et envoi de ce qui attendait.
+      void this.catalogue.refresh();
+      void this.customers.refresh();
+      void this.sync.requestFlush();
       await this.router.navigateByUrl(landingPath(this.auth.user()?.role, this.cash.session() !== null));
     } catch (error) {
       this.password.set('');

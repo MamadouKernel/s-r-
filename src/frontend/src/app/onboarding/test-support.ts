@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { FlashService } from '../management/flash.service';
 import { AuthService } from '../services/auth.service';
+import { CustomerService } from '../customers/customer.service';
 import { CashService } from '../services/cash.service';
+import { CatalogueService } from '../services/catalogue.service';
+import { SyncService } from '../services/sync.service';
 import { NetworkService } from '../services/network.service';
 import { OnboardingApi, OwnerSession } from './onboarding-api';
 
@@ -54,6 +57,9 @@ export async function renderPage<T>(
       { provide: OnboardingApi, useValue: api },
       { provide: AuthService, useValue: auth },
       { provide: CashService, useValue: { session: signal(null).asReadonly() } },
+      { provide: CatalogueService, useValue: { refresh: vi.fn().mockResolvedValue(undefined) } },
+      { provide: CustomerService, useValue: { refresh: vi.fn().mockResolvedValue(undefined) } },
+      { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null) } },
       { provide: NetworkService, useValue: { online: signal(options.online ?? true) } },
       { provide: ActivatedRoute, useValue: { snapshot: { fragment: options.fragment ?? null, paramMap: { get: () => null } } } },
       ...(options.extraProviders ?? []),

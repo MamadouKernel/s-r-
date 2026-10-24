@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { Journal, SaleOperation } from './journal';
-import { CatalogueProduct } from '../domain/types';
+import { CatalogueProduct, CustomerSnapshot } from '../domain/types';
 
 let counter = 0;
 const jus: CatalogueProduct = {
@@ -404,5 +404,111 @@ describe('Journal: database upgrade (SC-P10)', () => {
     await journal.saveDraft([{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 1 }]);
     expect(await journal.loadDraft()).toHaveLength(1);
     expect(await journal.listHeld()).toEqual([]);
+  });
+});
+
+describe('Journal: customers and credit sales (CRD-04, offline)', () => {
+  const awa: CustomerSnapshot = { id: 'c-awa', name: 'Awa Koné', phone: '+2250707070707', creditCeilingFcfa: 20_000, debtFcfa: 8_000, availableCreditFcfa: 12_000, isActive: true };
+  const issa: CustomerSnapshot = { id: 'c-issa', name: 'Issa Diallo', phone: null, creditCeilingFcfa: 20_000, debtFcfa: 0, availableCreditFcfa: 20_000, isActive: true };
+  const ancien: CustomerSnapshot = { ...issa, id: 'c-old', name: 'Ancien Client', isActive: false };
+
+  const creditSale = (id: string, credit: number, customerId: string | null = 'c-awa') => ({
+    id,
+    at: '2026-10-23T08:10:00.000Z',
+    lines: [{ productId: 'p-jus', name: jus.name, unitPriceFcfa: credit, quantity: 1 }],
+    payments: [{ id: 'pay-' + id, method: 'Credit' as const, amountFcfa: credit }],
+    customerId,
+  });
+
+  it('lists the active customers by name, searching names without accents or case and phones by their digits', async () => {
+    const journal = await newJournal();
+    await journal.replaceCustomers([issa, awa, ancien]);
+
+    expect((await journal.listCustomers()).map((c) => c.name)).toEqual(['Awa Koné', 'Issa Diallo']);
+    expect((await journal.listCustomers('KONE')).map((c) => c.id)).toEqual(['c-awa']);
+    expect((await journal.listCustomers('07 07')).map((c) => c.id)).toEqual(['c-awa']);
+    expect(await journal.listCustomers('zzz')).toEqual([]);
+  });
+
+  it('keeps the customer with the sale and raises the local debt at once, so the ceiling holds without network', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.replaceCustomers([awa]);
+
+    const sale = await journal.recordSale(creditSale('a', 5_000));
+
+    expect(sale.customerId).toBe('c-awa');
+    const [after] = await journal.listCustomers();
+    expect(after.debtFcfa).toBe(13_000);
+    expect(after.availableCreditFcfa).toBe(7_000);
+  });
+
+  it('accumulates several offline credit sales on the same customer, never below zero credit', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.replaceCustomers([awa]);
+
+    await journal.recordSale(creditSale('a', 5_000));
+    await journal.recordSale(creditSale('b', 9_000));
+
+    const [after] = await journal.listCustomers();
+    expect(after.debtFcfa).toBe(22_000);
+    expect(after.availableCreditFcfa).toBe(0);
+  });
+
+  it('refuses a credit sale without a customer and records nothing', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    await expect(journal.recordSale(creditSale('a', 5_000, null))).rejects.toThrow('Choisissez le client');
+    expect(await journal.counts()).toEqual({ pending: 1, synced: 0, rejected: 0 }); // seule l'ouverture de caisse
+  });
+
+  it('does not touch the debt for a cash sale, even when a customer is attached', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.replaceCustomers([awa]);
+
+    await journal.recordSale({ ...cashSale('a'), customerId: 'c-awa' });
+
+    expect((await journal.listCustomers())[0].debtFcfa).toBe(8_000);
+  });
+
+  it('does not charge twice when the same sale is replayed', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.replaceCustomers([awa]);
+
+    await journal.recordSale(creditSale('a', 5_000));
+    await journal.recordSale(creditSale('a', 5_000));
+
+    expect((await journal.listCustomers())[0].debtFcfa).toBe(13_000);
+  });
+
+  it('adds the pending credit sales back when the list is refreshed from the server, until they are sent', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.replaceCustomers([awa]);
+    const sent = await journal.recordSale(creditSale('a', 5_000));
+
+    await journal.replaceCustomers([awa]); // le serveur ne connaît pas encore cette vente
+
+    const [pending] = await journal.listCustomers();
+    expect(pending.debtFcfa).toBe(13_000);
+
+    await journal.markSynced(sent.seq);
+    await journal.replaceCustomers([{ ...awa, debtFcfa: 13_000, availableCreditFcfa: 7_000 }]); // le serveur l'a maintenant comptée
+
+    expect((await journal.listCustomers())[0].debtFcfa).toBe(13_000);
+  });
+
+  it('adds or updates a single customer, for one created at the till', async () => {
+    const journal = await newJournal();
+    await journal.replaceCustomers([awa]);
+
+    await journal.upsertCustomer(issa);
+    await journal.upsertCustomer({ ...issa, name: 'Issa D.' });
+
+    expect((await journal.listCustomers()).map((c) => c.name)).toEqual(['Awa Koné', 'Issa D.']);
   });
 });
