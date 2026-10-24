@@ -1,9 +1,12 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SaleOperation } from '../data/journal';
-import { PaymentDraft } from '../domain/types';
+import { CustomerService } from '../customers/customer.service';
+import { CustomerSnapshot, PaymentDraft } from '../domain/types';
 import { referenceKey } from '../domain/payment';
+import { AuthService } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
+import { NetworkService } from '../services/network.service';
 import { SyncService } from '../services/sync.service';
 import { PaymentPanel } from './payment-panel';
 
@@ -12,11 +15,39 @@ const sale = (draft: PaymentDraft[]): SaleOperation => ({
   netTotalFcfa: 1450, changeFcfa: 0, lines: [], payments: draft,
 });
 
-async function render(used: string[] = [], pending = 1) {
-  const confirmSale = vi.fn(async (drafts: PaymentDraft[]) => sale(drafts));
+const customer = (overrides: Partial<CustomerSnapshot> = {}): CustomerSnapshot => ({
+  id: 'c-1', name: 'Awa Koné', phone: '+2250707070707', creditCeilingFcfa: 20_000, debtFcfa: 8_000, availableCreditFcfa: 12_000, isActive: true, ...overrides,
+});
+
+interface Options {
+  used?: string[];
+  pending?: number;
+  customers?: CustomerSnapshot[];
+  role?: string;
+  online?: boolean;
+  created?: CustomerSnapshot;
+}
+
+async function render(used: string[] = [], pending = 1, options: Omit<Options, 'used' | 'pending'> = {}) {
+  const confirmSale = vi.fn(async (drafts: PaymentDraft[], customerId?: string | null) => ({
+    ...sale(drafts), ...(customerId ? { customerId } : {}),
+  }));
+  const customersSignal = signal(options.customers ?? []);
+  const customerService = {
+    customers: customersSignal.asReadonly(),
+    loadLocal: vi.fn(async (term?: string) => {
+      const needle = (term ?? '').toLowerCase();
+      customersSignal.set((options.customers ?? []).filter((item) => item.name.toLowerCase().includes(needle)));
+    }),
+    refresh: vi.fn(async () => undefined),
+    create: vi.fn(async () => options.created ?? customer({ id: 'c-new', name: 'Nouveau', debtFcfa: 0, availableCreditFcfa: 20_000 })),
+  };
   TestBed.configureTestingModule({
     providers: [
       { provide: SyncService, useValue: { counts: signal({ pending, synced: 0, rejected: 0 }) } },
+      { provide: CustomerService, useValue: customerService },
+      { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'Awa', role: options.role ?? 'Cashier' }) } },
+      { provide: NetworkService, useValue: { online: signal(options.online ?? true) } },
       {
         provide: CashService,
         useValue: { confirmSale, usedReferences: async () => new Set(used), submitting: signal(false) },
@@ -37,7 +68,13 @@ async function render(used: string[] = [], pending = 1) {
     button?.click();
     await fixture.whenStable();
   };
-  return { fixture, root, confirmSale, type, click };
+  const choose = async (selector: string, value: string) => {
+    const element = root.querySelector<HTMLSelectElement>(selector)!;
+    element.value = value;
+    element.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+  };
+  return { fixture, root, confirmSale, customerService, type, click, choose };
 }
 
 describe('PaymentPanel', () => {
@@ -116,3 +153,166 @@ describe('PaymentPanel', () => {
     expect(root.textContent).toContain('550');
   });
 });
+
+describe('PaymentPanel: credit (CRD-04)', () => {
+  const awa = customer();
+
+  async function onCredit(options: Omit<Options, 'used' | 'pending'> = { customers: [awa] }) {
+    const page = await render([], 1, options);
+    await page.choose('select', 'Credit');
+    return page;
+  }
+
+  it('offers credit as a payment mode, in plain words, with nothing to type but the amount', async () => {
+    const { root, choose } = await render([], 1, { customers: [awa] });
+
+    expect(root.textContent).toContain('Crédit (le client paiera plus tard)');
+    await choose('select', 'Credit');
+
+    expect(root.textContent).toContain('Ce montant s’ajoute à ce que le client vous doit');
+    expect(root.querySelector('input.font-mono')).toBeNull(); // pas de référence
+    expect(root.textContent).not.toContain('Montant reçu');
+  });
+
+  it('shows no customer section until credit is chosen', async () => {
+    const { root } = await render([], 1, { customers: [awa] });
+    expect(root.textContent).not.toContain('Client à crédit');
+  });
+
+  it('refuses to validate without a customer and says why', async () => {
+    const { root, click, confirmSale } = await onCredit();
+
+    await click('Valider la vente');
+
+    expect(confirmSale).not.toHaveBeenCalled();
+    expect(root.textContent).toContain('Choisissez le client à qui vous vendez à crédit.');
+  });
+
+  it('lists the customers with their debt and available credit, and filters them while typing', async () => {
+    const issa = customer({ id: 'c-2', name: 'Issa Diallo', debtFcfa: 0, availableCreditFcfa: 20_000 });
+    const { root, type } = await onCredit({ customers: [awa, issa] });
+
+    const text = root.textContent!.replace(/\u00a0/g, ' ');
+    expect(text).toContain('Awa Koné');
+    expect(text).toContain('Dette : 8 000 FCFA · Crédit disponible : 12 000 FCFA');
+    expect(text).toContain('Issa Diallo');
+
+    await type(root.querySelector<HTMLInputElement>('#client-recherche')!, 'issa');
+    expect(root.textContent).not.toContain('Awa Koné');
+    expect(root.textContent).toContain('Issa Diallo');
+  });
+
+  it('sells on credit for a customer within the ceiling and sends the customer with the sale (SC-U-credit)', async () => {
+    const { fixture, root, click, confirmSale, type } = await render([], 1, { customers: [awa] });
+    await type(root.querySelectorAll<HTMLInputElement>('input')[0], '1000');
+    await click('Ajouter un paiement');
+    const selects = root.querySelectorAll<HTMLSelectElement>('select');
+    selects[1].value = 'Credit';
+    selects[1].dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    await click('Awa Koné');
+
+    await click('Valider la vente');
+
+    expect(confirmSale).toHaveBeenCalledTimes(1);
+    const [drafts, customerId] = confirmSale.mock.calls[0];
+    expect(drafts).toMatchObject([{ method: 'Cash', amountFcfa: 1000 }, { method: 'Credit', amountFcfa: 450 }]);
+    expect(customerId).toBe('c-1');
+    expect(root.textContent!.replace(/\u00a0/g, ' ')).toContain('À crédit pour Awa Koné : 450 FCFA. Sa dette passe à 8 450 FCFA.');
+  });
+
+  it('stops a cashier above the ceiling with the figures and what to do, and sends nothing', async () => {
+    const tight = customer({ debtFcfa: 19_000, availableCreditFcfa: 1_000 });
+    const { root, click, confirmSale } = await onCredit({ customers: [tight], role: 'Cashier' });
+    await click('Awa Koné');
+
+    await click('Valider la vente');
+
+    const alert = root.querySelector('[role="alert"]')!.textContent!.replace(/\u00a0/g, ' ');
+    expect(alert).toContain('Awa Koné doit déjà 19 000 FCFA pour un plafond de 20 000 FCFA');
+    expect(alert).toContain('il reste 1 000 FCFA de crédit');
+    expect(alert).toContain('Seul un gérant peut valider un crédit plus grand : appelez-le.');
+    expect(confirmSale).not.toHaveBeenCalled();
+  });
+
+  it('lets a manager go above the ceiling after telling them it is their validation', async () => {
+    const tight = customer({ debtFcfa: 19_000, availableCreditFcfa: 1_000 });
+    const { root, click, confirmSale } = await onCredit({ customers: [tight], role: 'Manager' });
+    await click('Awa Koné');
+
+    expect(root.textContent).toContain('En validant la vente, vous l’autorisez en tant que gérant');
+    await click('Valider la vente');
+
+    expect(confirmSale).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the cashier change the customer', async () => {
+    const { root, click } = await onCredit();
+    await click('Awa Koné');
+    expect(root.textContent).toContain('Changer de client');
+
+    await click('Changer de client');
+
+    expect(root.querySelector('#client-recherche')).toBeTruthy();
+  });
+
+  it('creates a customer at the till and selects it, online', async () => {
+    const created = customer({ id: 'c-new', name: 'Marie Awa', debtFcfa: 0, availableCreditFcfa: 20_000 });
+    const { root, click, type, customerService } = await onCredit({ customers: [], created });
+
+    expect(root.textContent).toContain('Aucun client enregistré sur cet appareil. Créez-le ci-dessous.');
+    await click('Nouveau client');
+    await type(root.querySelector<HTMLInputElement>('#client-nom')!, 'Marie Awa');
+    await type(root.querySelector<HTMLInputElement>('#client-telephone')!, '07 07 07 07 07');
+    await click('Enregistrer le client');
+
+    expect(customerService.create).toHaveBeenCalledWith('Marie Awa', '07 07 07 07 07');
+    expect(root.textContent).toContain('Marie Awa');
+    expect(root.textContent).toContain('Changer de client');
+  });
+
+  it('asks for a name before creating a customer, and shows the server refusal in plain words', async () => {
+    const page = await onCredit({ customers: [] });
+    await page.click('Nouveau client');
+    await page.click('Enregistrer le client');
+    expect(page.root.textContent).toContain('Donnez le nom du client');
+    expect(page.customerService.create).not.toHaveBeenCalled();
+
+    page.customerService.create.mockRejectedValueOnce(Object.assign(new Error('x'), {}));
+    await page.type(page.root.querySelector<HTMLInputElement>('#client-nom')!, 'Awa');
+    await page.click('Enregistrer le client');
+    expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('Une erreur est survenue');
+  });
+
+  it('works offline with the list kept on the device, but cannot create a customer without internet', async () => {
+    const { root } = await onCredit({ customers: [awa], online: false });
+
+    expect(root.textContent).toContain('Awa Koné');
+    const newCustomer = [...root.querySelectorAll('button')].find((button) => button.textContent?.includes('Nouveau client'))!;
+    expect(newCustomer.disabled).toBe(true);
+    expect(root.textContent).toContain('Ajouter un client demande internet.');
+  });
+
+  it('says so when the device has no customer list yet and is offline', async () => {
+    const { root } = await onCredit({ customers: [], online: false });
+    expect(root.textContent).toContain('Connectez-vous à internet pour charger la liste des clients');
+  });
+
+  it('refreshes the list from the server when opened online, and not offline', async () => {
+    const online = await render([], 1, { customers: [awa], online: true });
+    expect(online.customerService.refresh).toHaveBeenCalledOnce();
+
+    TestBed.resetTestingModule();
+    const offline = await render([], 1, { customers: [awa], online: false });
+    expect(offline.customerService.refresh).not.toHaveBeenCalled();
+  });
+
+  it('sends no customer for a sale without credit', async () => {
+    const { click, confirmSale } = await render([], 1, { customers: [awa] });
+
+    await click('Valider la vente');
+
+    expect(confirmSale.mock.calls[0][1]).toBeNull();
+  });
+});
+

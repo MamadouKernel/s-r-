@@ -115,5 +115,5 @@ Voir `docs/specs/cout-moyen/spec.md` et `docs/decisions/0007-cout-moyen-pondere.
 Voir `docs/specs/clients-credit/spec.md` et `docs/decisions/0008-clients-et-credit.md`.
 
 - [x] T120 Clients, plafond, dette, versements, vente à crédit et annulation (serveur) — CRD-01 à CRD-08
-- [ ] T121 Écrans : fiche client, crédit à la caisse (y compris hors ligne), versement, dettes — lot 2
+- [x] T121 Écrans : fiche client, crédit à la caisse (y compris hors ligne), versement, dettes — CRD-09
 

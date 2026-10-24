@@ -1,4 +1,4 @@
-import { cashChange, referenceKey, validatePayments } from './payment';
+import { cashChange, creditProblem, referenceKey, validatePayments } from './payment';
 import { PaymentDraft } from './types';
 
 const cash = (amount: number, tendered = amount): PaymentDraft => ({
@@ -76,8 +76,38 @@ describe('validatePayments', () => {
     expect(validatePayments(1000.5, [cash(1000.5)], none).length).toBeGreaterThan(0);
   });
 
-  it('does not offer credit while customers do not exist', () => {
+  it('asks for a customer when part of the sale is on credit, and accepts it once chosen', () => {
     const credit: PaymentDraft = { id: 'k', method: 'Credit', amountFcfa: 1000 };
-    expect(validatePayments(1000, [credit], none).length).toBeGreaterThan(0);
+
+    expect(validatePayments(1000, [credit], none)).toEqual(['Choisissez le client à qui vous vendez à crédit.']);
+    expect(validatePayments(1000, [credit], none, null)).toEqual(['Choisissez le client à qui vous vendez à crédit.']);
+    expect(validatePayments(1000, [credit], none, 'client-1')).toEqual([]);
+  });
+
+  it('accepts a mixed payment with cash and credit that adds up', () => {
+    const credit: PaymentDraft = { id: 'k', method: 'Credit', amountFcfa: 400 };
+    expect(validatePayments(1000, [cash(600), credit], none, 'client-1')).toEqual([]);
+    expect(validatePayments(1000, [cash(500), credit], none, 'client-1')).toEqual(['Le total des paiements doit être égal au montant à payer.']);
+  });
+});
+
+describe('creditProblem', () => {
+  const customer = { id: 'c', name: 'Awa Koné', phone: null, creditCeilingFcfa: 20_000, debtFcfa: 8_000, availableCreditFcfa: 12_000, isActive: true };
+
+  it('lets credit through up to what is available, to the franc', () => {
+    expect(creditProblem(customer, 12_000, false)).toBeNull();
+    expect(creditProblem(customer, 1, false)).toBeNull();
+  });
+
+  it('refuses a cashier above the ceiling with the figures and what to do', () => {
+    const message = creditProblem(customer, 12_001, false)!.replace(/\u00a0/g, ' ');
+    expect(message).toContain('Awa Koné doit déjà 8 000 FCFA');
+    expect(message).toContain('plafond de 20 000 FCFA');
+    expect(message).toContain('il reste 12 000 FCFA de crédit');
+    expect(message).toContain('appelez-le');
+  });
+
+  it('lets a manager go above the ceiling, since validating is the manager’s call', () => {
+    expect(creditProblem(customer, 50_000, true)).toBeNull();
   });
 });

@@ -150,12 +150,12 @@ export class CashService {
    * Enregistre la vente. L'identifiant est créé une fois par encaissement et conservé en cas de nouvel essai : un double appui, ou
    * un nouvel appui après une erreur, ne peut donc jamais produire deux ventes (SC-P4).
    */
-  confirmSale(payments: PaymentDraft[]): Promise<SaleOperation> {
+  confirmSale(payments: PaymentDraft[], customerId: string | null = null): Promise<SaleOperation> {
     if (this.inFlight) {
       return this.inFlight;
     }
     this.checkoutId ??= crypto.randomUUID();
-    const input = { id: this.checkoutId, at: new Date().toISOString(), lines: this.cartSignal(), payments };
+    const input = { id: this.checkoutId, at: new Date().toISOString(), lines: this.cartSignal(), payments, customerId };
     this.submittingSignal.set(true);
     this.inFlight = (async () => {
       try {

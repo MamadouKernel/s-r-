@@ -1,3 +1,6 @@
+import { CustomerService } from '../customers/customer.service';
+import { CatalogueService } from '../services/catalogue.service';
+import { SyncService } from '../services/sync.service';
 import { ApiError } from '../sync/sync-api';
 import { OwnerLoginPage } from './owner-login-page';
 import { fakeOnboardingApi, ownerSession, renderPage } from './test-support';
@@ -32,6 +35,19 @@ describe('OwnerLoginPage', () => {
     expect(page.api.ownerLogin).toHaveBeenCalledWith('mamadou@exemple.ci', 'Boutique-2026-ok');
     expect(page.auth.acceptOwnerSession).toHaveBeenCalledWith(ownerSession());
     expect(page.navigate).toHaveBeenCalledWith('/tableau-de-bord');
+  });
+
+  it('loads the catalogue and the customers and sends what was waiting, since the owner can sell from this browser', async () => {
+    const page = await renderPage(OwnerLoginPage);
+    await page.type('#email-proprietaire', 'mamadou@exemple.ci');
+    await page.type('#mdp-proprietaire', 'Boutique-2026-ok');
+
+    await page.submit();
+
+    const { TestBed } = await import('@angular/core/testing');
+    expect(TestBed.inject(CatalogueService).refresh).toHaveBeenCalledOnce();
+    expect(TestBed.inject(CustomerService).refresh).toHaveBeenCalledOnce();
+    expect(TestBed.inject(SyncService).requestFlush).toHaveBeenCalledOnce();
   });
 
   it('shows the same plain message for a wrong password and empties the password', async () => {

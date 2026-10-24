@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { auditGuard, catalogueGuard, deviceGuard, devicesGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', pathMatch: 'full', redirectTo: 'bienvenue' },
@@ -42,6 +42,11 @@ export const routes: Routes = [
     path: 'tableau-de-bord',
     canActivate: [deviceGuard, reportsGuard],
     loadComponent: () => import('./dashboard/dashboard-page').then((m) => m.DashboardPage),
+  },
+  {
+    path: 'clients',
+    canActivate: [deviceGuard, customersGuard],
+    loadComponent: () => import('./customers/customers-page').then((m) => m.CustomersPage),
   },
   {
     path: 'journal',
