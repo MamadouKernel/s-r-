@@ -109,3 +109,11 @@ Voir `spec.md` (questions ouvertes) et `docs/analyse-merise.md` §11. Le domaine
 Voir `docs/specs/cout-moyen/spec.md` et `docs/decisions/0007-cout-moyen-pondere.md`.
 
 - [x] T110 Prix d'achat moyen pondéré à la réception, coût figé à la vente, marge exacte ou estimée, écrans — CM-01 à CM-05 (RG-11)
+
+## Clients et crédit (V1)
+
+Voir `docs/specs/clients-credit/spec.md` et `docs/decisions/0008-clients-et-credit.md`.
+
+- [x] T120 Clients, plafond, dette, versements, vente à crédit et annulation (serveur) — CRD-01 à CRD-08
+- [ ] T121 Écrans : fiche client, crédit à la caisse (y compris hors ligne), versement, dettes — lot 2
+

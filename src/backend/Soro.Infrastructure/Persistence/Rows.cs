@@ -310,3 +310,45 @@ internal sealed class DeviceInvitationRow
 
     public DateTimeOffset? ConsumedAt { get; set; }
 }
+
+internal sealed class CustomerRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Numéro canonique <c>+225XXXXXXXXXX</c> ; <c>null</c> si le client n'en a pas donné.</summary>
+    public string? Phone { get; set; }
+
+    public long CreditCeiling { get; set; }
+
+    public long Debt { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public bool IsActive { get; set; }
+}
+
+internal sealed class DebtRepaymentRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid CustomerId { get; set; }
+
+    public long Amount { get; set; }
+
+    public PaymentMethod Method { get; set; }
+
+    public string? Reference { get; set; }
+
+    /// <summary>Référence normalisée (majuscules) : porte l'unicité insensible à la casse, comme pour les ventes.</summary>
+    public string? ReferenceKey { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public DateTimeOffset At { get; set; }
+}

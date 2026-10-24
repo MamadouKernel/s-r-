@@ -1,5 +1,6 @@
 using Soro.Application.Cash;
 using Soro.Application.Common;
+using Soro.Application.Customers;
 using Soro.Application.Identity;
 using Soro.Application.Settings;
 using Soro.Application.Stock;
@@ -28,7 +29,9 @@ public sealed record RecordSaleCommand(
     long DiscountFcfa,
     IReadOnlyList<PaymentInput> Payments,
     CustomerId? Customer,
-    UserId? DiscountApprover);
+    UserId? DiscountApprover,
+    UserId? CreditApprover = null,
+    bool EnforceCreditCeiling = true);
 
 public sealed record RecordSaleResult(SaleId SaleId, long NetTotalFcfa, long ChangeFcfa, bool AlreadyProcessed);
 
@@ -42,6 +45,7 @@ public sealed class RecordSaleHandler(
     ISaleRepository sales,
     IProductRepository products,
     IStockMovementRepository stockMovements,
+    ICustomerRepository customers,
     IShopSettings settings,
     IUserDirectory directory,
     IAuditTrail audit,
@@ -104,6 +108,12 @@ public sealed class RecordSaleHandler(
             return Result<RecordSaleResult>.Failure(referenceError);
         }
 
+        var creditError = await ApplyCreditAsync(command, draft, cancellationToken);
+        if (creditError is not null)
+        {
+            return Result<RecordSaleResult>.Failure(creditError);
+        }
+
         var sale = session.RecordSale(draft);
         await sales.AddAsync(sale, cancellationToken);
         await sessions.UpdateAsync(session, cancellationToken);
@@ -150,6 +160,60 @@ public sealed class RecordSaleHandler(
                 .ToArray(),
         };
     }
+
+    /// <summary>
+    /// Vente à crédit (CRD-04, RG-06) : le montant à crédit s'ajoute à la dette du client dans la même transaction que la vente. Au-delà du plafond,
+    /// un gérant doit valider ; une vente venue de la synchronisation a déjà eu lieu, on l'enregistre toujours et on signale le dépassement.
+    /// </summary>
+    private async Task<ApplicationError?> ApplyCreditAsync(RecordSaleCommand command, SaleDraft draft, CancellationToken cancellationToken)
+    {
+        var credit = Money.Sum(draft.Payments.Where(payment => payment.Method == PaymentMethod.Credit).Select(payment => payment.Amount));
+        if (credit == Money.Zero || draft.Customer is not { } customerId)
+        {
+            return null; // sans client, le domaine refuse la vente à crédit avec son propre message
+        }
+
+        var customer = await customers.GetAsync(customerId, user.Tenant, cancellationToken);
+        if (customer is null)
+        {
+            return ApplicationError.NotFound("Client introuvable : la vente à crédit ne peut pas être enregistrée.");
+        }
+
+        if (!customer.IsActive)
+        {
+            return ApplicationError.RuleViolation($"Le client {customer.Name} est désactivé : il ne peut plus acheter à crédit.");
+        }
+
+        if (customer.WouldExceedCeiling(credit))
+        {
+            var detail = $"{customer.Name} : dette {customer.Debt}, plafond {customer.CreditCeiling}, crédit demandé {credit}";
+            var approver = RolePolicy.IsManager(user.Role) ? user.User : command.CreditApprover;
+            if (approver is { } who && await IsManagerAsync(who, cancellationToken))
+            {
+                await audit.RecordAsync(CreditEntry(AuditActions.CreditApproved, command, detail), cancellationToken);
+            }
+            else if (command.EnforceCreditCeiling)
+            {
+                await audit.RecordAsync(CreditEntry(AuditActions.CreditRefused, command, detail), cancellationToken);
+                await unitOfWork.CommitAsync(cancellationToken);
+                return new ApplicationError(
+                    ErrorCodes.CreditLimitExceeded,
+                    $"{customer.Name} a atteint son plafond de crédit ({customer.CreditCeiling}) : dette {customer.Debt}, il reste {customer.AvailableCredit}. "
+                    + "La validation d'un gérant est nécessaire.");
+            }
+            else
+            {
+                await audit.RecordAsync(CreditEntry(AuditActions.CreditExceeded, command, detail), cancellationToken);
+            }
+        }
+
+        customer.Charge(credit);
+        await customers.UpdateAsync(customer, cancellationToken);
+        return null;
+    }
+
+    private AuditEntry CreditEntry(string action, RecordSaleCommand command, string detail) =>
+        new(user.Tenant, user.User, action, command.Id.Value, detail, clock.UtcNow);
 
     private async Task<ApplicationError?> CheckDiscountAsync(
         RecordSaleCommand command,

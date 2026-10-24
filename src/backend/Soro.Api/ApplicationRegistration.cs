@@ -1,5 +1,6 @@
 using Soro.Application.Cash;
 using Soro.Application.Common;
+using Soro.Application.Customers;
 using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Reporting;
@@ -42,6 +43,12 @@ public static class ApplicationRegistration
         services.AddScoped<SyncSalesHandler>();
         services.AddScoped<CancelSaleHandler>();
         services.AddScoped<LogInHandler>();
+        services.AddScoped<CreateCustomerHandler>();
+        services.AddScoped<UpdateCustomerHandler>();
+        services.AddScoped<DeactivateCustomerHandler>();
+        services.AddScoped<ListCustomersHandler>();
+        services.AddScoped<RecordRepaymentHandler>();
+        services.AddScoped<ListRepaymentsHandler>();
         services.AddScoped<CreateDeviceInvitationHandler>();
         services.AddScoped<EnrollDeviceHandler>();
         services.AddScoped<ListDevicesHandler>();

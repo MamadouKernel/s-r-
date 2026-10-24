@@ -1,4 +1,5 @@
 using Soro.Application.Cash;
+using Soro.Application.Customers;
 using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
@@ -7,6 +8,7 @@ using Soro.Application.Signup;
 using Soro.Application.Stock;
 using Soro.Domain.Stock;
 using Soro.Domain.Cash;
+using Soro.Domain.Customers;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
 using Soro.Domain.Identity;
@@ -74,6 +76,10 @@ internal sealed class TestWorld
 
     public FakeDevicePolicy DevicePolicy { get; } = new();
 
+    public InMemoryCustomerRepository Customers { get; } = new();
+
+    public InMemoryDebtRepaymentRepository Repayments { get; } = new();
+
     public InMemoryProductRepository Products { get; } = new();
 
     public InMemoryStockMovementRepository Movements { get; } = new();
@@ -92,11 +98,23 @@ internal sealed class TestWorld
 
     public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, UnitOfWork);
 
-    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Settings, Directory, Audit, Clock, UnitOfWork);
+    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Directory, Audit, Clock, UnitOfWork);
 
     public SyncSalesHandler SyncSales => new(RecordSale);
 
-    public CancelSaleHandler CancelSale => new(Current, Sales, Audit, Clock, UnitOfWork);
+    public CancelSaleHandler CancelSale => new(Current, Sales, Customers, Audit, Clock, UnitOfWork);
+
+    public CreateCustomerHandler CreateCustomer => new(Current, Customers, Settings, Clock, UnitOfWork);
+
+    public UpdateCustomerHandler UpdateCustomer => new(Current, Customers, UnitOfWork);
+
+    public DeactivateCustomerHandler DeactivateCustomer => new(Current, Customers, UnitOfWork);
+
+    public ListCustomersHandler ListCustomers => new(Current, Customers);
+
+    public RecordRepaymentHandler RecordRepayment => new(Current, Customers, Repayments, Sales, Audit, Clock, UnitOfWork);
+
+    public ListRepaymentsHandler ListRepayments => new(Current, Customers, Repayments);
 
     public StartSignupHandler StartSignup => new(OwnerDirectory, Verifications, Codes, Mail, SignupSettings, Clock, UnitOfWork);
 
@@ -169,6 +187,19 @@ internal sealed class TestWorld
         await Commerces.AddAsync(
             Commerce.Open(id, name, ActivityType.Supermarket, EmailAddress.Parse("mamadou@exemple.ci"), "2026-10-brouillon", Clock.UtcNow),
             CancellationToken.None);
+    }
+
+    /// <summary>Un client du commerce, avec sa dette déjà portée (comme si des ventes à crédit avaient eu lieu).</summary>
+    public Customer GivenCustomer(string name = "Awa Koné", string? phone = "07 07 07 07 07", long ceiling = 20_000, long debt = 0, TenantId? tenant = null)
+    {
+        var customer = Customer.Create(CustomerId.New(), tenant ?? Tenant, name, phone, Money.Fcfa(ceiling), Clock.UtcNow);
+        if (debt > 0)
+        {
+            customer.Charge(Money.Fcfa(debt));
+        }
+
+        Customers.Put(customer);
+        return customer;
     }
 
     public User GivenUser(

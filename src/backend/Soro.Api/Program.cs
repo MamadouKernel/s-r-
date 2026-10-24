@@ -41,6 +41,7 @@ api.MapUserEndpoints();
 api.MapProductEndpoints();
 api.MapReportingEndpoints();
 api.MapDeviceEndpoints();
+api.MapCustomerEndpoints();
 
 app.Run();
 

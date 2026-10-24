@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Soro.Application.Cash;
 using Soro.Application.Common;
+using Soro.Application.Customers;
 using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Reporting;
@@ -44,6 +45,8 @@ public static class DependencyInjection
         services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
         services.AddScoped<IOwnerDirectory, OwnerDirectory>();
         services.AddScoped<ICommerceRepository, CommerceRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IDebtRepaymentRepository, DebtRepaymentRepository>();
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IDeviceInvitationRepository, DeviceInvitationRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
