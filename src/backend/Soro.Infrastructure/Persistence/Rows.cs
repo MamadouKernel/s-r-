@@ -264,3 +264,43 @@ internal sealed class EmailVerificationRow
 
     public DateTimeOffset? ConsumedAt { get; set; }
 }
+
+internal sealed class DeviceRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string SecretHash { get; set; } = string.Empty;
+
+    public Guid InvitationId { get; set; }
+
+    public DateTimeOffset EnrolledAt { get; set; }
+
+    public DateTimeOffset LastSeenAt { get; set; }
+
+    public DateTimeOffset? RevokedAt { get; set; }
+
+    public Guid? RevokedBy { get; set; }
+}
+
+internal sealed class DeviceInvitationRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string SecretHash { get; set; } = string.Empty;
+
+    public Guid CreatedBy { get; set; }
+
+    public string? SuggestedName { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    public DateTimeOffset? ConsumedAt { get; set; }
+}

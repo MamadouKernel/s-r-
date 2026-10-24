@@ -68,6 +68,8 @@ internal sealed class RecordingAuditTrail : IAuditTrail
 
     public IReadOnlyList<AuditEntry> Entries => _entries;
 
+    public void Clear() => _entries.Clear();
+
     public Task RecordAsync(AuditEntry entry, CancellationToken cancellationToken)
     {
         _entries.Add(entry);

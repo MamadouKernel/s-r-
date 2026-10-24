@@ -26,11 +26,13 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseTenantScope();
+app.UseDeviceAccess();
 app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
 app.MapSignupEndpoints();
+app.MapDeviceEnrollment();
 
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapRegisterSessionEndpoints();
@@ -38,6 +40,7 @@ api.MapSaleEndpoints();
 api.MapUserEndpoints();
 api.MapProductEndpoints();
 api.MapReportingEndpoints();
+api.MapDeviceEndpoints();
 
 app.Run();
 

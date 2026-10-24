@@ -38,7 +38,7 @@ public sealed record AccessToken(string Value, DateTimeOffset ExpiresAt);
 /// <summary>Émet le jeton d'accès porté ensuite à chaque requête (commerce, utilisateur, profil).</summary>
 public interface ITokenIssuer
 {
-    AccessToken Issue(TenantId tenant, UserId user, Role role, DateTimeOffset now);
+    AccessToken Issue(TenantId tenant, UserId user, Role role, DateTimeOffset now, DeviceId? device = null);
 }
 
 /// <summary>

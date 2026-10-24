@@ -88,7 +88,7 @@ Voir `docs/specs/meilleures-ventes-journal/spec.md`.
 Voir `docs/specs/inscription/spec.md` et `docs/decisions/0005-inscription-proprietaire-et-email.md`.
 
 - [x] T100 Commerce, propriétaire, vérification de l'adresse e-mail, connexion et mot de passe oublié (serveur) — INS-01 à INS-07
-- [ ] T101 Invitations d'enrôlement et appareils révocables (serveur) — INS-08, INS-09
+- [x] T101 Invitations d'enrôlement et appareils révocables (serveur) — INS-08, INS-09
 - [ ] T102 Écrans d'inscription, de connexion du propriétaire, d'enrôlement et des appareils — INS-10
 
 ## Consultation et rapports (V1)

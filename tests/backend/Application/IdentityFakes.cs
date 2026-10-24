@@ -56,8 +56,8 @@ internal sealed class FakePinHasher : IPinHasher
 
 internal sealed class FakeTokenIssuer : ITokenIssuer
 {
-    public AccessToken Issue(TenantId tenant, UserId user, Role role, DateTimeOffset now) =>
-        new($"token:{tenant.Value}:{user.Value}:{role}", now.AddHours(8));
+    public AccessToken Issue(TenantId tenant, UserId user, Role role, DateTimeOffset now, DeviceId? device = null) =>
+        new($"token:{tenant.Value}:{user.Value}:{role}" + (device is { } id ? $":device={id.Value}" : string.Empty), now.AddHours(8));
 }
 
 internal sealed class FakeTenantScope : ITenantScope

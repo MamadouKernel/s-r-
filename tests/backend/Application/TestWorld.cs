@@ -1,4 +1,5 @@
 using Soro.Application.Cash;
+using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Application.Reporting;
@@ -9,6 +10,7 @@ using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
 using Soro.Domain.Identity;
+using Soro.Domain.Tenancy;
 
 namespace Soro.Application.Tests;
 
@@ -64,6 +66,14 @@ internal sealed class TestWorld
 
     private FakeSignupSettings SignupSettings { get; } = new();
 
+    public InMemoryDeviceRepository Devices { get; } = new();
+
+    public InMemoryDeviceInvitationRepository DeviceInvitations { get; } = new();
+
+    public FakeDeviceSecrets DeviceSecrets { get; } = new();
+
+    public FakeDevicePolicy DevicePolicy { get; } = new();
+
     public InMemoryProductRepository Products { get; } = new();
 
     public InMemoryStockMovementRepository Movements { get; } = new();
@@ -102,7 +112,17 @@ internal sealed class TestWorld
     public ConfirmPasswordResetHandler ConfirmPasswordReset =>
         new(Scope, OwnerDirectory, Verifications, Codes, Users, Passwords, Audit, Clock, UnitOfWork);
 
-    public LogInHandler LogIn => new(Scope, Users, Hasher, Tokens, Clock, UnitOfWork);
+    public LogInHandler LogIn => new(Scope, Users, Devices, DeviceSecrets, DevicePolicy, Hasher, Tokens, Clock, UnitOfWork);
+
+    public CreateDeviceInvitationHandler CreateDeviceInvitation => new(Current, DeviceInvitations, DeviceSecrets, Audit, Clock, UnitOfWork);
+
+    public EnrollDeviceHandler EnrollDevice => new(Scope, DeviceInvitations, Devices, Commerces, DeviceSecrets, Audit, Clock, UnitOfWork);
+
+    public ListDevicesHandler ListDevices => new(Current, Devices);
+
+    public RevokeDeviceHandler RevokeDevice => new(Current, Devices, Audit, Clock, UnitOfWork);
+
+    public CheckDeviceAccessHandler CheckDeviceAccess => new(Devices, Clock, UnitOfWork);
 
     public RegisterUserHandler RegisterUser => new(Current, Users, Hasher, Clock, UnitOfWork);
 
@@ -141,6 +161,15 @@ internal sealed class TestWorld
     public ListAuditLogHandler ListAuditLog => new(Current, AuditLog);
 
     public void ActAs(UserId user, Role role) => Current.Become(user, role);
+
+    /// <summary>Le commerce du monde de test, tel que l'inscription le crée.</summary>
+    public async Task GivenCommerceAsync(TenantId? tenant = null, string name = "Supérette du Carrefour")
+    {
+        var id = tenant ?? Tenant;
+        await Commerces.AddAsync(
+            Commerce.Open(id, name, ActivityType.Supermarket, EmailAddress.Parse("mamadou@exemple.ci"), "2026-10-brouillon", Clock.UtcNow),
+            CancellationToken.None);
+    }
 
     public User GivenUser(
         string identifier = "awa.kone",

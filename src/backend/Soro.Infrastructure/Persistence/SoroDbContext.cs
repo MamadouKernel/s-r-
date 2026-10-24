@@ -31,6 +31,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<EmailVerificationRow> EmailVerifications => Set<EmailVerificationRow>();
 
+    internal DbSet<DeviceRow> Devices => Set<DeviceRow>();
+
+    internal DbSet<DeviceInvitationRow> DeviceInvitations => Set<DeviceInvitationRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSessions(modelBuilder.Entity<SessionRow>());
@@ -44,6 +48,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
         ConfigureOwnerDirectory(modelBuilder.Entity<OwnerDirectoryRow>());
         ConfigureEmailVerifications(modelBuilder.Entity<EmailVerificationRow>());
+        ConfigureDevices(modelBuilder.Entity<DeviceRow>());
+        ConfigureDeviceInvitations(modelBuilder.Entity<DeviceInvitationRow>());
         SnakeCase.ApplyToColumns(modelBuilder);
     }
 
@@ -154,6 +160,26 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         verification.Property(row => row.CodeHash).HasMaxLength(100);
         verification.Property(row => row.Payload).HasMaxLength(1000);
         verification.HasIndex(row => new { row.Email, row.Purpose, row.CreatedAt });
+    }
+
+    private static void ConfigureDevices(EntityTypeBuilder<DeviceRow> device)
+    {
+        device.ToTable("devices");
+        device.HasKey(row => row.Id);
+        device.Property(row => row.Name).HasMaxLength(50);
+        device.Property(row => row.SecretHash).HasMaxLength(100);
+        device.HasIndex(row => new { row.TenantId, row.EnrolledAt });
+    }
+
+    private static void ConfigureDeviceInvitations(EntityTypeBuilder<DeviceInvitationRow> invitation)
+    {
+        invitation.ToTable("device_invitations");
+        invitation.HasKey(row => row.Id);
+        invitation.Property(row => row.SecretHash).HasMaxLength(100);
+        invitation.Property(row => row.SuggestedName).HasMaxLength(50);
+
+        // Deux appareils qui présentent le même lien en même temps : le second échoue (xmin) et son enrôlement est annulé en entier.
+        invitation.Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
     }
 
     private static void ConfigureProducts(EntityTypeBuilder<ProductRow> product)

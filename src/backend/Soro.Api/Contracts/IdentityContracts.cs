@@ -9,6 +9,11 @@ public sealed record LogInRequest
     public required string Identifier { get; init; }
 
     public required string Pin { get; init; }
+
+    /// <summary>L'appareil, tel que l'enrôlement l'a donné. Facultatif seulement tant que <c>Devices:Required</c> est faux.</summary>
+    public Guid? DeviceId { get; init; }
+
+    public string? DeviceSecret { get; init; }
 }
 
 public sealed record RegisterUserRequest

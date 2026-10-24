@@ -1,4 +1,5 @@
 using Soro.Api.Contracts;
+using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Domain.Common;
 
@@ -22,7 +23,13 @@ internal static class AuthEndpoints
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(
-            new LogInCommand(new TenantId(request.TenantId), request.Identifier, request.Pin),
+            new LogInCommand(
+                new TenantId(request.TenantId),
+                request.Identifier,
+                request.Pin,
+                request.DeviceId is { } device && request.DeviceSecret is { } secret
+                    ? new DeviceCredentials(new DeviceId(device), secret)
+                    : null),
             cancellationToken);
 
         return result.ToHttp(login => Results.Ok(new LogInResponse(

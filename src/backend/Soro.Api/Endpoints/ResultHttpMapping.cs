@@ -26,7 +26,9 @@ internal static class ResultHttpMapping
         ErrorCodes.MobileMoneyReferenceUsed or ErrorCodes.RegisterAlreadyOpen or ErrorCodes.IdentifierTaken
             or ErrorCodes.BarcodeTaken or ErrorCodes.EmailAlreadyRegistered
             => StatusCodes.Status409Conflict,
-        ErrorCodes.InvalidCode or ErrorCodes.VerificationExpired => StatusCodes.Status422UnprocessableEntity,
+        ErrorCodes.InvalidCode or ErrorCodes.VerificationExpired or ErrorCodes.InvalidInvitation
+            => StatusCodes.Status422UnprocessableEntity,
+        ErrorCodes.DeviceNotAuthorized => StatusCodes.Status403Forbidden,
         ErrorCodes.TooManyRequests => StatusCodes.Status429TooManyRequests,
         ErrorCodes.EmailNotSent => StatusCodes.Status503ServiceUnavailable,
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
