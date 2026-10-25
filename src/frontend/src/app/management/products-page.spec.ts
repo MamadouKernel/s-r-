@@ -114,4 +114,46 @@ describe('ProductsPage', () => {
     const page = await render(ProductsPage, { api, online: false });
     expect(page.root.querySelector('[role="note"]')?.textContent).toContain('hors ligne');
   });
+
+  describe('families', () => {
+    const eau = (id: string, label: string, price: number, extra = {}) =>
+      product({ id, name: `Eau minérale · ${label}`, familyId: 'eau', familyName: 'Eau minérale', formatLabel: label, salePriceFcfa: price, category: 'Boissons', ...extra });
+
+    it('shows a family once, with a header and one row per format from the cheapest', async () => {
+      const api = fakeApi();
+      api.list.mockResolvedValue([eau('a', '1,5 L', 400), eau('b', '30 cl', 150), eau('c', '1 L', 300), product({ id: 's', name: 'Sel fin' })]);
+      const page = await render(ProductsPage, { api });
+
+      expect(page.root.querySelectorAll('tbody')).toHaveLength(2);
+      const rows = [...page.root.querySelectorAll('tbody:first-of-type tr')].map((row) => row.textContent ?? '');
+      expect(rows[0]).toContain('Eau minérale');
+      expect(rows[0]).toContain('3 formats');
+      expect(rows[1]).toContain('30 cl');
+      expect(rows[3]).toContain('1,5 L');
+    });
+
+    it('lets a manager open the family, but not a stock keeper', async () => {
+      const api = fakeApi();
+      api.list.mockResolvedValue([eau('a', '1 L', 300), eau('b', '2 L', 500)]);
+      const manager = await render(ProductsPage, { api, role: 'Manager' });
+      const link = manager.root.querySelector('[aria-label="Famille Eau minérale"]');
+      expect(link?.getAttribute('href')).toBe('/gestion/produits/famille/eau');
+      expect(manager.has('Regrouper dans une famille')).toBe(true);
+
+      TestBed.resetTestingModule();
+      const keeper = await render(ProductsPage, { api, role: 'StockKeeper' });
+      expect(keeper.root.querySelector('[aria-label^="Famille"]')).toBeNull();
+      expect(keeper.has('Regrouper dans une famille')).toBe(false);
+      expect(keeper.root.querySelector('[aria-label="Stock de Eau minérale · 1 L"]')).toBeTruthy();
+    });
+
+    it('gives a single product a way to add formats', async () => {
+      const api = fakeApi();
+      api.list.mockResolvedValue([product({ id: 'sel', name: 'Sel fin', familyId: 'sel', familyName: 'Sel fin' })]);
+      const page = await render(ProductsPage, { api });
+
+      expect(page.root.querySelector('[aria-label="Formats de Sel fin"]')?.getAttribute('href')).toBe('/gestion/produits/famille/sel');
+      expect(page.root.querySelectorAll('tbody')).toHaveLength(1);
+    });
+  });
 });

@@ -7,17 +7,19 @@ import { describeError } from './errors';
 import { FlashService } from './flash.service';
 import { ManagedProduct, ProductsApi } from './products-api';
 import { canManageCatalogue } from './roles';
+import { ProductAvatar } from '../shared/product-avatar';
 
 /** GES-01 : liste des produits, recherche, stock bas. En ligne seulement. */
 @Component({
   selector: 'app-products-page',
-  imports: [RouterLink],
+  imports: [RouterLink, ProductAvatar],
   template: `
     <section aria-labelledby="produits-titre">
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <h2 id="produits-titre" class="text-xl font-bold">Produits</h2>
         @if (canCreate()) {
-          <a class="btn-primary ml-auto" routerLink="/gestion/produits/nouveau">Nouveau produit</a>
+          <a class="btn ml-auto" routerLink="/gestion/produits/regrouper">Regrouper dans une famille</a>
+          <a class="btn-primary" routerLink="/gestion/produits/nouveau">Nouveau produit</a>
         }
       </div>
 
@@ -88,41 +90,68 @@ import { canManageCatalogue } from './roles';
                 <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-sauge">
-              @for (product of products(); track product.id) {
-                <tr>
-                  <th scope="row" class="px-3 py-3 font-semibold">
-                    {{ product.name }}
-                    @if (product.category) {
-                      <span class="block text-sm font-normal text-ardoise">{{ product.category }}</span>
-                    }
-                  </th>
-                  <td class="amount px-3 py-3 text-right">{{ format(product.salePriceFcfa) }}</td>
-                  @if (showPurchase()) {
-                    <td class="amount px-3 py-3 text-right">{{ product.purchasePriceFcfa === null ? '—' : format(product.purchasePriceFcfa) }}</td>
-                  }
-                  <td class="amount px-3 py-3 text-right">{{ product.tracksStock ? product.quantityOnHand : '—' }}</td>
-                  <td class="px-3 py-3">
-                    <span class="font-semibold" [class.text-erreur]="stockState(product) === 'Rupture de stock'" [class.text-avertissement]="stockState(product) === 'Stock bas'">
-                      {{ stockState(product) }}
-                    </span>
-                    @if (!product.isActive) {
-                      <span class="block text-sm text-ardoise">Désactivé</span>
-                    }
-                  </td>
-                  <td class="px-3 py-3">
-                    <div class="flex flex-wrap justify-end gap-2">
-                      @if (canCreate()) {
-                        <a class="btn" [routerLink]="['/gestion/produits', product.id]" [attr.aria-label]="'Modifier ' + product.name">Modifier</a>
+            @for (family of families(); track family.familyId) {
+              <tbody class="divide-y divide-sauge border-t border-sauge">
+                @if (family.formats.length > 1) {
+                  <tr class="bg-ivoire">
+                    <th scope="colgroup" [attr.colspan]="columns()" class="px-3 py-2 text-left">
+                      <span class="flex items-center gap-3">
+                        <app-product-avatar [name]="family.name" [photoId]="family.photoId" />
+                        <span class="min-w-0 flex-1">
+                          <span class="block font-semibold">{{ family.name }}</span>
+                          <span class="block text-sm font-normal text-ardoise">
+                            {{ family.category ? family.category + ' · ' : '' }}{{ family.formats.length }} formats
+                          </span>
+                        </span>
+                        @if (canCreate()) {
+                          <a class="btn" [routerLink]="['/gestion/produits/famille', family.familyId]" [attr.aria-label]="'Famille ' + family.name">Modifier la famille</a>
+                        }
+                      </span>
+                    </th>
+                  </tr>
+                }
+                @for (product of family.formats; track product.id) {
+                  <tr>
+                    <th scope="row" class="px-3 py-3 font-semibold" [class.pl-8]="family.formats.length > 1">
+                      @if (family.formats.length > 1) {
+                        <span class="sr-only">{{ family.name }} · </span>{{ product.formatLabel ?? product.name }}
+                      } @else {
+                        {{ product.name }}
+                        @if (product.category) {
+                          <span class="block text-sm font-normal text-ardoise">{{ product.category }}</span>
+                        }
                       }
-                      @if (product.tracksStock) {
-                        <a class="btn" [routerLink]="['/gestion/produits', product.id, 'stock']" [attr.aria-label]="'Stock de ' + product.name">Stock</a>
+                    </th>
+                    <td class="amount px-3 py-3 text-right">{{ format(product.salePriceFcfa) }}</td>
+                    @if (showPurchase()) {
+                      <td class="amount px-3 py-3 text-right">{{ product.purchasePriceFcfa === null ? '—' : format(product.purchasePriceFcfa) }}</td>
+                    }
+                    <td class="amount px-3 py-3 text-right">{{ product.tracksStock ? product.quantityOnHand : '—' }}</td>
+                    <td class="px-3 py-3">
+                      <span class="font-semibold" [class.text-erreur]="stockState(product) === 'Rupture de stock'" [class.text-avertissement]="stockState(product) === 'Stock bas'">
+                        {{ stockState(product) }}
+                      </span>
+                      @if (!product.isActive) {
+                        <span class="block text-sm text-ardoise">Désactivé</span>
                       }
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
+                    </td>
+                    <td class="px-3 py-3">
+                      <div class="flex flex-wrap justify-end gap-2">
+                        @if (canCreate()) {
+                          <a class="btn" [routerLink]="['/gestion/produits', product.id]" [attr.aria-label]="'Modifier ' + product.name">Modifier</a>
+                          @if (family.formats.length === 1) {
+                            <a class="btn" [routerLink]="['/gestion/produits/famille', family.familyId]" [attr.aria-label]="'Formats de ' + product.name">Formats</a>
+                          }
+                        }
+                        @if (product.tracksStock) {
+                          <a class="btn" [routerLink]="['/gestion/produits', product.id, 'stock']" [attr.aria-label]="'Stock de ' + product.name">Stock</a>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            }
           </table>
         </div>
       }
@@ -146,6 +175,8 @@ export class ProductsPage implements OnInit {
 
   protected readonly canCreate = computed(() => canManageCatalogue(this.auth.user()?.role));
   /** Le serveur n'envoie le prix d'achat qu'aux profils autorisés : la colonne n'apparaît que s'il y a des valeurs. */
+  protected readonly families = computed(() => groupManaged(this.products()));
+  protected readonly columns = computed(() => (this.showPurchase() ? 6 : 5));
   protected readonly showPurchase = computed(() => this.products().some((product) => product.purchasePriceFcfa !== null));
   protected format = formatFcfa;
 
@@ -197,4 +228,32 @@ export class ProductsPage implements OnInit {
     }
     return product.isLowStock ? 'Stock bas' : 'Stock correct';
   }
+}
+
+interface ManagedFamily {
+  familyId: string;
+  name: string;
+  category: string | null;
+  photoId: string | null;
+  /** Du plus petit prix au plus grand. */
+  formats: ManagedProduct[];
+}
+
+/** Regroupe la liste par famille, dans l'ordre où chaque famille apparaît ; un produit sans famille est sa propre famille. */
+function groupManaged(products: readonly ManagedProduct[]): ManagedFamily[] {
+  const groups = new Map<string, ManagedProduct[]>();
+  for (const product of products) {
+    const key = product.familyId ?? product.id;
+    groups.set(key, [...(groups.get(key) ?? []), product]);
+  }
+  return [...groups].map(([familyId, members]) => {
+    const formats = [...members].sort((a, b) => a.salePriceFcfa - b.salePriceFcfa);
+    return {
+      familyId,
+      name: formats[0].familyName ?? formats[0].name,
+      category: formats[0].category,
+      photoId: formats.find((format) => format.photoId)?.photoId ?? null,
+      formats,
+    };
+  });
 }

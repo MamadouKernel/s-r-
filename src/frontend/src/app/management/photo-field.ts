@@ -27,7 +27,7 @@ import { ProductAvatar } from '../shared/product-avatar';
             Choisir un fichier
             <input class="sr-only" type="file" accept="image/*" [disabled]="busy()" (change)="choose($event)" />
           </label>
-          @if (hasPhoto()) {
+          @if (showRemove()) {
             <button type="button" class="btn !border-erreur !text-erreur" [disabled]="busy()" (click)="removed.emit()">Retirer la photo</button>
           }
         </div>
@@ -48,6 +48,8 @@ export class PhotoField {
   readonly photoId = input<string | null | undefined>(null);
   /** Aperçu d'une image choisie mais pas encore envoyée (création d'un produit). */
   readonly previewUrl = input<string | null>(null);
+  /** Surcharge « Retirer la photo » : seule la photo propre d'un format se retire, pas celle de sa famille qu'il affiche. */
+  readonly canRemove = input<boolean | null>(null);
   readonly busy = input(false);
   readonly error = input('');
 
@@ -55,6 +57,7 @@ export class PhotoField {
   readonly removed = output<void>();
 
   protected readonly hasPhoto = computed(() => !!this.photoId() || !!this.previewUrl());
+  protected readonly showRemove = computed(() => this.canRemove() ?? this.hasPhoto());
 
   protected choose(event: Event): void {
     const field = event.target as HTMLInputElement;

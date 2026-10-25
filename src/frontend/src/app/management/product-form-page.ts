@@ -1,27 +1,33 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { parseFcfa } from '../core/money';
+import { ImageService } from '../core/image';
 import { ApiError } from '../sync/sync-api';
 import { describeError } from './errors';
 import { FlashService } from './flash.service';
+import { PhotoField } from './photo-field';
 import { ManagedProduct, ProductsApi } from './products-api';
 
 interface FieldErrors {
   name?: string;
+  label?: string;
   barcode?: string;
   salePrice?: string;
   purchasePrice?: string;
   threshold?: string;
 }
 
-/** GES-02 : création et modification d'une fiche produit, désactivation avec confirmation. */
+/**
+ * GES-02 : modification d'un format (un produit vendable) et désactivation avec confirmation. La création passe par `FamilyFormPage`. Le nom et la
+ * catégorie sont ceux de la famille : les changer renomme tous ses formats.
+ */
 @Component({
   selector: 'app-product-form-page',
-  imports: [RouterLink],
+  imports: [RouterLink, PhotoField],
   template: `
     <section class="mx-auto max-w-xl" aria-labelledby="fiche-titre">
       <a class="btn mb-4" routerLink="/gestion/produits">← Retour aux produits</a>
-      <h2 id="fiche-titre" class="mb-4 text-xl font-bold">{{ isEdit() ? 'Modifier le produit' : 'Nouveau produit' }}</h2>
+      <h2 id="fiche-titre" class="mb-4 text-xl font-bold">Modifier le produit</h2>
 
       @if (loading()) {
         <p class="panel text-ardoise" role="status">Chargement du produit…</p>
@@ -34,6 +40,16 @@ interface FieldErrors {
           <label class="field-label" for="nom">Nom du produit</label>
           <input id="nom" class="field" type="text" maxlength="200" autocomplete="off" [value]="name()" (input)="name.set($any($event.target).value)" [attr.aria-invalid]="errors().name ? 'true' : null" aria-describedby="nom-erreur" />
           <p id="nom-erreur" class="field-error">{{ errors().name }}</p>
+          @if (siblings() > 1) {
+            <p class="field-help">
+              Ce nom est celui de toute la famille ({{ siblings() }} formats) :
+              <a class="font-semibold underline" [routerLink]="['/gestion/produits/famille', familyId()]">ouvrir la famille</a>.
+            </p>
+          }
+
+          <label class="field-label mt-4" for="format">Format{{ siblings() > 1 ? '' : ' (facultatif)' }}</label>
+          <input id="format" class="field" type="text" maxlength="40" autocomplete="off" placeholder="1 L, 50 kg…" [value]="label()" (input)="label.set($any($event.target).value)" [attr.aria-invalid]="errors().label ? 'true' : null" aria-describedby="format-erreur" />
+          <p id="format-erreur" class="field-error">{{ errors().label }}</p>
 
           <label class="field-label mt-4" for="code-barres">Code-barres (facultatif)</label>
           <input id="code-barres" class="field font-mono" type="text" maxlength="64" autocomplete="off" inputmode="numeric" [value]="barcode()" (input)="barcode.set($any($event.target).value)" [attr.aria-invalid]="errors().barcode ? 'true' : null" aria-describedby="code-aide code-erreur" />
@@ -58,12 +74,10 @@ interface FieldErrors {
           <p id="seuil-erreur" class="field-error">{{ errors().threshold }}</p>
 
           <label class="mt-4 flex items-center gap-2 text-base">
-            <input type="checkbox" class="h-6 w-6" [checked]="tracksStock()" [disabled]="isEdit()" (change)="tracksStock.set($any($event.target).checked)" />
+            <input type="checkbox" class="h-6 w-6" [checked]="tracksStock()" disabled />
             Suivre le stock de ce produit
           </label>
-          <p class="field-help">
-            {{ isEdit() ? 'Ce choix se fait à la création et ne peut plus changer.' : 'Décochez pour une prestation sans stock (coupe, réparation…).' }}
-          </p>
+          <p class="field-help">Ce choix se fait à la création et ne peut plus changer.</p>
 
           @if (failure()) {
             <p class="field-error mt-4" role="alert">{{ failure() }}</p>
@@ -71,14 +85,23 @@ interface FieldErrors {
           <button type="submit" class="btn-primary mt-6 w-full" [disabled]="saving()">{{ saving() ? 'Enregistrement…' : 'Enregistrer' }}</button>
         </form>
 
-        @if (isEdit() && active()) {
+        <section class="panel mt-4" aria-labelledby="photo-format-titre">
+          <h3 id="photo-format-titre" class="mb-3 text-lg font-bold">Photo de ce format (facultatif)</h3>
+          <app-photo-field
+            [name]="displayName()" [photoId]="effectivePhotoId()" [canRemove]="hasOwnPhoto()" [busy]="photoBusy()" [error]="photoError()"
+            (picked)="pickPhoto($event)" (removed)="removePhoto()"
+          />
+          <p class="field-help">Sans photo propre, ce format montre celle de la famille.</p>
+        </section>
+
+        @if (active()) {
           <section class="panel mt-4" aria-labelledby="desactiver-titre">
             <h3 id="desactiver-titre" class="text-lg font-bold">Désactiver ce produit</h3>
             <p class="mt-1 text-base text-ardoise">
               Il n’apparaîtra plus à la vente, mais il reste dans l’historique des ventes et des mouvements de stock. Rien n’est supprimé.
             </p>
             @if (confirmingDeactivation()) {
-              <p class="mt-3 font-semibold text-erreur" role="alert">Désactiver « {{ name() }} » ?</p>
+              <p class="mt-3 font-semibold text-erreur" role="alert">Désactiver « {{ displayName() }} » ?</p>
               <div class="mt-2 grid grid-cols-2 gap-3">
                 <button type="button" class="btn" (click)="confirmingDeactivation.set(false)">Non, le garder</button>
                 <button type="button" class="btn-primary !border-erreur !bg-erreur" (click)="deactivate()" [disabled]="saving()">Oui, désactiver</button>
@@ -97,9 +120,17 @@ export class ProductFormPage implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly flash = inject(FlashService);
+  private readonly images = inject(ImageService);
 
   protected readonly productId = signal<string>('');
-  protected readonly isEdit = computed(() => this.route.snapshot.paramMap.has('id'));
+  protected readonly familyId = signal('');
+  protected readonly siblings = signal(1);
+  protected readonly displayName = signal('');
+  protected readonly effectivePhotoId = signal<string | null>(null);
+  protected readonly hasOwnPhoto = signal(false);
+  protected readonly photoBusy = signal(false);
+  protected readonly photoError = signal('');
+  protected readonly label = signal('');
   protected readonly loading = signal(false);
   protected readonly loadError = signal('');
   protected readonly saving = signal(false);
@@ -117,22 +148,22 @@ export class ProductFormPage implements OnInit {
   protected readonly tracksStock = signal(true);
 
   async ngOnInit(): Promise<void> {
-    // Identifiant fixé à l'ouverture : un nouvel essai après une erreur réseau ne peut pas créer un second produit (SC-G6).
-    const existing = this.route.snapshot.paramMap.get('id');
-    this.productId.set(existing ?? crypto.randomUUID());
-    if (existing) {
-      await this.loadProduct(existing);
-    }
+    const id = this.route.snapshot.paramMap.get('id') ?? '';
+    this.productId.set(id);
+    await this.loadProduct(id);
   }
 
   private async loadProduct(id: string): Promise<void> {
     this.loading.set(true);
     try {
-      const product = (await this.api.list({ includeInactive: true })).find((candidate) => candidate.id === id);
+      const all = await this.api.list({ includeInactive: true });
+      const product = all.find((candidate) => candidate.id === id);
       if (!product) {
         this.loadError.set('Produit introuvable.');
         return;
       }
+      this.familyId.set(product.familyId ?? product.id);
+      this.siblings.set(all.filter((candidate) => (candidate.familyId ?? candidate.id) === this.familyId()).length);
       this.fill(product);
     } catch (error) {
       this.loadError.set(describeError(error));
@@ -142,7 +173,11 @@ export class ProductFormPage implements OnInit {
   }
 
   private fill(product: ManagedProduct): void {
-    this.name.set(product.name);
+    this.displayName.set(product.name);
+    this.name.set(product.familyName ?? product.name);
+    this.label.set(product.formatLabel ?? '');
+    this.effectivePhotoId.set(product.photoId ?? null);
+    this.hasOwnPhoto.set(!!product.photoId && product.photoId !== (product.familyPhotoId ?? null));
     this.barcode.set(product.barcode ?? '');
     this.category.set(product.category ?? '');
     this.salePrice.set(String(product.salePriceFcfa));
@@ -166,22 +201,46 @@ export class ProductFormPage implements OnInit {
 
     this.saving.set(true);
     try {
-      if (this.isEdit()) {
-        await this.api.update(this.productId(), checked.input);
-        this.flash.show('Produit modifié.');
-      } else {
-        await this.api.create(this.productId(), { ...checked.input, tracksStock: this.tracksStock() });
-        this.flash.show('Produit créé.');
-      }
+      await this.api.update(this.productId(), checked.input);
+      this.flash.show('Produit modifié.');
       await this.router.navigateByUrl('/gestion/produits');
     } catch (error) {
       if (error instanceof ApiError && error.code === 'barcode_taken') {
         this.errors.set({ barcode: 'Ce code-barres est déjà utilisé par un autre produit.' });
+      } else if (error instanceof ApiError && error.code === 'rule_violation') {
+        this.errors.set({ label: error.message });
       } else {
         this.failure.set(describeError(error));
       }
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  protected async pickPhoto(file: File): Promise<void> {
+    this.photoError.set('');
+    this.photoBusy.set(true);
+    try {
+      const photoId = await this.api.setPhoto('format', this.productId(), await this.images.shrink(file));
+      this.effectivePhotoId.set(photoId);
+      this.hasOwnPhoto.set(true);
+    } catch (error) {
+      this.photoError.set(error instanceof Error ? error.message : describeError(error));
+    } finally {
+      this.photoBusy.set(false);
+    }
+  }
+
+  protected async removePhoto(): Promise<void> {
+    this.photoError.set('');
+    this.photoBusy.set(true);
+    try {
+      await this.api.removePhoto('format', this.productId());
+      await this.loadProduct(this.productId());
+    } catch (error) {
+      this.photoError.set(describeError(error));
+    } finally {
+      this.photoBusy.set(false);
     }
   }
 
@@ -209,6 +268,7 @@ export class ProductFormPage implements OnInit {
       purchasePriceFcfa: number;
       salePriceFcfa: number;
       alertThreshold: number;
+      formatLabel: string | null;
     } | null;
   } {
     const errors: FieldErrors = {};
@@ -217,8 +277,12 @@ export class ProductFormPage implements OnInit {
     const purchasePrice = parseFcfa(this.purchasePrice());
     const threshold = parseFcfa(this.threshold());
 
+    const label = this.label().split(/\s+/).filter(Boolean).join(' ');
     if (name === '') {
       errors.name = 'Le nom du produit est obligatoire.';
+    }
+    if (label === '' && this.siblings() > 1) {
+      errors.label = 'Donnez un format à ce produit (1 L, 50 kg…).';
     }
     if (salePrice === null) {
       errors.salePrice = 'Saisissez le prix de vente en chiffres, sans virgule.';
@@ -241,6 +305,7 @@ export class ProductFormPage implements OnInit {
         purchasePriceFcfa: purchasePrice,
         salePriceFcfa: salePrice,
         alertThreshold: threshold,
+        formatLabel: label === '' ? null : label,
       },
     };
   }
