@@ -191,6 +191,28 @@ public sealed class ApiSignupTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task Resetting_the_password_ends_the_session_of_a_stolen_token()
+    {
+        var email = NewEmail();
+        var (stolen, session) = await SignUpAsync(email);
+        stolen.DefaultRequestHeaders.Authorization = new("Bearer", session.GetProperty("accessToken").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await stolen.GetAsync("/api/v1/users")).StatusCode);
+        await Task.Delay(TimeSpan.FromMilliseconds(2100)); // un jeton ne porte que des secondes entières : le changement doit être d'une seconde au moins plus récent
+        using var owner = _factory.CreateClient();
+
+        await owner.PostAsJsonAsync("/api/v1/owner/password-reset/start", new { email });
+        await owner.PostAsJsonAsync(
+            "/api/v1/owner/password-reset/confirm",
+            new { email, code = _factory.Mail.LastCodeFor(email), newPassword = NewPassword });
+
+        await AssertProblemAsync(await stolen.GetAsync("/api/v1/users"), HttpStatusCode.Unauthorized, "session_outdated");
+        var fresh = await owner.PostAsJsonAsync("/api/v1/auth/owner/login", new { email, password = NewPassword });
+        using var after = _factory.CreateClient();
+        after.DefaultRequestHeaders.Authorization = new("Bearer", (await JsonOf(fresh)).GetProperty("accessToken").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await after.GetAsync("/api/v1/users")).StatusCode);
+    }
+
+    [Fact]
     public async Task Two_commerces_stay_apart_and_each_owner_only_sees_their_own_team_and_commerce_row()
     {
         var emailA = NewEmail();
