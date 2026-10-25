@@ -1,3 +1,4 @@
+using Soro.Application.Export;
 using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Application.Cash;
@@ -345,12 +346,15 @@ internal sealed class FakeAuditLogQueries : IAuditLogQueries
 
     public int Calls { get; private set; }
 
+    /// <summary>Ce que le journal renvoie (par défaut : rien).</summary>
+    public IReadOnlyList<AuditEntryView> Next { get; set; } = [];
+
     public Task<AuditPage> ListAsync(TenantId tenant, AuditLogFilter filter, CancellationToken cancellationToken)
     {
         Calls++;
         LastTenant = tenant;
         LastFilter = filter;
-        return Task.FromResult(new AuditPage([], false));
+        return Task.FromResult(new AuditPage(Next.Take(filter.Limit).ToArray(), false));
     }
 }
 
@@ -372,4 +376,42 @@ internal sealed class FakeTemplateWriter : IProductTemplateWriter
     public byte[] Bytes { get; } = [1, 2, 3];
 
     public byte[] Write() => Bytes;
+}
+
+internal sealed class FakeDataExportQueries : IDataExportQueries
+{
+    public ExportCounts Counts { get; set; } = new(1, 1, 1, 1, 1, 1);
+
+    public int Reads { get; private set; }
+
+    public TenantId? LastTenant { get; private set; }
+
+    public Task<ExportCounts> CountAsync(TenantId tenant, ExportPeriod period, CancellationToken cancellationToken)
+    {
+        LastTenant = tenant;
+        return Task.FromResult(Counts);
+    }
+
+    public Task<DataExportData> ReadAsync(TenantId tenant, ExportPeriod period, CancellationToken cancellationToken)
+    {
+        Reads++;
+        LastTenant = tenant;
+        return Task.FromResult(new DataExportData([], [], [], [], [], []));
+    }
+}
+
+internal sealed class FakeDataExportWriter : IDataExportWriter
+{
+    public byte[] Bytes { get; } = [9, 8, 7];
+
+    public DataExport? Last { get; private set; }
+
+    public int Writes { get; private set; }
+
+    public byte[] Write(DataExport data)
+    {
+        Writes++;
+        Last = data;
+        return Bytes;
+    }
 }
