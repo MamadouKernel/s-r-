@@ -68,6 +68,31 @@ public class PersistenceTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task A_sale_and_the_closing_at_the_same_moment_do_not_overwrite_each_other()
+    {
+        var tenant = TenantId.New();
+        var session = Samples.Session(tenant, openingFloat: 10_000);
+        await SaveAsync(tenant, session);
+
+        await using var first = Db.App(fixture, tenant);
+        await using var second = Db.App(fixture, tenant);
+        var closing = (await new SessionRepository(first).GetAsync(session.Id, tenant, Ct))!;
+        var selling = (await new SessionRepository(second).GetAsync(session.Id, tenant, Ct))!;
+        closing.Close(Money.Fcfa(10_000), Samples.Morning.AddHours(8));
+        selling.RecordSale(Samples.Draft(1, 10_000, Payment.Cash(PaymentId.New(), Money.Fcfa(10_000), Money.Fcfa(10_000))));
+        await new SessionRepository(first).UpdateAsync(closing, Ct);
+        await new SessionRepository(second).UpdateAsync(selling, Ct);
+
+        await new EfUnitOfWork(first).CommitAsync(Ct);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => new EfUnitOfWork(second).CommitAsync(Ct));
+
+        await using var read = Db.App(fixture, tenant);
+        var stored = (await new SessionRepository(read).GetAsync(session.Id, tenant, Ct))!;
+        Assert.Equal(SessionStatus.Closed, stored.Status);
+        Assert.Equal(Money.Zero, stored.CashReceived); // la vente perdue n'a pas faussé le total : elle est rejouée, pas écrasée
+    }
+
+    [Fact]
     public async Task A_sale_round_trips_with_its_lines_and_mixed_payments()
     {
         var tenant = TenantId.New();

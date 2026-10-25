@@ -186,7 +186,7 @@ public class UserTests
         Fail(owner, User.MaxFailedAttempts, Now);
         Assert.True(owner.IsLocked(Now));
 
-        owner.ChangePassword("password-hash-2");
+        owner.ChangePassword("password-hash-2", Now);
 
         Assert.Equal("password-hash-2", owner.PasswordHash);
         Assert.False(owner.IsLocked(Now));
@@ -197,8 +197,8 @@ public class UserTests
     [Fact]
     public void A_password_change_cannot_use_a_blank_hash_and_a_pin_user_cannot_get_one()
     {
-        Assert.Throws<DomainException>(() => NewOwner().ChangePassword(" "));
-        Assert.Throws<DomainException>(() => NewUser().ChangePassword("password-hash-2"));
+        Assert.Throws<DomainException>(() => NewOwner().ChangePassword(" ", Now));
+        Assert.Throws<DomainException>(() => NewUser().ChangePassword("password-hash-2", Now));
     }
 
     [Fact]
@@ -210,5 +210,17 @@ public class UserTests
 
         Assert.True(owner.IsLocked(Now));
         Assert.False(owner.CanLogIn(Now));
+    }
+
+    [Fact]
+    public void Changing_the_password_ends_earlier_sessions_and_lifts_a_lock()
+    {
+        var owner = NewOwner();
+
+        owner.ChangePassword("password-hash-2", Now.AddMinutes(10));
+
+        Assert.Equal(Now.AddMinutes(10), owner.SessionsValidFrom);
+        Assert.True(owner.AreSessionsOutdated(Now));
+        Assert.False(owner.AreSessionsOutdated(Now.AddMinutes(11)));
     }
 }
