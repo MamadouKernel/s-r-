@@ -22,6 +22,12 @@ const LOW_STOCK_HINT = 5;
   imports: [PaymentPanel, ProductAvatar, RouterLink],
   template: `
     <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
+    @if (scanNote(); as note) {
+      <!-- Un nouvel élément à chaque scan : deux scans du même produit s'annoncent chacun. -->
+      @for (item of [note]; track item.serial) {
+        <p data-testid="scan-note" class="mb-3 rounded border border-feuille bg-surface p-2 font-semibold text-feuille" role="status">{{ item.text }}</p>
+      }
+    }
 
     @if (paying()) {
       <div class="mx-auto max-w-xl">
@@ -241,7 +247,7 @@ export class SalePage implements OnInit {
   constructor() {
     // Lecteur de codes-barres (ADR 0015) : un scan est pris sur la page ou dans la zone de recherche, jamais dans un autre champ de saisie.
     const stop = this.scanner.listen({
-      accept: (target) => !this.paying() && (!isEditable(target) || (target as HTMLElement).dataset['scan'] === 'search'),
+      accept: (target) => !isEditable(target) || (target as HTMLElement).dataset['scan'] === 'search',
       onScan: (scan) => void this.onScan(scan.code),
     });
     inject(DestroyRef).onDestroy(stop);
@@ -255,6 +261,9 @@ export class SalePage implements OnInit {
   protected readonly paying = signal(false);
   protected readonly unknownCode = signal('');
   protected readonly announcement = signal('');
+  protected readonly scanNote = signal<{ serial: number; text: string } | null>(null);
+  private scanSerial = 0;
+  private scanNoteTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly holding = signal(false);
   protected readonly holdLabel = signal('');
   protected readonly confirmDelete = signal<string | null>(null);
@@ -300,16 +309,29 @@ export class SalePage implements OnInit {
 
   /** Un scan reconnu par sa vitesse : produit ajouté, ou code inconnu dit à voix haute et à l'écran. La zone de recherche est toujours vidée. */
   private async onScan(code: string): Promise<void> {
+    if (this.paying()) {
+      this.scanner.feedback(false);
+      this.tell('Terminez ou annulez le paiement avant de scanner un article.');
+      return;
+    }
     const product = await this.catalogue.findByBarcode(code);
     await this.search('');
     if (product) {
       this.add(product);
       this.scanner.feedback(true);
+      this.tell(`${product.name} ajouté au panier`);
     } else {
       this.unknownCode.set(code);
       this.announcement.set(`Aucun produit pour le code ${this.shortCode(code)}`);
       this.scanner.feedback(false);
     }
+  }
+
+  /** Message visible après un scan (le son peut être coupé) ; chaque message est un nouvel élément, annoncé même s'il répète le précédent. */
+  private tell(text: string): void {
+    clearTimeout(this.scanNoteTimer);
+    this.scanNote.set({ serial: ++this.scanSerial, text });
+    this.scanNoteTimer = setTimeout(() => this.scanNote.set(null), 4000);
   }
 
   /** Le texte d'un QR code peut être long : on n'en montre que le début. */

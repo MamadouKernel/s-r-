@@ -61,6 +61,9 @@ export class ScanDetector {
       this.reset();
       return NOTHING;
     }
+    if (input.key === ' ' && this.chars.length > 0 && input.at - this.lastAt <= MAX_GAP_MS) {
+      return { scan: null, swallow: true }; // l'espace que certains lecteurs ajoutent après le code n'active pas le bouton qui a le focus
+    }
     if (input.key.length !== 1 || input.key === ' ') {
       return NOTHING;
     }
@@ -94,7 +97,8 @@ export class ScanDetector {
   }
 
   private finish(end: ScanEnd, at: number): PushOutcome {
-    if (this.chars.length === 0 || at - this.lastAt > MAX_GAP_MS) {
+    // Un lecteur Bluetooth peut envoyer Entrée un peu après le dernier chiffre : on l'accepte tant que le silence de fin de scan n'est pas écoulé.
+    if (this.chars.length === 0 || at - this.lastAt > SILENCE_MS) {
       this.reset();
       return NOTHING;
     }

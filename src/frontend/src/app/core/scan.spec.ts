@@ -178,6 +178,46 @@ describe('ScanDetector', () => {
   });
 });
 
+describe('ScanDetector: late endings and stray keys (audit 25/10/2026)', () => {
+  it('still reads a scan whose Enter arrives up to 100 ms after the last digit', () => {
+    const detector = new ScanDetector();
+    const { last } = burst(detector, '6111000000011');
+
+    const end = detector.push(enter(last + 90));
+
+    expect(end.scan).toMatchObject({ code: '6111000000011', end: 'enter' });
+    expect(end.swallow).toBe(true);
+  });
+
+  it('does not read it when the Enter comes after the silence: that is a person pressing Enter', () => {
+    const detector = new ScanDetector();
+    const { last } = burst(detector, '6111000000011');
+
+    const end = detector.push(enter(last + 150));
+
+    expect(end.scan).toBeNull();
+    expect(end.swallow).toBe(false);
+  });
+
+  it('keeps the space some readers send after the code from pressing the focused button', () => {
+    const detector = new ScanDetector();
+    const { last } = burst(detector, '6111000000011');
+
+    const space = detector.push({ key: ' ', code: 'Space', at: last + 5 });
+
+    expect(space.swallow).toBe(true);
+    expect(detector.push(enter(last + 12)).scan?.code).toBe('6111000000011');
+  });
+
+  it('leaves a space typed by a person alone', () => {
+    const detector = new ScanDetector();
+
+    expect(detector.push({ key: ' ', code: 'Space', at: 1000 }).swallow).toBe(false);
+    burst(detector, '123456789', 2000, 10);
+    expect(detector.push({ key: ' ', code: 'Space', at: 2500 }).swallow).toBe(false);
+  });
+});
+
 describe('ScanDetector.flush', () => {
   it('gives the scan in progress at once, once, and nothing when it is too short', () => {
     const detector = new ScanDetector();

@@ -485,4 +485,38 @@ describe('SalePage: barcode scanner (ADR 0015)', () => {
     expect(root.textContent).toContain('Eau minérale');
     expect(cash.cart()).toEqual([]);
   });
+
+  it('shows a visible message when a scan adds a product, and again for the same product scanned twice', async () => {
+    const { fixture, root } = await open();
+
+    scan(document.body, eau.barcode!);
+    await until(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="scan-note"]')?.textContent).toContain('Eau minérale 1,5 L ajouté au panier');
+    });
+
+    const first = root.querySelector('[data-testid="scan-note"]');
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    scan(document.body, eau.barcode!);
+    await until(() => {
+      fixture.detectChanges();
+      const second = root.querySelector('[data-testid="scan-note"]');
+      expect(second?.textContent).toContain('ajouté au panier');
+      expect(second).not.toBe(first); // un nouvel élément : un lecteur d'écran l'annonce de nouveau
+    });
+  });
+
+  it('tells the cashier to finish the payment instead of ignoring a scan in silence', async () => {
+    const { cash, fixture, root } = await open();
+    cash.add(eau);
+    fixture.componentInstance['paying'].set(true);
+    fixture.detectChanges();
+
+    scan(document.body, '6111000000028');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    fixture.detectChanges();
+
+    expect(cash.cart()).toHaveLength(1);
+    expect(root.textContent).toContain('Terminez ou annulez le paiement');
+  });
 });
