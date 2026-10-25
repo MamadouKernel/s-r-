@@ -1,3 +1,4 @@
+using Soro.Domain.Subscription;
 using Soro.Domain.Cash;
 using Soro.Domain.Identity;
 using Soro.Domain.Sales;
@@ -271,6 +272,8 @@ internal sealed class CommerceRow
     public string TermsVersion { get; set; } = string.Empty;
 
     public DateTimeOffset TermsAcceptedAt { get; set; }
+
+    public DateTimeOffset? PaidUntil { get; set; }
 }
 
 /// <summary>Numéro → commerce et utilisateur. Hors isolation par commerce : c'est ce qui permet de trouver le commerce avant de le connaître.</summary>
@@ -388,4 +391,52 @@ internal sealed class DebtRepaymentRow
     public Guid UserId { get; set; }
 
     public DateTimeOffset At { get; set; }
+}
+
+internal sealed class SubscriptionPaymentRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public SubscriptionPeriod Period { get; set; }
+
+    public SubscriptionMethod Method { get; set; }
+
+    public string Reference { get; set; } = string.Empty;
+
+    public string ReferenceKey { get; set; } = string.Empty;
+
+    public long Amount { get; set; }
+
+    public DateTimeOffset DeclaredAt { get; set; }
+
+    public SubscriptionPaymentStatus Status { get; set; }
+
+    public DateTimeOffset? DecidedAt { get; set; }
+
+    public string? Reason { get; set; }
+
+    public DateTimeOffset? CoveredFrom { get; set; }
+
+    public DateTimeOffset? CoveredTo { get; set; }
+}
+
+/// <summary>Références de paiement déjà utilisées. Hors isolation par commerce, comme l'annuaire des propriétaires : c'est ce qui permet de refuser une référence déjà vue chez un autre commerce.</summary>
+internal sealed class SubscriptionReferenceRow
+{
+    public SubscriptionMethod Method { get; set; }
+
+    public string ReferenceKey { get; set; } = string.Empty;
+}
+
+internal sealed class SubscriptionReminderRow
+{
+    public Guid TenantId { get; set; }
+
+    public DateTimeOffset EndsAt { get; set; }
+
+    public string Kind { get; set; } = string.Empty;
+
+    public DateTimeOffset SentAt { get; set; }
 }

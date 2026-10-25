@@ -51,6 +51,8 @@ internal sealed class ApiFactory(
         }
 
         // Les tests d'identité d'avant les appareils se connectent sans appareil ; les tests d'appareils l'exigent.
+        // Pas de mémoire d'état d'abonnement dans les tests : chaque requête relit la base.
+        builder.UseSetting("Subscription:StateCacheSeconds", "0");
         builder.UseSetting("Devices:Required", devicesRequired ? "true" : "false");
         if (publicPermitsPerMinute is { } publicPermits)
         {

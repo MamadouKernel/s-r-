@@ -8,6 +8,7 @@ using Soro.Application.Sales;
 using Soro.Application.Settings;
 using Soro.Application.Signup;
 using Soro.Application.Stock;
+using Soro.Application.Subscription;
 using MailKit.Security;
 using Soro.Domain.Common;
 using Soro.Infrastructure.Security;
@@ -36,6 +37,13 @@ public static class ApplicationRegistration
             configuration["Signup:TermsVersion"] ?? DefaultTermsVersion,
             configuration.GetValue("Signup:TrialDays", Domain.Tenancy.Commerce.DefaultTrialDays)));
         AddEmailSender(services, configuration, environment);
+        services.AddSingleton<ISubscriptionSettings>(Soro.Infrastructure.Subscription.SubscriptionSettings.From(
+            key => configuration[key], allowDevelopmentDefaults: environment.IsDevelopment() || environment.IsEnvironment("Testing")));
+        services.AddMemoryCache();
+        services.AddScoped<GetSubscriptionHandler>();
+        services.AddScoped<DeclareSubscriptionPaymentHandler>();
+        services.AddScoped<GetSubscriptionStateHandler>();
+        services.AddScoped<RecordExpiredSyncHandler>();
 
         services.AddScoped<OpenRegisterSessionHandler>();
         services.AddScoped<CloseRegisterSessionHandler>();

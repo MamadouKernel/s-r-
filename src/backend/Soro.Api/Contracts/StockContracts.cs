@@ -122,3 +122,18 @@ public sealed record GroupIntoFamilyRequest
 public sealed record FamilyCreatedResponse(Guid FamilyId, bool AlreadyProcessed);
 
 public sealed record PhotoChangedResponse(Guid PhotoId);
+
+public sealed record DeclareSubscriptionPaymentRequest
+{
+    public required Guid PaymentId { get; init; }
+
+    public required Soro.Domain.Subscription.SubscriptionPeriod Period { get; init; }
+
+    public required Soro.Domain.Subscription.SubscriptionMethod Method { get; init; }
+
+    public required string Reference { get; init; }
+
+    public required long AmountFcfa { get; init; }
+}
+
+public sealed record SubscriptionPaymentDeclaredResponse(Guid PaymentId, bool AlreadyProcessed);

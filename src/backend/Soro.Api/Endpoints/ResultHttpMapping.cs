@@ -28,7 +28,7 @@ internal static class ResultHttpMapping
             => StatusCodes.Status409Conflict,
         ErrorCodes.InvalidCode or ErrorCodes.VerificationExpired or ErrorCodes.InvalidInvitation
             => StatusCodes.Status422UnprocessableEntity,
-        ErrorCodes.DeviceNotAuthorized or ErrorCodes.CreditLimitExceeded => StatusCodes.Status403Forbidden,
+        ErrorCodes.DeviceNotAuthorized or ErrorCodes.CreditLimitExceeded or ErrorCodes.SubscriptionExpired => StatusCodes.Status403Forbidden,
         ErrorCodes.TooManyRequests => StatusCodes.Status429TooManyRequests,
         ErrorCodes.EmailNotSent => StatusCodes.Status503ServiceUnavailable,
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,

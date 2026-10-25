@@ -30,4 +30,5 @@ public static class ErrorCodes
     public const string PhoneTaken = "phone_taken";
     public const string CreditLimitExceeded = "credit_limit_exceeded";
     public const string DeviceNotAuthorized = "device_not_authorized";
+    public const string SubscriptionExpired = "subscription_expired";
 }

@@ -23,6 +23,12 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<ProductRow> Products => Set<ProductRow>();
 
+    internal DbSet<SubscriptionPaymentRow> SubscriptionPayments => Set<SubscriptionPaymentRow>();
+
+    internal DbSet<SubscriptionReferenceRow> SubscriptionReferences => Set<SubscriptionReferenceRow>();
+
+    internal DbSet<SubscriptionReminderRow> SubscriptionReminders => Set<SubscriptionReminderRow>();
+
     internal DbSet<ProductFamilyRow> ProductFamilies => Set<ProductFamilyRow>();
 
     internal DbSet<PhotoRow> Photos => Set<PhotoRow>();
@@ -56,6 +62,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureProducts(modelBuilder.Entity<ProductRow>());
         ConfigureStockMovements(modelBuilder.Entity<StockMovementRow>());
         ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
+        ConfigureSubscriptions(modelBuilder);
         ConfigureOwnerDirectory(modelBuilder.Entity<OwnerDirectoryRow>());
         ConfigureEmailVerifications(modelBuilder.Entity<EmailVerificationRow>());
         ConfigureCustomers(modelBuilder.Entity<CustomerRow>());
@@ -153,6 +160,32 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         commerce.Property(row => row.OwnerEmail).HasMaxLength(254);
         commerce.Property(row => row.Formula).HasMaxLength(32);
         commerce.Property(row => row.TermsVersion).HasMaxLength(32);
+    }
+
+    private static void ConfigureSubscriptions(ModelBuilder modelBuilder)
+    {
+        var payment = modelBuilder.Entity<SubscriptionPaymentRow>();
+        payment.ToTable("subscription_payments", table => table.HasCheckConstraint("ck_subscription_payments_amount", "amount > 0"));
+        payment.HasKey(row => row.Id);
+        payment.Property(row => row.Period).HasConversion<string>().HasMaxLength(16);
+        payment.Property(row => row.Method).HasConversion<string>().HasMaxLength(16);
+        payment.Property(row => row.Status).HasConversion<string>().HasMaxLength(16);
+        payment.Property(row => row.Reference).HasMaxLength(100);
+        payment.Property(row => row.ReferenceKey).HasMaxLength(100);
+        payment.Property(row => row.Reason).HasMaxLength(500);
+        payment.HasIndex(row => new { row.TenantId, row.DeclaredAt });
+        payment.HasIndex(row => row.Status);
+
+        var reference = modelBuilder.Entity<SubscriptionReferenceRow>();
+        reference.ToTable("subscription_references");
+        reference.HasKey(row => new { row.Method, row.ReferenceKey });
+        reference.Property(row => row.Method).HasConversion<string>().HasMaxLength(16);
+        reference.Property(row => row.ReferenceKey).HasMaxLength(100);
+
+        var reminder = modelBuilder.Entity<SubscriptionReminderRow>();
+        reminder.ToTable("subscription_reminders");
+        reminder.HasKey(row => new { row.TenantId, row.EndsAt, row.Kind });
+        reminder.Property(row => row.Kind).HasMaxLength(16);
     }
 
     private static void ConfigureOwnerDirectory(EntityTypeBuilder<OwnerDirectoryRow> directory)

@@ -27,6 +27,7 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseTenantScope();
 app.UseDeviceAccess();
+app.UseSubscriptionAccess();
 app.UseRateLimiter();
 app.UseAuthorization();
 
@@ -43,6 +44,7 @@ api.MapProductImportEndpoints();
 api.MapReportingEndpoints();
 api.MapDeviceEndpoints();
 api.MapCustomerEndpoints();
+api.MapSubscriptionEndpoints();
 
 app.Run();
 

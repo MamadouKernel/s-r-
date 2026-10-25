@@ -99,6 +99,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("owner_email");
 
+                    b.Property<DateTimeOffset?>("PaidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_until");
+
                     b.Property<DateTimeOffset>("TermsAcceptedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("terms_accepted_at");
@@ -898,6 +902,125 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_stock_movements_values", "quantity_delta <> 0 AND (unit_cost IS NULL OR unit_cost >= 0)");
                         });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SubscriptionPaymentRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("CoveredFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("covered_from");
+
+                    b.Property<DateTimeOffset?>("CoveredTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("covered_to");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<DateTimeOffset>("DeclaredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("declared_at");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("period");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("ReferenceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId", "DeclaredAt");
+
+                    b.ToTable("subscription_payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_payments_amount", "amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SubscriptionReferenceRow", b =>
+                {
+                    b.Property<string>("Method")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("ReferenceKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_key");
+
+                    b.HasKey("Method", "ReferenceKey");
+
+                    b.ToTable("subscription_references", (string)null);
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SubscriptionReminderRow", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("TenantId", "EndsAt", "Kind");
+
+                    b.ToTable("subscription_reminders", (string)null);
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.UserRow", b =>

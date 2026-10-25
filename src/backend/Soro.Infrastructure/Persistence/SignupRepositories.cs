@@ -109,18 +109,7 @@ public sealed class CommerceRepository(SoroDbContext db) : ICommerceRepository
     public async Task<Commerce?> GetAsync(TenantId tenant, CancellationToken cancellationToken)
     {
         var row = await db.Commerces.AsNoTracking().SingleOrDefaultAsync(item => item.Id == tenant.Value, cancellationToken);
-        return row is null
-            ? null
-            : Commerce.Restore(
-                new TenantId(row.Id),
-                row.Name,
-                row.Activity,
-                EmailAddress.Parse(row.OwnerEmail),
-                row.Formula,
-                row.CreatedAt,
-                row.TrialEndsAt,
-                row.TermsVersion,
-                row.TermsAcceptedAt);
+        return row is null ? null : CommerceMapper.ToDomain(row);
     }
 
     public Task AddAsync(Commerce commerce, CancellationToken cancellationToken)
@@ -139,4 +128,20 @@ public sealed class CommerceRepository(SoroDbContext db) : ICommerceRepository
         });
         return Task.CompletedTask;
     }
+}
+
+internal static class CommerceMapper
+{
+    public static Commerce ToDomain(CommerceRow row) =>
+        Commerce.Restore(
+            new TenantId(row.Id),
+            row.Name,
+            row.Activity,
+            EmailAddress.Parse(row.OwnerEmail),
+            row.Formula,
+            row.CreatedAt,
+            row.TrialEndsAt,
+            row.TermsVersion,
+            row.TermsAcceptedAt,
+            row.PaidUntil);
 }
