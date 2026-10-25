@@ -189,6 +189,43 @@ internal sealed class ProductRow
     public bool IsActive { get; set; }
 
     public int QuantityOnHand { get; set; }
+
+    public Guid FamilyId { get; set; }
+
+    public string? FormatLabel { get; set; }
+
+    public Guid? PhotoId { get; set; }
+}
+
+internal sealed class ProductFamilyRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Category { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public Guid? PhotoId { get; set; }
+}
+
+internal sealed class PhotoRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public byte[] Data { get; set; } = [];
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>Photo retirée : le rôle applicatif ne supprime jamais de ligne, l'image est donc vidée et la ligne marquée.</summary>
+    public DateTimeOffset? RemovedAt { get; set; }
 }
 
 internal sealed class StockMovementRow

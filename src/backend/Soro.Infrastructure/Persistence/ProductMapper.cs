@@ -29,7 +29,38 @@ internal static class ProductMapper
         row.AlertThreshold = product.AlertThreshold;
         row.IsActive = product.IsActive;
         row.QuantityOnHand = product.QuantityOnHand;
+        row.FamilyId = product.FamilyId.Value;
+        row.FormatLabel = product.FormatLabel;
+        row.PhotoId = product.PhotoId?.Value;
     }
+
+    public static ProductFamilyRow ToRow(ProductFamily family)
+    {
+        var row = new ProductFamilyRow
+        {
+            Id = family.Id.Value,
+            TenantId = family.Tenant.Value,
+            CreatedAt = family.CreatedAt.ToUniversalTime(),
+        };
+        Apply(row, family);
+        return row;
+    }
+
+    public static void Apply(ProductFamilyRow row, ProductFamily family)
+    {
+        row.Name = family.Name;
+        row.Category = family.Category;
+        row.PhotoId = family.PhotoId?.Value;
+    }
+
+    public static ProductFamily ToDomain(ProductFamilyRow row) =>
+        ProductFamily.Restore(
+            new FamilyId(row.Id),
+            new TenantId(row.TenantId),
+            row.Name,
+            row.Category,
+            row.CreatedAt,
+            row.PhotoId is { } photo ? new PhotoId(photo) : null);
 
     public static Product ToDomain(ProductRow row) =>
         Product.Restore(
@@ -44,7 +75,10 @@ internal static class ProductMapper
             row.TracksStock,
             row.CreatedAt,
             row.IsActive,
-            row.QuantityOnHand);
+            row.QuantityOnHand,
+            new FamilyId(row.FamilyId),
+            row.FormatLabel,
+            row.PhotoId is { } photo ? new PhotoId(photo) : null);
 
     public static StockMovementRow ToRow(StockMovement movement) =>
         new()

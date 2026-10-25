@@ -475,6 +475,85 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.PhotoRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("data");
+
+                    b.Property<DateTimeOffset?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("photos", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_photos_size", "removed_at IS NOT NULL OR octet_length(data) BETWEEN 1 AND 204800");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.ProductFamilyRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhotoId");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("product_families", (string)null);
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.ProductRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -500,6 +579,15 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("family_id");
+
+                    b.Property<string>("FormatLabel")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("format_label");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -509,6 +597,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
 
                     b.Property<long>("PurchasePrice")
                         .HasColumnType("bigint")
@@ -537,6 +629,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("PhotoId");
 
                     b.HasIndex("TenantId", "Barcode")
                         .IsUnique()
@@ -899,6 +995,28 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SaleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.ProductFamilyRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.PhotoRow", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.ProductRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.ProductFamilyRow", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Soro.Infrastructure.Persistence.PhotoRow", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleLineRow", b =>

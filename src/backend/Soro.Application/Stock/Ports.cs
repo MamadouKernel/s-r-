@@ -36,9 +36,6 @@ public interface IProductFamilyRepository
     Task AddAsync(ProductFamily family, CancellationToken cancellationToken);
 
     Task UpdateAsync(ProductFamily family, CancellationToken cancellationToken);
-
-    /// <summary>Retire une famille devenue vide (regroupement de produits).</summary>
-    Task RemoveAsync(ProductFamily family, CancellationToken cancellationToken);
 }
 
 /// <summary>Photo d'un produit ou d'une famille, privée au commerce (docs/specs/formats-produits FMT-04).</summary>
@@ -50,6 +47,7 @@ public interface IPhotoStore
 
     Task AddAsync(Photo photo, CancellationToken cancellationToken);
 
+    /// <summary>Retire la photo (l'image est vidée) ; retirer une photo absente n'est pas une erreur.</summary>
     Task RemoveAsync(PhotoId id, TenantId tenant, CancellationToken cancellationToken);
 }
 

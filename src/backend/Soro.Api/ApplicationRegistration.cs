@@ -67,6 +67,13 @@ public static class ApplicationRegistration
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<UpdateProductHandler>();
         services.AddScoped<DeactivateProductHandler>();
+        services.AddScoped<CreateFamilyHandler>();
+        services.AddScoped<AddFormatHandler>();
+        services.AddScoped<UpdateFamilyHandler>();
+        services.AddScoped<GroupIntoFamilyHandler>();
+        services.AddScoped<SetPhotoHandler>();
+        services.AddScoped<RemovePhotoHandler>();
+        services.AddScoped<GetPhotoHandler>();
         services.AddScoped<ReceiveStockHandler>();
         services.AddScoped<RecordStockLossHandler>();
         services.AddScoped<ListProductsHandler>();

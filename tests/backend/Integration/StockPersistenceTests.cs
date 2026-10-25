@@ -22,7 +22,7 @@ public class StockPersistenceTests(PostgresFixture fixture)
         await using var db = Db.App(fixture, tenant);
         foreach (var product in products)
         {
-            await new ProductRepository(db).AddAsync(product, Ct);
+            await ProductSeed.AddAsync(db, product, Ct);
         }
 
         await new EfUnitOfWork(db).CommitAsync(Ct);
@@ -36,7 +36,7 @@ public class StockPersistenceTests(PostgresFixture fixture)
         var movement = product.Receive(24, "Grossiste", UserId.New(), At);
         await using (var db = Db.App(fixture, tenant))
         {
-            await new ProductRepository(db).AddAsync(product, Ct);
+            await ProductSeed.AddAsync(db, product, Ct);
             await new StockMovementRepository(db).AddAsync(movement, Ct);
             await new EfUnitOfWork(db).CommitAsync(Ct);
         }
@@ -60,7 +60,7 @@ public class StockPersistenceTests(PostgresFixture fixture)
         await SaveAsync(tenantB, NewProduct(tenantB, "999"));
 
         await using var db = Db.App(fixture, tenantA);
-        await new ProductRepository(db).AddAsync(NewProduct(tenantA, "999", "Doublon"), Ct);
+        await ProductSeed.AddAsync(db, NewProduct(tenantA, "999", "Doublon"), Ct);
 
         var failure = await Assert.ThrowsAsync<DbUpdateException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
         Assert.Equal(PostgresErrorCodes.UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
@@ -98,7 +98,7 @@ public class StockPersistenceTests(PostgresFixture fixture)
         var movement = product.Receive(5, null, UserId.New(), At);
         await using (var db = Db.App(fixture, tenant))
         {
-            await new ProductRepository(db).AddAsync(product, Ct);
+            await ProductSeed.AddAsync(db, product, Ct);
             await new StockMovementRepository(db).AddAsync(movement, Ct);
             await new EfUnitOfWork(db).CommitAsync(Ct);
         }

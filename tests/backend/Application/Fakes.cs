@@ -217,12 +217,6 @@ internal sealed class InMemoryProductFamilyRepository : IProductFamilyRepository
     }
 
     public Task UpdateAsync(ProductFamily family, CancellationToken cancellationToken) => Task.CompletedTask;
-
-    public Task RemoveAsync(ProductFamily family, CancellationToken cancellationToken)
-    {
-        _families.Remove(family);
-        return Task.CompletedTask;
-    }
 }
 
 internal sealed class InMemoryPhotoStore : IPhotoStore

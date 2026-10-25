@@ -15,7 +15,7 @@ Un **format est un produit vendable complet**, exactement comme un produit aujou
 ## Exigences
 
 ### FMT-01 Famille et formats
-Une famille a un **nom** (2 à 100 caractères), une **catégorie** facultative et au moins un format actif tant qu'elle est proposée à la vente. Un format a : un **libellé** (1 à 40 caractères : « 1,5 L », « 50 kg », « Pack de 6 »), un **code-barres** facultatif, un prix d'achat, un prix de vente, un suivi du stock (choisi à la création, non modifiable), un seuil d'alerte, un stock. Règles de valeur : celles de GES-02 (FCFA entiers, prix de vente ≥ prix d'achat non exigé).
+Une famille a un **nom** (1 à 200 caractères, comme un produit aujourd'hui), une **catégorie** facultative et au moins un format actif tant qu'elle est proposée à la vente. Un format a : un **libellé** (1 à 40 caractères : « 1,5 L », « 50 kg », « Pack de 6 »), un **code-barres** facultatif, un prix d'achat, un prix de vente, un suivi du stock (choisi à la création, non modifiable), un seuil d'alerte, un stock. Règles de valeur : celles de GES-02 (FCFA entiers, prix de vente ≥ prix d'achat non exigé).
 - Le libellé est **unique dans la famille** (sans tenir compte des majuscules ni des espaces en trop).
 - Une famille à **un seul format** peut ne pas avoir de libellé (« Sel fin », « Savon Omo »). Dès qu'elle a deux formats, **tous** ont un libellé.
 - Le code-barres reste unique dans le commerce (409 sinon, comme aujourd'hui).
@@ -31,7 +31,7 @@ Le nom affiché d'un format est « **Nom de la famille · libellé** » (« Eau 
 ### FMT-04 Photo facultative
 - Une famille peut avoir **une photo**, jamais obligatoire. Un format peut avoir **sa propre photo** qui remplace celle de la famille (utile quand l'emballage diffère) ; sans photo propre, il montre celle de la famille.
 - Ajout depuis l'appareil photo du téléphone ou un fichier ; **l'application réduit l'image** avant l'envoi (côté le plus long 480 px, JPEG ; viser moins de 60 Ko) pour que ça marche avec une connexion faible.
-- Le serveur n'accepte que JPEG, PNG ou WebP **reconnus par leur contenu** (pas par le nom du fichier), 200 Ko au plus ; sinon message clair (« Cette image est trop lourde » / « Ce fichier n'est pas une image »). Remplacer ou retirer une photo est possible à tout moment.
+- Le serveur n'accepte que JPEG, PNG ou WebP **reconnus par leur contenu** (pas par le nom du fichier), 200 Ko au plus ; sinon message clair (« Cette image est trop lourde » / « Ce fichier n'est pas une image »). Remplacer ou retirer une photo est possible à tout moment ; l'image retirée est vidée de la base (le rôle applicatif ne supprime jamais de ligne).
 - Une photo est **privée au commerce** (isolation comme le reste) ; elle n'est servie qu'à un utilisateur connecté de ce commerce.
 - **Sans photo, rien ne manque** : l'écran affiche les initiales du produit. Hors ligne, une photo déjà vue reste affichée ; une photo jamais chargée est remplacée par les initiales, sans erreur.
 - Les montants, le stock et la vente ne dépendent jamais d'une photo.
@@ -53,7 +53,7 @@ Chaque article du catalogue de la caisse indique : identifiant du format, identi
 - Écrans en ligne seulement, comme GES.
 
 ### FMT-08 Reprise de l'existant
-À la mise en service, chaque produit actuel devient **sa propre famille à un format sans libellé** : même nom, même stock, même prix, mêmes mouvements, mêmes ventes. Aucun montant ni aucun stock ne change ; les ventes déjà enregistrées ne sont pas modifiées. Pour regrouper des produits existants en une famille (par exemple « Eau 1,5 L » et « Eau 50 cl »), le gérant utilise **« Regrouper dans une famille »** : il choisit des produits, donne le nom de la famille et le libellé de chacun. Le nom affiché peut alors changer, pas les ventes passées.
+À la mise en service, chaque produit actuel devient **sa propre famille à un format sans libellé** : même nom, même stock, même prix, mêmes mouvements, mêmes ventes. Aucun montant ni aucun stock ne change ; les ventes déjà enregistrées ne sont pas modifiées. La famille d'origine d'un produit regroupé reste en base, vide et invisible (aucune suppression de ligne côté application). Pour regrouper des produits existants en une famille (par exemple « Eau 1,5 L » et « Eau 50 cl »), le gérant utilise **« Regrouper dans une famille »** : il choisit des produits, donne le nom de la famille et le libellé de chacun. Le nom affiché peut alors changer, pas les ventes passées.
 
 ### FMT-09 Copie locale de la caisse
 La copie locale du catalogue gagne les champs de FMT-05. Une copie ancienne (sans famille) reste utilisable : chaque article est alors sa propre famille jusqu'au prochain chargement. Le catalogue se recopie à chaque ouverture de la vente et à la connexion (déjà en place).

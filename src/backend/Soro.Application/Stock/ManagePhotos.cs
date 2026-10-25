@@ -50,6 +50,9 @@ public sealed class SetPhotoHandler(
     IPhotoStore photos,
     IUnitOfWork unitOfWork)
 {
+    /// <summary>Taille maximale d'une photo acceptée (FMT-04).</summary>
+    public const int MaxBytes = ImageSniffer.MaxBytes;
+
     public async Task<Result<PhotoId>> HandleAsync(SetPhotoCommand command, CancellationToken cancellationToken = default)
     {
         if (!RolePolicy.CanManageCatalogue(user.Role))

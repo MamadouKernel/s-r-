@@ -265,7 +265,7 @@ public class FamilyTests
         Assert.Equal(["Eau minérale · 1,5 L", "Eau minérale · 50 cl"], products.Select(product => product.Name).Order().ToArray());
         Assert.All(products, product => Assert.Equal(family, product.FamilyId));
         Assert.Equal(12, products.Single(product => product.Id == big.Id).QuantityOnHand);
-        Assert.Null(await world.Families.GetAsync(new FamilyId(big.Id.Value), world.Tenant, CancellationToken.None));
+        Assert.Empty(await world.Products.ListByFamilyAsync(new FamilyId(big.Id.Value), world.Tenant, CancellationToken.None));
         Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.ProductsGrouped);
     }
 

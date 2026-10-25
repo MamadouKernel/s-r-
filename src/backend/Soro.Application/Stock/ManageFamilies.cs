@@ -346,10 +346,6 @@ public sealed class GroupIntoFamilyHandler(
 
                 product.Describe(family, label);
                 await products.UpdateAsync(product, cancellationToken);
-                if (oldFamily is not null)
-                {
-                    await families.RemoveAsync(oldFamily, cancellationToken);
-                }
             }
 
             await audit.RecordAsync(
