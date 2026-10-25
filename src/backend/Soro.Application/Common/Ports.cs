@@ -40,6 +40,7 @@ public static class AuditActions
     public const string ProductCreated = "product.created";
     public const string ProductUpdated = "product.updated";
     public const string ProductDeactivated = "product.deactivated";
+    public const string ProductBarcodeCreated = "product.barcode.created";
     public const string FamilyCreated = "family.created";
     public const string ProductsGrouped = "products.grouped";
     public const string ProductsImported = "products.imported";

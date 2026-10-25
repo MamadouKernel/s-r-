@@ -60,7 +60,7 @@ Aucun ticket n'est envoyé par e-mail, WhatsApp ou SMS dans cette version.
 1. **Code interne.** Un produit sans code reçoit « 2900000000017 »-type ; son EAN-13 est valide ; le produit se retrouve en le scannant à la caisse.
 2. **Pas de doublon.** Demander un second code interne pour le même produit est refusé ; deux produits n'ont jamais le même code, même créés au même instant depuis deux caisses.
 3. **Droits.** Le caissier ne crée pas de code (403) ; le magasinier imprime mais ne crée pas ; un autre commerce reçoit 404.
-4. **Dessin.** L'EAN-13 « 6111000000011 » est dessiné en EAN-13 ; « 111 » ou « RIZ-25 » en Code 128 ; un code à clé fausse est dessiné en Code 128 ; chaque dessin se relit exactement (test aller-retour).
+4. **Dessin.** L'EAN-13 « 6111000000014 » est dessiné en EAN-13 ; « 111 » ou « RIZ-25 » en Code 128 ; un code à clé fausse (« 6111000000011 ») est dessiné en Code 128 ; chaque dessin se relit exactement (test aller-retour).
 5. **Étiquettes d'une sélection.** 3 produits, 2 / 1 / 5 exemplaires : 8 étiquettes, dans l'ordre, sur 1 planche A4 ; avec « commencer à l'étiquette n° 20 » : 5 étiquettes sur la planche courante, 3 sur la suivante.
 6. **Produit sans code coché.** L'impression est refusée avec le nombre de produits concernés ; après « Créer un code interne » elle devient possible.
 7. **Rouleau.** Une étiquette = une page 50 × 30 mm.

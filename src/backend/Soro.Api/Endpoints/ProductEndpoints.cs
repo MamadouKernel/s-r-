@@ -13,6 +13,7 @@ internal static class ProductEndpoints
         products.MapPost("", CreateAsync);
         products.MapPut("/{productId:guid}", UpdateAsync);
         products.MapPost("/{productId:guid}/deactivate", DeactivateAsync);
+        products.MapPost("/{productId:guid}/internal-barcode", CreateInternalBarcodeAsync);
         products.MapPost("/{productId:guid}/receptions", ReceiveAsync);
         products.MapPost("/{productId:guid}/losses", RecordLossAsync);
         products.MapGet("/{productId:guid}/movements", ListMovementsAsync);
@@ -184,6 +185,15 @@ internal static class ProductEndpoints
                 request.FormatLabel),
             cancellationToken);
         return result.ToHttp(_ => Results.NoContent());
+    }
+
+    private static async Task<IResult> CreateInternalBarcodeAsync(
+        Guid productId,
+        CreateInternalBarcodeHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new CreateInternalBarcodeCommand(new ProductId(productId)), cancellationToken);
+        return result.ToHttp(code => Results.Ok(new InternalBarcodeResponse(code)));
     }
 
     private static async Task<IResult> DeactivateAsync(
