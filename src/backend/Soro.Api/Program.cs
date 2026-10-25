@@ -45,6 +45,7 @@ api.MapReportingEndpoints();
 api.MapDeviceEndpoints();
 api.MapCustomerEndpoints();
 api.MapSubscriptionEndpoints();
+api.MapDataExportEndpoints();
 
 app.Run();
 

@@ -40,6 +40,7 @@ public static class ApplicationRegistration
         services.AddSingleton<ISubscriptionSettings>(Soro.Infrastructure.Subscription.SubscriptionSettings.From(
             key => configuration[key], allowDevelopmentDefaults: environment.IsDevelopment() || environment.IsEnvironment("Testing")));
         services.AddMemoryCache();
+        services.AddScoped<Soro.Application.Export.ExportDataHandler>();
         services.AddScoped<GetSubscriptionHandler>();
         services.AddScoped<DeclareSubscriptionPaymentHandler>();
         services.AddScoped<GetSubscriptionStateHandler>();
