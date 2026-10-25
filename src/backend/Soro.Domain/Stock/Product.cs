@@ -23,9 +23,15 @@ public sealed class Product
         Money salePrice,
         int alertThreshold,
         bool tracksStock,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        FamilyId? family = null,
+        string? formatLabel = null,
+        PhotoId? photo = null)
     {
         Id = id;
+        FamilyId = family ?? new FamilyId(id.Value);
+        FormatLabel = formatLabel;
+        PhotoId = photo;
         Tenant = tenant;
         Name = name;
         Barcode = barcode;
@@ -42,6 +48,16 @@ public sealed class Product
 
     public TenantId Tenant { get; }
 
+    /// <summary>Famille du produit (docs/decisions/0009). Un produit seul est sa propre famille : même identifiant.</summary>
+    public FamilyId FamilyId { get; private set; }
+
+    /// <summary>Format dans la famille (« 1,5 L », « 50 kg ») ; absent pour une famille à un seul format.</summary>
+    public string? FormatLabel { get; private set; }
+
+    /// <summary>Photo propre à ce format ; sans elle, celle de la famille s'applique.</summary>
+    public PhotoId? PhotoId { get; private set; }
+
+    /// <summary>Nom affiché : « Famille · libellé » (ou la famille seule).</summary>
     public string Name { get; private set; }
 
     public string? Barcode { get; private set; }
@@ -75,10 +91,12 @@ public sealed class Product
         Money salePrice,
         int alertThreshold,
         bool tracksStock,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        FamilyId? family = null,
+        string? formatLabel = null)
     {
         var product = new Product(
-            id, tenant, string.Empty, null, null, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt);
+            id, tenant, string.Empty, null, null, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel);
         product.Edit(name, barcode, category, purchasePrice, salePrice, alertThreshold);
         return product;
     }
@@ -96,8 +114,11 @@ public sealed class Product
         bool tracksStock,
         DateTimeOffset createdAt,
         bool isActive,
-        int quantityOnHand) =>
-        new(id, tenant, name, barcode, category, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt)
+        int quantityOnHand,
+        FamilyId? family = null,
+        string? formatLabel = null,
+        PhotoId? photo = null) =>
+        new(id, tenant, name, barcode, category, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel, photo)
         {
             IsActive = isActive,
             QuantityOnHand = quantityOnHand,
@@ -130,6 +151,19 @@ public sealed class Product
         SalePrice = salePrice;
         AlertThreshold = alertThreshold;
     }
+
+    /// <summary>Rattache le produit à une famille et recalcule son nom affiché et sa catégorie.</summary>
+    public void Describe(ProductFamily family, string? label)
+    {
+        Ensure.That(family.Tenant == Tenant, "Cette famille n'appartient pas à ce commerce.");
+        var clean = Soro.Domain.Stock.FormatLabel.Normalize(label);
+        Name = Soro.Domain.Stock.FormatLabel.DisplayName(family.Name, clean);
+        FamilyId = family.Id;
+        FormatLabel = clean;
+        Category = family.Category;
+    }
+
+    public void SetPhoto(PhotoId? photo) => PhotoId = photo;
 
     /// <summary>Un produit désactivé reste lisible dans l'historique mais n'est plus proposé à la vente.</summary>
     public void Deactivate() => IsActive = false;
