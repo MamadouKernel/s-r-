@@ -21,7 +21,7 @@ Un paiement validé pendant la grâce ou la lecture seule redonne l'état **Acti
 Une formule unique : **mensuelle** (1 mois) ou **annuelle** (12 mois au prix de 10). Les prix sont des **paramètres de configuration** (`Subscription:MonthlyPriceFcfa`, `Subscription:AnnualPriceFcfa`) ; l'application refuse de démarrer en production sans eux (même garde-fou que le courrier).
 
 ### ABO-03 Lire son abonnement
-`GET /api/v1/subscription` (propriétaire, gérant ; caissier : état seul) renvoie : état, jours restants avant la prochaine échéance, date d'échéance, prix des deux périodes, moyens de paiement acceptés avec le **numéro de Sôrô** pour chacun, paiements déclarés et leur statut. Le **statut seul** est aussi envoyé à toutes les caisses avec le catalogue, pour afficher le bandeau.
+`GET /api/v1/subscription` (propriétaire, gérant ; caissier : état seul) renvoie : état, jours restants avant la prochaine échéance, date d'échéance, prix des deux périodes, moyens de paiement acceptés avec le **numéro de Sôrô** pour chacun, paiements déclarés et leur statut. Le **statut seul** (état, échéance, jours restants) est lu par toutes les caisses avec la même route, pour afficher le bandeau ; les prix, les numéros et les paiements sont réservés au propriétaire et au gérant.
 
 ### ABO-04 Déclarer un paiement
 `POST /api/v1/subscription/payments` (propriétaire seulement) : identifiant du paiement (rejouable), **période** (mensuelle ou annuelle), **moyen** (Wave, Orange Money, MTN MoMo, Moov Money), **référence** de la transaction (obligatoire), montant versé. Le montant doit être **au moins** le prix de la période. Une référence ne sert **qu'une fois** pour un même moyen, tous commerces confondus (une fraude à la référence est détectée). Le paiement est **en attente de validation**. Un paiement déclaré en attente n'active rien.
@@ -57,7 +57,7 @@ Le propriétaire télécharge à tout moment, **même en lecture seule**, un cla
 7. **Grâce.** Jour 31 à 37 : tout fonctionne, bandeau d'avertissement.
 8. **Lecture seule.** Jour 38 : créer un produit, ouvrir une caisse, enregistrer une vente en ligne : 403 `subscription_expired`. Lire, exporter, déclarer un paiement : acceptés.
 9. **Vente hors ligne.** Une caisse hors ligne a vendu pendant la lecture seule : à la reconnexion, ses ventes sont **enregistrées** et signalées dans le journal.
-10. **Reprise.** Le paiement validé en lecture seule : plus aucune restriction, à la seconde.
+10. **Reprise.** Le paiement validé en lecture seule : plus aucune restriction dans les secondes qui suivent (l'état est gardé 20 secondes au plus).
 11. **Refus.** Paiement refusé avec motif : le propriétaire reçoit l'e-mail et voit « Refusé : motif » ; il peut redéclarer.
 12. **Droits et isolation.** Le caissier ne déclare rien ; le commerce B ne voit pas les paiements du commerce A.
 13. **Rejeu.** Déclarer deux fois avec le même identifiant : un seul paiement.

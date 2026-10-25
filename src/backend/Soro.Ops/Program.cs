@@ -39,7 +39,7 @@ if (string.IsNullOrWhiteSpace(connection))
 }
 
 var services = new ServiceCollection();
-services.AddLogging(logging => logging.AddSimpleConsole(options => options.SingleLine = true));
+services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning).AddSimpleConsole(options => options.SingleLine = true));
 services.AddSoroPersistence(connection);
 services.AddSingleton<IClock, OpsClock>();
 services.AddSingleton<ISubscriptionSettings>(SubscriptionSettings.From(Setting, allowDevelopmentDefaults: false));
