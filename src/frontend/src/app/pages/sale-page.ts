@@ -199,6 +199,9 @@ export class SalePage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.catalogue.loadLocal();
+    // Un produit ajouté depuis « Gestion » doit apparaître ici sans reconnexion : on recopie le catalogue à chaque ouverture de la vente.
+    // La copie locale reste affichée pendant ce temps, et si le réseau manque elle reste utilisable (PWA-03).
+    void this.catalogue.refresh();
   }
 
   protected async search(term: string): Promise<void> {
