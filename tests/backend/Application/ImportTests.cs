@@ -41,7 +41,7 @@ public class ImportPlannerTests
         Assert.Equal(2, plan.NewFamilies.Count);
         var rice = plan.NewFamilies.Single(family => family.Name == "Riz parfumé");
         Assert.Equal("Épicerie", rice.Category);
-        Assert.Equal(["5 kg", "25 kg"], rice.Formats.Select(format => format.Label).ToArray());
+        Assert.Equal(["5 kg", "25 kg"], rice.Formats.Select(format => format.Label!).ToArray());
         Assert.Equal([2400L, 11500L], rice.Formats.Select(format => format.PurchasePriceFcfa).ToArray());
         Assert.Equal(14500, rice.Formats[1].SalePriceFcfa);
         Assert.Equal(5, rice.Formats[0].AlertThreshold);
@@ -151,7 +151,7 @@ public class ImportPlannerTests
         Assert.Equal(3, inFile.Problems.Single().Line);
         Assert.Contains("ligne 2", inFile.Problems.Single().Message, StringComparison.Ordinal);
         Assert.Empty(inShop.Problems);
-        Assert.Equal(1, inShop.Skipped.Count);
+        Assert.Single(inShop.Skipped);
         Assert.Equal(2, inShop.Skipped[0].Line);
     }
 

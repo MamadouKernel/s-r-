@@ -14,7 +14,7 @@ Une ligne du fichier = **un format** (un produit vendable). Plusieurs lignes qui
 ## Exigences
 
 ### IMP-01 Modèle à télécharger
-`GET /api/v1/product-imports/template` renvoie un classeur `.xlsx` : une feuille **« Produits »** avec l'en-tête et deux lignes d'exemple, une feuille **« Mode d'emploi »** qui explique chaque colonne en français. Lecture : propriétaire et gérant.
+`GET /api/v1/product-imports/template` renvoie un classeur `.xlsx` : une feuille **« Produits »** avec seulement l'en-tête (la colonne Code-barres est au format Texte), une feuille **« Mode d'emploi »** qui explique chaque colonne en français et donne les exemples. Les exemples ne sont pas dans « Produits » : un modèle importé tel quel ne créerait pas de faux produits. Lecture : propriétaire et gérant.
 Colonnes, dans cet ordre : **Nom du produit** · **Format** · **Catégorie** · **Code-barres** · **Prix d'achat** · **Prix de vente** · **Alerte stock** · **Stock de départ** · **Suivi du stock**.
 
 ### IMP-02 Fichier accepté

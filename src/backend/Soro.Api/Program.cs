@@ -39,6 +39,7 @@ api.MapRegisterSessionEndpoints();
 api.MapSaleEndpoints();
 api.MapUserEndpoints();
 api.MapProductEndpoints();
+api.MapProductImportEndpoints();
 api.MapReportingEndpoints();
 api.MapDeviceEndpoints();
 api.MapCustomerEndpoints();

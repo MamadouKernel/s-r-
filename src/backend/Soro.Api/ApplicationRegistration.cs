@@ -74,6 +74,9 @@ public static class ApplicationRegistration
         services.AddScoped<SetPhotoHandler>();
         services.AddScoped<RemovePhotoHandler>();
         services.AddScoped<GetPhotoHandler>();
+        services.AddScoped<GetImportTemplateHandler>();
+        services.AddScoped<PreviewProductImportHandler>();
+        services.AddScoped<ImportProductsHandler>();
         services.AddScoped<ReceiveStockHandler>();
         services.AddScoped<RecordStockLossHandler>();
         services.AddScoped<ListProductsHandler>();
