@@ -3,6 +3,10 @@ import { ApiError } from '../sync/sync-api';
 /** Message en français pour un échec d'un écran de gestion : le détail du serveur quand il est parlant, sinon une phrase claire. */
 export function describeError(error: unknown): string {
   if (error instanceof ApiError) {
+    // Le serveur explique lui-même pourquoi (abonnement terminé, référence déjà utilisée…) : on garde ses mots.
+    if (error.code === 'subscription_expired' && error.message) {
+      return error.message;
+    }
     switch (error.status) {
       case 0:
         return 'Le serveur est injoignable : cet écran a besoin du réseau. Vérifiez la connexion puis réessayez.';

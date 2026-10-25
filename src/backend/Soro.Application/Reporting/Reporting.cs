@@ -186,11 +186,12 @@ public static class AuditCategories
     private static readonly Dictionary<string, string[]> Prefixes = new(StringComparer.OrdinalIgnoreCase)
     {
         ["sales"] = ["sale."],
-        ["catalogue"] = ["product."],
+        ["catalogue"] = ["product.", "products.", "family."],
         ["stock"] = ["stock."],
         ["team"] = ["user."],
         ["devices"] = ["device."],
         ["credit"] = ["credit.", "debt."],
+        ["subscription"] = ["subscription."],
     };
 
     public static IReadOnlyCollection<string> Names => Prefixes.Keys;

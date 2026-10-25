@@ -134,9 +134,9 @@ public class AuditLogTests
     [Theory]
     [InlineData("sales", "sale.")]
     [InlineData("SALES", "sale.")]
-    [InlineData("catalogue", "product.")]
     [InlineData("stock", "stock.")]
     [InlineData("team", "user.")]
+    [InlineData("subscription", "subscription.")]
     public async Task A_category_becomes_its_action_prefixes(string category, string prefix)
     {
         var world = new TestWorld();
@@ -145,6 +145,17 @@ public class AuditLogTests
         await world.ListAuditLog.HandleAsync(Query(category));
 
         Assert.Equal([prefix], world.AuditLog.LastFilter!.ActionPrefixes);
+    }
+
+    [Fact]
+    public async Task The_catalogue_category_covers_products_families_and_imports()
+    {
+        var world = new TestWorld();
+        world.ActAs(world.Owner, Role.Owner);
+
+        await world.ListAuditLog.HandleAsync(Query("catalogue"));
+
+        Assert.Equal(["product.", "products.", "family."], world.AuditLog.LastFilter!.ActionPrefixes);
     }
 
     [Fact]

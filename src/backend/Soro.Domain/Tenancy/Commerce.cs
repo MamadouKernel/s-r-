@@ -1,10 +1,11 @@
 using Soro.Domain.Common;
+using Soro.Domain.Subscription;
 
 namespace Soro.Domain.Tenancy;
 
 /// <summary>
 /// Un commerce client, racine de l'isolation (le <see cref="TenantId"/> de toutes les autres lignes). Créé à l'inscription,
-/// avec un essai gratuit dont seule la date de fin est enregistrée ici (la mise en lecture seule RG-14 viendra avec l'abonnement).
+/// avec un essai gratuit ; la fin de la dernière période payée s'ajoute ensuite (docs/decisions/0011). L'état d'abonnement se calcule, il ne se stocke pas.
 /// </summary>
 public sealed class Commerce
 {
@@ -24,8 +25,10 @@ public sealed class Commerce
         DateTimeOffset createdAt,
         DateTimeOffset trialEndsAt,
         string termsVersion,
-        DateTimeOffset termsAcceptedAt)
+        DateTimeOffset termsAcceptedAt,
+        DateTimeOffset? paidUntil = null)
     {
+        PaidUntil = paidUntil;
         Id = id;
         Name = name;
         Activity = activity;
@@ -56,6 +59,9 @@ public sealed class Commerce
 
     public DateTimeOffset TermsAcceptedAt { get; }
 
+    /// <summary>Fin de la dernière période payée ; <c>null</c> tant que rien n'a été payé.</summary>
+    public DateTimeOffset? PaidUntil { get; private set; }
+
     public static Commerce Open(
         TenantId id,
         string name,
@@ -77,6 +83,18 @@ public sealed class Commerce
 
     public bool IsTrialOver(DateTimeOffset now) => now >= TrialEndsAt;
 
+    public SubscriptionState SubscriptionStateAt(DateTimeOffset now) => SubscriptionRules.StateAt(TrialEndsAt, PaidUntil, now);
+
+    /// <summary>Début de la période qu'un paiement validé maintenant couvrirait (RG-14, docs/decisions/0011).</summary>
+    public DateTimeOffset CoverageStartAt(DateTimeOffset now) => SubscriptionRules.CoverageStart(TrialEndsAt, PaidUntil, now);
+
+    /// <summary>Un paiement validé prolonge l'abonnement ; la fin de période ne recule jamais.</summary>
+    public void ExtendPaidUntil(DateTimeOffset paidUntil)
+    {
+        Ensure.That(PaidUntil is null || paidUntil > PaidUntil, "La période payée ne peut pas reculer.");
+        PaidUntil = paidUntil;
+    }
+
     /// <summary>Reconstruction depuis le stockage : l'état a déjà été validé à l'ouverture.</summary>
     internal static Commerce Restore(
         TenantId id,
@@ -87,6 +105,7 @@ public sealed class Commerce
         DateTimeOffset createdAt,
         DateTimeOffset trialEndsAt,
         string termsVersion,
-        DateTimeOffset termsAcceptedAt) =>
-        new(id, name, activity, ownerEmail, formula, createdAt, trialEndsAt, termsVersion, termsAcceptedAt);
+        DateTimeOffset termsAcceptedAt,
+        DateTimeOffset? paidUntil = null) =>
+        new(id, name, activity, ownerEmail, formula, createdAt, trialEndsAt, termsVersion, termsAcceptedAt, paidUntil);
 }

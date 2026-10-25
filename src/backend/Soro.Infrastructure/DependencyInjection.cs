@@ -10,6 +10,7 @@ using Soro.Application.Reporting;
 using Soro.Application.Sales;
 using Soro.Application.Signup;
 using Soro.Application.Stock;
+using Soro.Application.Subscription;
 using Soro.Infrastructure.Persistence;
 
 namespace Soro.Infrastructure;
@@ -38,6 +39,8 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductFamilyRepository, ProductFamilyRepository>();
         services.AddScoped<IPhotoStore, PhotoStore>();
+        services.AddScoped<ISubscriptionPaymentRepository, SubscriptionPaymentRepository>();
+        services.AddScoped<IPlatformSubscriptions, PlatformSubscriptions>();
         services.AddSingleton<IProductSheetReader, Soro.Infrastructure.Import.ClosedXmlProductSheetReader>();
         services.AddSingleton<IProductTemplateWriter, Soro.Infrastructure.Import.ClosedXmlProductTemplateWriter>();
         services.AddScoped<IStockMovementRepository, StockMovementRepository>();

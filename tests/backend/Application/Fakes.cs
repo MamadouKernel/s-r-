@@ -39,6 +39,8 @@ internal sealed class FakeUnitOfWork : IUnitOfWork
 {
     public int Commits { get; private set; }
 
+    public void Reset() => Commits = 0;
+
     public Task CommitAsync(CancellationToken cancellationToken)
     {
         Commits++;

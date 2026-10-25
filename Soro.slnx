@@ -5,6 +5,7 @@
     <Project Path="src/backend/Soro.Application/Soro.Application.csproj" />
     <Project Path="src/backend/Soro.Domain/Soro.Domain.csproj" />
     <Project Path="src/backend/Soro.Infrastructure/Soro.Infrastructure.csproj" />
+    <Project Path="src/backend/Soro.Ops/Soro.Ops.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/backend/" />

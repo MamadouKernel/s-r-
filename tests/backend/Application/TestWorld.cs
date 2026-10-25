@@ -5,6 +5,7 @@ using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Application.Reporting;
 using Soro.Application.Signup;
+using Soro.Application.Subscription;
 using Soro.Application.Stock;
 using Soro.Domain.Stock;
 using Soro.Domain.Cash;
@@ -21,8 +22,10 @@ internal sealed class TestWorld
 {
     public static readonly DateTimeOffset Morning = new(2026, 10, 15, 8, 0, 0, TimeSpan.Zero);
 
-    public TestWorld()
+    public TestWorld(InMemorySubscriptions? sharedSubscriptions = null)
     {
+        Subscriptions = sharedSubscriptions ?? new InMemorySubscriptions();
+        Subscriptions.Register(Commerces);
         Directory.Set(Tenant, Cashier, Role.Cashier);
         Directory.Set(Tenant, Manager, Role.Manager);
         Current = new FakeCurrentUser(Tenant, Cashier, Role.Cashier);
@@ -63,6 +66,10 @@ internal sealed class TestWorld
     public InMemoryOwnerDirectory OwnerDirectory { get; } = new();
 
     public InMemoryCommerceRepository Commerces { get; } = new();
+
+    public InMemorySubscriptions Subscriptions { get; }
+
+    public FakeSubscriptionSettings SubscriptionSettings { get; } = new();
 
     public FakePasswordHasher Passwords { get; } = new();
 
@@ -175,6 +182,22 @@ internal sealed class TestWorld
     public RemovePhotoHandler RemovePhoto => new(Current, Families, Products, Photos, UnitOfWork);
 
     public GetPhotoHandler GetPhoto => new(Current, Photos);
+
+    public GetSubscriptionHandler GetSubscription => new(Current, Commerces, Subscriptions, SubscriptionSettings, Clock);
+
+    public DeclareSubscriptionPaymentHandler DeclareSubscriptionPayment => new(Current, Subscriptions, SubscriptionSettings, Audit, Clock, UnitOfWork);
+
+    public GetSubscriptionStateHandler SubscriptionState => new(Commerces, Clock);
+
+    public RecordExpiredSyncHandler RecordExpiredSync => new(Current, Audit, Clock, UnitOfWork);
+
+    public ValidateSubscriptionPaymentHandler ValidatePayment => new(Subscriptions, Mail, Audit, Clock, UnitOfWork);
+
+    public RefuseSubscriptionPaymentHandler RefusePayment => new(Subscriptions, Mail, Audit, Clock, UnitOfWork);
+
+    public ListPendingSubscriptionPaymentsHandler ListPendingPayments => new(Subscriptions);
+
+    public SendSubscriptionRemindersHandler SendReminders => new(Subscriptions, Mail, SubscriptionSettings, Clock, UnitOfWork);
 
     public GetImportTemplateHandler ImportTemplate => new(Current, TemplateWriter);
 

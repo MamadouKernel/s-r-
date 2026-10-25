@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — abonnement</title>
+<style>
+  :root { --ivoire:#f7f7f2; --surface:#fff; --charbon:#20231f; --ardoise:#626a63; --sauge:#dde2da; --feuille:#287a52; --avert:#a86412; --erreur:#b43a32; --info:#426a82; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ivoire); color:var(--charbon); font:16px/1.4 "Source Sans 3", system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1,h2,h3,p { margin:0; }
+  .note { background:#fff7e6; border-bottom:1px solid #ecd9a8; padding:10px 16px; font-size:14px; color:#6b4a0b; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--sauge); position:sticky; top:0; z-index:5; }
+  .tab { min-height:44px; padding:8px 14px; border:1px solid var(--sauge); border-radius:4px; background:var(--surface); font:inherit; font-weight:600; cursor:pointer; }
+  .tab[aria-selected="true"] { border-color:var(--feuille); color:var(--feuille); box-shadow:inset 0 -3px 0 var(--feuille); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  .screen { display:none; } .screen.on { display:block; }
+  .why { margin:0 0 16px; color:var(--ardoise); font-size:15px; }
+  .panel { background:var(--surface); border:1px solid var(--sauge); border-radius:4px; padding:16px; }
+  .panel + .panel { margin-top:12px; }
+  .btn,.btn-primary { min-height:48px; display:inline-flex; align-items:center; justify-content:center; padding:8px 16px; border-radius:4px; font:inherit; font-weight:600; cursor:pointer; border:1px solid var(--sauge); background:var(--surface); color:var(--charbon); text-decoration:none; }
+  .btn-primary { background:var(--feuille); border-color:var(--feuille); color:#fff; }
+  .btn-primary[disabled] { opacity:.5; cursor:not-allowed; }
+  .stack > * + * { margin-top:12px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .muted { color:var(--ardoise); font-size:14px; }
+  .field { width:100%; min-height:48px; padding:8px 12px; border:1px solid var(--ardoise); border-radius:4px; font:inherit; background:var(--surface); }
+  label.l { display:block; font-weight:600; margin-bottom:4px; }
+  .banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 14px; border-radius:4px; border:1px solid; font-size:15px; }
+  .banner b { font-weight:700; }
+  .banner .btn { min-height:40px; padding:4px 12px; margin-left:auto; }
+  .b-info { background:#eef4f8; border-color:var(--info); color:#26485c; }
+  .b-warn { background:#fff4e2; border-color:var(--avert); color:#6b4a0b; }
+  .b-err { background:#fdf1f0; border-color:var(--erreur); color:#7d2620; }
+  .frame { border:1px solid var(--sauge); border-radius:6px; background:var(--ivoire); overflow:hidden; }
+  .frame-head { display:flex; gap:8px; align-items:center; background:var(--surface); padding:8px 12px; border-bottom:1px solid var(--sauge); font-weight:700; color:var(--feuille); }
+  .frame-head span.nav { margin-left:auto; font-weight:400; color:var(--ardoise); font-size:14px; }
+  .frame-body { padding:12px; }
+  .cap { font-size:13px; font-weight:700; color:var(--ardoise); text-transform:uppercase; letter-spacing:.03em; margin:18px 0 6px; }
+  .state { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .state b { font-size:28px; }
+  .tag { display:inline-block; font-size:13px; font-weight:700; padding:1px 8px; border-radius:3px; border:1px solid; }
+  .ok { color:var(--feuille); border-color:var(--feuille); } .wait { color:var(--avert); border-color:var(--avert); } .bad { color:var(--erreur); border-color:var(--erreur); }
+  .step { display:flex; gap:12px; align-items:flex-start; }
+  .num { width:32px; height:32px; border-radius:50%; background:var(--feuille); color:#fff; display:grid; place-items:center; font-weight:700; flex:none; }
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { flex:1; min-width:150px; min-height:56px; border:2px solid var(--sauge); border-radius:6px; background:var(--surface); font:inherit; cursor:pointer; padding:8px 12px; text-align:left; }
+  .seg button[aria-pressed="true"] { border-color:var(--feuille); background:#eef7f1; }
+  .seg b { display:block; font-size:18px; }
+  .big { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .copy { background:#fbfbf8; border:1px dashed var(--ardoise); border-radius:4px; padding:10px 12px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th,td { text-align:left; padding:8px 10px; border-top:1px solid var(--sauge); vertical-align:top; }
+  th { font-size:13px; color:var(--ardoise); border-top:0; }
+  .legend { margin-top:20px; padding:12px 16px; border-left:4px solid var(--info); background:#eef4f8; font-size:15px; }
+  .cart { display:grid; grid-template-columns:1fr; gap:12px; }
+  @media (min-width:700px) { .cart { grid-template-columns:1fr 240px; } }
+  .prod { border:1px solid var(--sauge); border-radius:4px; padding:10px; background:var(--surface); }
+</style>
+</head>
+<body>
+<div class="note"><strong>Maquette à valider</strong> — pas encore le vrai programme. Les mots, l'ordre des gestes et ce que voit chaque profil sont ceux qui seront construits. Les montants sont des exemples : vous fixerez les vrais prix.</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-t="s1">1. Le bandeau</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s2">2. Mon abonnement</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s3">3. Après la déclaration</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s4">4. Caisse en lecture seule</button>
+</div>
+
+<main>
+
+<!-- 1 BANDEAU -->
+<section class="screen on" id="s1">
+  <p class="why">Le bandeau s'affiche <b>en haut de tous les écrans</b>, uniquement quand il y a quelque chose à dire. Il ne gêne jamais la vente. Le <b>propriétaire et le gérant</b> voient le prix et le bouton ; le <b>caissier</b> voit un message court, sans prix : il n'a pas à payer.</p>
+
+  <p class="cap">Essai — à partir de 7 jours avant la fin</p>
+  <div class="banner b-info"><span>Votre essai gratuit finit <b>dans 5 jours</b> (le 30/10).</span><a class="btn" href="#" onclick="show('s2');return false">Voir mon abonnement</a></div>
+
+  <p class="cap">Dernier jour</p>
+  <div class="banner b-warn"><span>Votre abonnement se termine <b>aujourd'hui</b>. Payez pour ne rien interrompre.</span><a class="btn" href="#" onclick="show('s2');return false">Payer maintenant</a></div>
+
+  <p class="cap">Délai de grâce — tout fonctionne encore</p>
+  <div class="banner b-warn"><span>Abonnement échu. <b>Plus que 3 jours</b> avant la lecture seule (le 06/11).</span><a class="btn" href="#" onclick="show('s2');return false">Payer maintenant</a></div>
+
+  <p class="cap">Lecture seule</p>
+  <div class="banner b-err"><span><b>Lecture seule :</b> vos données sont conservées, vous pouvez les consulter. Payez pour reprendre la vente et la gestion.</span><a class="btn" href="#" onclick="show('s2');return false">Payer pour reprendre</a></div>
+
+  <p class="cap">Ce que voit le caissier (aucun prix, aucun bouton de paiement)</p>
+  <div class="banner b-warn"><span>L'abonnement de la boutique est échu. <b>Prévenez votre responsable.</b></span></div>
+  <div class="banner b-err" style="margin-top:8px"><span><b>La boutique est en lecture seule.</b> Les ventes en cours sont enregistrées ; prévenez votre responsable.</span></div>
+
+  <div class="legend">Rien ne s'affiche si l'abonnement est actif et que l'échéance est à plus de 7 jours. Le bandeau reste lisible à 320 px de large : le texte passe à la ligne, le bouton garde 48 px de haut.</div>
+</section>
+
+<!-- 2 MON ABONNEMENT -->
+<section class="screen" id="s2">
+  <p class="why">Réservé au <b>propriétaire</b> (le gérant peut le lire, pas déclarer). Dans <b>Gestion → Mon abonnement</b>. Tout tient en un écran : où j'en suis, comment payer, déclarer mon paiement, mon historique.</p>
+
+  <div class="panel stack">
+    <h1>Mon abonnement</h1>
+    <div class="state"><b>Essai gratuit</b><span class="tag wait">Plus que 5 jours</span></div>
+    <p class="muted">Votre essai se termine le <b>30/10/2026</b>. Si vous payez maintenant, vos 5 jours restants ne sont pas perdus : le mois payé commence après.</p>
+  </div>
+
+  <div class="panel stack">
+    <h2>1. Choisissez la durée</h2>
+    <div class="seg" id="period">
+      <button type="button" aria-pressed="true" data-price="5 000" data-label="un mois"><b>1 mois</b>5 000 FCFA</button>
+      <button type="button" aria-pressed="false" data-price="50 000" data-label="un an"><b>12 mois</b>50 000 FCFA · 2 mois offerts</button>
+    </div>
+  </div>
+
+  <div class="panel stack">
+    <h2>2. Payez avec votre téléphone</h2>
+    <div class="step"><span class="num">1</span><div class="stack" style="flex:1">
+      <p>Choisissez votre moyen de paiement :</p>
+      <div class="seg" id="method">
+        <button type="button" aria-pressed="true" data-number="07 00 00 00 01" data-name="Wave"><b>Wave</b></button>
+        <button type="button" aria-pressed="false" data-number="05 00 00 00 02" data-name="Orange Money"><b>Orange Money</b></button>
+        <button type="button" aria-pressed="false" data-number="01 00 00 00 03" data-name="MTN MoMo"><b>MTN MoMo</b></button>
+        <button type="button" aria-pressed="false" data-number="01 00 00 00 04" data-name="Moov Money"><b>Moov Money</b></button>
+      </div>
+    </div></div>
+    <div class="step"><span class="num">2</span><div class="stack" style="flex:1">
+      <p>Envoyez <span class="big" id="amount">5 000 FCFA</span> par <b id="mname">Wave</b> au numéro :</p>
+      <div class="copy"><span class="big" id="mnumber">07 00 00 00 01</span> <span class="muted">· Sôrô</span></div>
+    </div></div>
+    <div class="step"><span class="num">3</span><div class="stack" style="flex:1">
+      <p>Notez la <b>référence de la transaction</b> : c'est le code reçu par message après le paiement.</p>
+    </div></div>
+  </div>
+
+  <div class="panel stack">
+    <h2>3. Déclarez votre paiement</h2>
+    <div><label class="l" for="ref">Référence de la transaction</label><input id="ref" class="field" placeholder="Exemple : W-123456 ou MP2610.1234"></div>
+    <div><label class="l" for="amt">Montant envoyé (FCFA)</label><input id="amt" class="field" value="5000" inputmode="numeric"></div>
+    <p class="muted">Nous vérifions votre paiement sur notre relevé, en général dans la journée. Vous recevez un e-mail dès que c'est fait. <b>Tant que ce n'est pas validé, rien ne change pour votre boutique.</b></p>
+    <button class="btn-primary" onclick="show('s3')">J'ai payé : envoyer ma déclaration</button>
+    <p class="muted">Messages possibles : « Le montant est trop bas : l'abonnement mensuel coûte 5 000 FCFA. » · « Cette référence de transaction a déjà été utilisée. Vérifiez-la dans le message de votre opérateur. » · « La référence de la transaction est obligatoire. »</p>
+  </div>
+
+  <div class="panel">
+    <h2>Mes paiements</h2>
+    <p class="muted" style="margin-top:6px">Aucun paiement pour le moment.</p>
+  </div>
+</section>
+
+<!-- 3 APRES -->
+<section class="screen" id="s3">
+  <p class="why">Après l'envoi, la page dit tout de suite ce qui se passe. Chaque paiement de l'historique a un <b>état en toutes lettres</b> (jamais la couleur seule). Trois cas, du plus fréquent au plus rare.</p>
+
+  <p class="cap">En attente de validation (juste après l'envoi)</p>
+  <div class="panel stack">
+    <div class="banner b-info"><span><b>Déclaration envoyée.</b> Nous la vérifions et vous écrivons dès que c'est fait. Votre boutique continue de fonctionner normalement.</span></div>
+    <table>
+      <thead><tr><th>Date</th><th>Durée</th><th>Moyen</th><th>Référence</th><th>Montant</th><th>État</th></tr></thead>
+      <tbody><tr><td>25/10</td><td>1 mois</td><td>Wave</td><td>W-123456</td><td>5 000 FCFA</td><td><span class="tag wait">En attente de validation</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <p class="cap">Validé</p>
+  <div class="panel stack">
+    <div class="state"><b>Abonnement actif</b><span class="tag ok">Jusqu'au 30/11/2026</span></div>
+    <table>
+      <thead><tr><th>Date</th><th>Durée</th><th>Moyen</th><th>Référence</th><th>Montant</th><th>État</th></tr></thead>
+      <tbody><tr><td>25/10</td><td>1 mois</td><td>Wave</td><td>W-123456</td><td>5 000 FCFA</td><td><span class="tag ok">Validé · couvre jusqu'au 30/11</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <p class="cap">Refusé (avec le motif écrit par l'équipe)</p>
+  <div class="panel stack">
+    <table>
+      <thead><tr><th>Date</th><th>Durée</th><th>Moyen</th><th>Référence</th><th>Montant</th><th>État</th></tr></thead>
+      <tbody><tr><td>25/10</td><td>1 mois</td><td>Wave</td><td>W-123456</td><td>5 000 FCFA</td><td><span class="tag bad">Refusé</span><br><span class="muted">Référence introuvable sur le relevé.</span></td></tr></tbody>
+    </table>
+    <p class="muted">Le propriétaire reçoit aussi un e-mail avec le motif, et peut déclarer de nouveau avec la bonne référence.</p>
+    <button class="btn" onclick="show('s2')">Déclarer de nouveau</button>
+  </div>
+</section>
+
+<!-- 4 CAISSE LECTURE SEULE -->
+<section class="screen" id="s4">
+  <p class="why">En lecture seule, la caisse ne <b>vend plus de nouvelle vente en ligne</b>, mais rien n'est perdu : les ventes déjà faites sans connexion sont enregistrées, tout reste consultable. Le bouton « Encaisser » dit <b>pourquoi</b> il est éteint et vers qui se tourner.</p>
+
+  <p class="cap">Ce que voit le propriétaire</p>
+  <div class="frame">
+    <div class="frame-head">Sôrô <span class="nav">Vente · Gestion · Journal</span></div>
+    <div class="frame-body stack">
+      <div class="banner b-err"><span><b>Lecture seule :</b> vos données sont conservées. Payez pour reprendre la vente.</span><a class="btn" href="#" onclick="show('s2');return false">Payer pour reprendre</a></div>
+      <div class="cart">
+        <div class="prod"><b>Eau minérale</b><p class="muted">3 formats · de 150 à 400 FCFA</p></div>
+        <div class="prod">
+          <h3>Panier</h3>
+          <p class="muted" style="margin:6px 0">Le panier est vide.</p>
+          <button class="btn-primary" style="width:100%" disabled>Encaisser</button>
+          <p class="muted" style="margin-top:8px">La vente est suspendue : l'abonnement est terminé. <a href="#" onclick="show('s2');return false">Voir mon abonnement</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="cap">Ce que voit le caissier</p>
+  <div class="frame">
+    <div class="frame-head">Sôrô <span class="nav">Vente</span></div>
+    <div class="frame-body stack">
+      <div class="banner b-err"><span><b>La boutique est en lecture seule.</b> Prévenez votre responsable.</span></div>
+      <div class="cart">
+        <div class="prod"><b>Eau minérale</b><p class="muted">3 formats · de 150 à 400 FCFA</p></div>
+        <div class="prod">
+          <h3>Panier</h3>
+          <p class="muted" style="margin:6px 0">Le panier est vide.</p>
+          <button class="btn-primary" style="width:100%" disabled>Encaisser</button>
+          <p class="muted" style="margin-top:8px"><b>Vente suspendue.</b> Prévenez votre responsable : l'abonnement de la boutique est à renouveler.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="cap">Une caisse qui vendait sans connexion</p>
+  <div class="panel stack">
+    <p>Si la caisse n'a pas pu savoir que l'abonnement est terminé (elle était hors ligne), <b>elle continue de vendre</b> jusqu'à sa prochaine connexion. Ses ventes sont enregistrées à la reconnexion. Le propriétaire les retrouve dans le <b>Journal</b>, catégorie « Abonnement » : « Données reçues après la fin de l'abonnement ».</p>
+  </div>
+
+  <div class="legend">Dès que le paiement est validé, le bandeau disparaît et « Encaisser » se rallume, sans reconnexion : en quelques secondes (l'application relit l'état toutes les minutes et à chaque ouverture de la vente).</div>
+</section>
+
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.t === id)));
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.t)));
+  function seg(id, onPick) {
+    const group = document.getElementById(id);
+    group.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      group.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+      onPick(b);
+    }));
+  }
+  seg('period', b => { document.getElementById('amount').textContent = b.dataset.price + ' FCFA'; document.getElementById('amt').value = b.dataset.price.replace(/\s/g, ''); });
+  seg('method', b => { document.getElementById('mname').textContent = b.dataset.name; document.getElementById('mnumber').textContent = b.dataset.number; });
+</script>
+</body>
+</html>

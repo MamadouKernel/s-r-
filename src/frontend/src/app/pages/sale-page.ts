@@ -4,8 +4,11 @@ import { cartTotal } from '../domain/cart';
 import { FamilyGroup, groupByFamily } from '../domain/families';
 import { CartLine, CatalogueProduct } from '../domain/types';
 import { CashService } from '../services/cash.service';
+import { AuthService } from '../services/auth.service';
 import { CatalogueService } from '../services/catalogue.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { ProductAvatar } from '../shared/product-avatar';
+import { RouterLink } from '@angular/router';
 import { PaymentPanel } from './payment-panel';
 
 const MAX_VISIBLE = 60;
@@ -15,7 +18,7 @@ const LOW_STOCK_HINT = 5;
 /** S4 : catalogue (recherche, scan) et panier. Le total reste visible (DESIGN.md §4, §5). */
 @Component({
   selector: 'app-sale-page',
-  imports: [PaymentPanel, ProductAvatar],
+  imports: [PaymentPanel, ProductAvatar, RouterLink],
   template: `
     <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
 
@@ -169,9 +172,18 @@ const LOW_STOCK_HINT = 5;
               <span>Total</span>
               <span class="amount text-3xl">{{ format(cash.total()) }}</span>
             </p>
-            <button type="button" class="btn-primary mt-4 w-full text-lg" [disabled]="cash.cart().length === 0" (click)="paying.set(true)">
+            <button type="button" class="btn-primary mt-4 w-full text-lg" [disabled]="cash.cart().length === 0 || suspended()" (click)="startPayment()">
               Encaisser
             </button>
+            @if (suspended()) {
+              <p class="field-help" role="status">
+                @if (isOwner()) {
+                  La vente est suspendue : l’abonnement est terminé. <a class="font-semibold underline" routerLink="/gestion/abonnement">Voir mon abonnement</a>
+                } @else {
+                  <strong>Vente suspendue.</strong> Prévenez votre responsable : l’abonnement de la boutique est à renouveler.
+                }
+              </p>
+            }
             @if (cash.cart().length > 0) {
               @if (holding()) {
                 <form class="mt-3" (submit)="hold($event)" novalidate>
@@ -210,7 +222,7 @@ const LOW_STOCK_HINT = 5;
               <span class="block text-sm text-ardoise">{{ itemCount() }} article{{ itemCount() > 1 ? 's' : '' }} · voir le panier</span>
               <span class="amount block text-2xl font-bold">{{ format(cash.total()) }}</span>
             </button>
-            <button type="button" class="btn-primary shrink-0 text-lg" (click)="paying.set(true)">Encaisser</button>
+            <button type="button" class="btn-primary shrink-0 text-lg" [disabled]="suspended()" (click)="startPayment()">Encaisser</button>
           </div>
         </div>
       }
@@ -220,6 +232,12 @@ const LOW_STOCK_HINT = 5;
 export class SalePage implements OnInit {
   protected readonly cash = inject(CashService);
   protected readonly catalogue = inject(CatalogueService);
+  private readonly subscription = inject(SubscriptionService);
+  private readonly auth = inject(AuthService);
+
+  /** Abonnement terminé (lecture seule) : on ne démarre plus de nouvel encaissement ; l'écran dit pourquoi et vers qui se tourner. */
+  protected readonly suspended = this.subscription.readOnly;
+  protected readonly isOwner = computed(() => this.auth.user()?.role === 'Owner');
 
   protected readonly term = signal('');
   protected readonly paying = signal(false);
@@ -307,6 +325,12 @@ export class SalePage implements OnInit {
       await action();
     } catch (error) {
       this.message.set(error instanceof Error ? error.message : 'L’opération a échoué.');
+    }
+  }
+
+  protected startPayment(): void {
+    if (!this.suspended()) {
+      this.paying.set(true);
     }
   }
 

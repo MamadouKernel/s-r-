@@ -20,4 +20,11 @@ describe('describeError', () => {
     expect(describeError(new ApiError(500, 'internal_error', 'Stack trace…'))).toBe('L’opération a échoué. Réessayez dans un instant.');
     expect(describeError(new Error('boom'))).toBe('L’opération a échoué. Réessayez dans un instant.');
   });
+
+  it('keeps the server wording when the subscription has ended, instead of a generic « no right » message', () => {
+    const error = new ApiError(403, 'subscription_expired', 'Votre abonnement est terminé : la boutique est en lecture seule.');
+
+    expect(describeError(error)).toBe('Votre abonnement est terminé : la boutique est en lecture seule.');
+    expect(describeError(new ApiError(403, 'forbidden', 'x'))).toContain('n’a pas le droit');
+  });
 });

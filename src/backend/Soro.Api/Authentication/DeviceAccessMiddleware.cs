@@ -34,9 +34,9 @@ public static class DeviceAccessMiddleware
 
 internal static class ResultHttpMappingProblem
 {
-    public static Task Write(HttpContext context, int status, string code, string detail) =>
+    public static Task Write(HttpContext context, int status, string code, string detail, string title = "Appareil non autorisé") =>
         Results.Problem(
-            title: "Appareil non autorisé",
+            title: title,
             detail: detail,
             statusCode: status,
             extensions: new Dictionary<string, object?> { ["code"] = code }).ExecuteAsync(context);

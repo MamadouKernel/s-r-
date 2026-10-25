@@ -40,6 +40,10 @@ public static class AuditActions
     public const string FamilyCreated = "family.created";
     public const string ProductsGrouped = "products.grouped";
     public const string ProductsImported = "products.imported";
+    public const string SubscriptionPaymentDeclared = "subscription.payment.declared";
+    public const string SubscriptionPaymentValidated = "subscription.payment.validated";
+    public const string SubscriptionPaymentRefused = "subscription.payment.refused";
+    public const string SubscriptionExpiredSale = "subscription.expired.sale";
     public const string StockLoss = "stock.loss";
     public const string CommerceCreated = "commerce.created";
     public const string PasswordReset = "user.password.reset";
