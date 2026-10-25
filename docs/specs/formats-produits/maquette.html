@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — familles et formats</title>
+<style>
+  :root {
+    --ivoire: #f7f7f2; --surface: #fff; --charbon: #20231f; --ardoise: #626a63; --sauge: #dde2da;
+    --feuille: #287a52; --avert: #a86412; --erreur: #b43a32; --info: #426a82;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ivoire); color: var(--charbon); font: 16px/1.4 "Source Sans 3", system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1, h2, h3, p { margin: 0; }
+  .note { background: #fff7e6; border-bottom: 1px solid #ecd9a8; padding: 10px 16px; font-size: 14px; color: #6b4a0b; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--sauge); position: sticky; top: 0; z-index: 5; }
+  .tab { min-height: 44px; padding: 8px 14px; border: 1px solid var(--sauge); border-radius: 4px; background: var(--surface); font: inherit; font-weight: 600; cursor: pointer; }
+  .tab[aria-selected="true"] { border-color: var(--feuille); color: var(--feuille); box-shadow: inset 0 -3px 0 var(--feuille); }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+  .why { margin: 0 0 16px; color: var(--ardoise); font-size: 15px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  @media (min-width: 900px) { .grid.two { grid-template-columns: minmax(0, 1fr) 360px; } }
+  .panel { background: var(--surface); border: 1px solid var(--sauge); border-radius: 4px; padding: 16px; }
+  .btn, .btn-primary, .btn-danger { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: 4px; font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--sauge); background: var(--surface); color: var(--charbon); }
+  .btn-primary { background: var(--feuille); border-color: var(--feuille); color: #fff; }
+  .btn-danger { color: var(--erreur); border-color: var(--erreur); }
+  label.l { display: block; font-weight: 600; margin-bottom: 4px; }
+  .field { width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid var(--ardoise); border-radius: 4px; font: inherit; background: var(--surface); }
+  .help { font-size: 14px; color: var(--ardoise); margin-top: 4px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .stack > * + * { margin-top: 14px; }
+  .initials { width: 56px; height: 56px; border-radius: 4px; background: var(--sauge); color: var(--ardoise); display: grid; place-items: center; font-weight: 700; font-size: 20px; flex: none; }
+  .photo { background: linear-gradient(135deg, #cfe3d6, #a9cdb8); color: #1f5a3c; }
+  .card { width: 100%; text-align: left; display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--sauge); border-radius: 4px; padding: 10px 12px; font: inherit; cursor: pointer; min-height: 72px; }
+  .card:hover { border-color: var(--feuille); }
+  .card strong { display: block; }
+  .muted { color: var(--ardoise); font-size: 14px; }
+  .price { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 1px 8px; border-radius: 3px; border: 1px solid; }
+  .tag.ok { color: var(--feuille); border-color: var(--feuille); }
+  .tag.low { color: var(--avert); border-color: var(--avert); }
+  .tag.out { color: var(--erreur); border-color: var(--erreur); }
+  .sheet { border: 2px solid var(--feuille); border-radius: 6px; background: var(--surface); padding: 16px; margin-top: 12px; }
+  .format { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; min-height: 64px; padding: 10px 14px; border: 1px solid var(--sauge); border-radius: 4px; background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
+  .format:hover { border-color: var(--feuille); }
+  .format .lab { font-size: 20px; font-weight: 700; }
+  .cart-line { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--sauge); }
+  .total { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 24px; margin: 12px 0; }
+  .family { border: 1px solid var(--sauge); border-radius: 4px; background: var(--surface); }
+  .family + .family { margin-top: 10px; }
+  .family-head { display: flex; gap: 12px; align-items: center; padding: 10px 12px; }
+  .family-head .grow { flex: 1; min-width: 0; }
+  .formats-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .formats-table th, .formats-table td { text-align: left; padding: 8px 12px; border-top: 1px solid var(--sauge); }
+  .formats-table th { font-size: 13px; color: var(--ardoise); }
+  .formats-table td.n, .formats-table th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .fmt-edit { border: 1px solid var(--sauge); border-radius: 4px; padding: 12px; background: #fbfbf8; }
+  .fmt-edit + .fmt-edit { margin-top: 10px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .check { display: flex; gap: 10px; align-items: center; min-height: 48px; }
+  .check input { width: 22px; height: 22px; }
+  .legend { margin-top: 24px; padding: 12px 16px; border-left: 4px solid var(--info); background: #eef4f8; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="note"><strong>Maquette à valider</strong> — pas encore le vrai programme. Les écrans, les mots et l'ordre des gestes sont ceux qui seront construits. Cliquez sur les onglets, sur une famille (« Eau minérale », « Riz parfumé ») et sur un format pour voir le déroulé.</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-t="caisse1">1. Caisse : l'eau</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="caisse2">2. Caisse : le riz</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="liste">3. Gestion : la liste</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="fiche">4. Gestion : la fiche (eau)</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="riz">5. Gestion : créer le riz</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="regrouper">6. Regrouper</button>
+</div>
+
+<main>
+
+<!-- 1. CAISSE : EAU -->
+<section class="screen on" id="caisse1">
+  <p class="why">Le caissier tape « eau ». Il voit <b>une seule famille</b>, pas trois lignes mélangées. Il la touche, puis choisit le format en gros bouton. S'il scanne le code-barres d'une bouteille, le bon format entre directement dans le panier.</p>
+  <div class="grid two">
+    <div>
+      <label class="l" for="q1">Rechercher ou scanner un code-barres</label>
+      <input id="q1" class="field" value="eau" aria-label="Recherche">
+      <p class="help">Un code-barres exact s'ajoute au panier avec la touche Entrée.</p>
+      <div class="stack" style="margin-top:14px">
+        <button class="card" data-open="eau-formats">
+          <span class="initials photo">EM</span>
+          <span><strong>Eau minérale</strong><span class="muted">3 formats · de 150 F à 400 F</span></span>
+        </button>
+        <div class="sheet" id="eau-formats" hidden>
+          <h3>Eau minérale — quel format ?</h3>
+          <div class="stack" style="margin-top:10px">
+            <button class="format" data-add="Eau minérale · 1,5 L|400"><span class="lab">1,5 L</span><span class="price">400 FCFA</span><span class="tag ok">12 en stock</span><span></span></button>
+            <button class="format" data-add="Eau minérale · 1 L|300"><span class="lab">1 L</span><span class="price">300 FCFA</span><span class="tag low">Plus que 3</span><span></span></button>
+            <button class="format" data-add="Eau minérale · 30 cl|150"><span class="lab">30 cl</span><span class="price">150 FCFA</span><span class="tag out">Épuisé</span><span></span></button>
+          </div>
+          <p class="help">Un format épuisé reste visible : la règle de stock du commerce s'applique, comme aujourd'hui.</p>
+        </div>
+        <button class="card" data-add="Sel fin|200">
+          <span class="initials">SF</span>
+          <span><strong>Sel fin</strong><span class="muted">Un seul format : un toucher suffit</span></span>
+          <span class="price" style="margin-left:auto">200 FCFA</span>
+        </button>
+      </div>
+    </div>
+    <aside class="panel" aria-label="Panier">
+      <h2>Panier</h2>
+      <div id="cart1"><p class="muted" style="margin-top:8px">Le panier est vide. Touchez un produit ou scannez un code-barres.</p></div>
+      <div class="total"><span>Total</span><span class="price" id="tot1">0 FCFA</span></div>
+      <button class="btn-primary" style="width:100%">Encaisser</button>
+    </aside>
+  </div>
+  <div class="legend">Sur le ticket et dans le panier, le format est écrit en toutes lettres : « Eau minérale · 1 L ». Deux formats de la même famille sont deux lignes distinctes.</div>
+</section>
+
+<!-- 2. CAISSE : RIZ -->
+<section class="screen" id="caisse2">
+  <p class="why">Même geste pour le riz. Les formats se trouvent aussi en tapant « riz 25 » : la recherche regarde le nom et le format.</p>
+  <div class="grid two">
+    <div>
+      <label class="l" for="q2">Rechercher ou scanner un code-barres</label>
+      <input id="q2" class="field" value="riz 25" aria-label="Recherche">
+      <div class="stack" style="margin-top:14px">
+        <button class="card" data-add="Riz parfumé · 25 kg|14500">
+          <span class="initials">RP</span>
+          <span><strong>Riz parfumé · 25 kg</strong><span class="muted">Trouvé par « 25 »</span></span>
+          <span style="margin-left:auto;text-align:right"><span class="price">14 500 FCFA</span><br><span class="tag ok">6 en stock</span></span>
+        </button>
+        <p class="muted">Effacez « 25 » pour voir tous les formats du riz parfumé : 5 kg, 25 kg, 50 kg.</p>
+        <div class="sheet">
+          <h3>Riz parfumé — quel format ?</h3>
+          <div class="stack" style="margin-top:10px">
+            <button class="format" data-add="Riz parfumé · 5 kg|3200"><span class="lab">5 kg</span><span class="price">3 200 FCFA</span><span class="tag ok">20 en stock</span><span></span></button>
+            <button class="format" data-add="Riz parfumé · 25 kg|14500"><span class="lab">25 kg</span><span class="price">14 500 FCFA</span><span class="tag ok">6 en stock</span><span></span></button>
+            <button class="format" data-add="Riz parfumé · 50 kg|27000"><span class="lab">50 kg</span><span class="price">27 000 FCFA</span><span class="tag low">Plus que 2</span><span></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="panel" aria-label="Panier">
+      <h2>Panier</h2>
+      <div id="cart2"><p class="muted" style="margin-top:8px">Le panier est vide.</p></div>
+      <div class="total"><span>Total</span><span class="price" id="tot2">0 FCFA</span></div>
+      <button class="btn-primary" style="width:100%">Encaisser</button>
+    </aside>
+  </div>
+</section>
+
+<!-- 3. GESTION : LISTE -->
+<section class="screen" id="liste">
+  <p class="why">La liste montre les <b>familles</b>. On déplie une famille pour voir ses formats : prix, stock, seuil, statut en toutes lettres. La recherche trouve par nom, format ou code-barres exact.</p>
+  <div class="row" style="margin-bottom:12px">
+    <input class="field" style="flex:1;min-width:220px" placeholder="Rechercher un produit ou un code-barres" aria-label="Recherche">
+    <button class="btn">Stock bas</button>
+    <button class="btn-primary">Nouveau produit</button>
+    <button class="btn">Regrouper dans une famille</button>
+  </div>
+  <div class="family">
+    <div class="family-head"><span class="initials photo">EM</span>
+      <div class="grow"><strong>Eau minérale</strong><div class="muted">Boissons · 3 formats</div></div>
+      <span class="tag out">1 format épuisé</span><button class="btn">Modifier</button></div>
+    <table class="formats-table">
+      <thead><tr><th>Format</th><th class="n">Prix d'achat</th><th class="n">Prix de vente</th><th class="n">Stock</th><th class="n">Seuil</th><th>Statut</th></tr></thead>
+      <tbody>
+        <tr><td><b>1,5 L</b></td><td class="n">250 F</td><td class="n">400 F</td><td class="n">12</td><td class="n">5</td><td><span class="tag ok">En stock</span></td></tr>
+        <tr><td><b>1 L</b></td><td class="n">180 F</td><td class="n">300 F</td><td class="n">3</td><td class="n">5</td><td><span class="tag low">Stock bas : à réapprovisionner</span></td></tr>
+        <tr><td><b>30 cl</b></td><td class="n">80 F</td><td class="n">150 F</td><td class="n">0</td><td class="n">10</td><td><span class="tag out">Épuisé</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="family">
+    <div class="family-head"><span class="initials">RP</span>
+      <div class="grow"><strong>Riz parfumé</strong><div class="muted">Épicerie · 3 formats</div></div>
+      <span class="tag low">1 format bas</span><button class="btn">Modifier</button></div>
+  </div>
+  <div class="family">
+    <div class="family-head"><span class="initials">SF</span>
+      <div class="grow"><strong>Sel fin</strong><div class="muted">Épicerie · 1 format · 200 F · 40 en stock</div></div>
+      <span class="tag ok">En stock</span><button class="btn">Modifier</button></div>
+  </div>
+  <div class="legend">Réception, perte et historique de stock se font <b>par format</b> : le nom affiché (« Eau minérale · 1 L ») dit toujours lequel.</div>
+</section>
+
+<!-- 4. GESTION : FICHE -->
+<section class="screen" id="fiche">
+  <p class="why">La fiche s'ouvre sur la <b>famille</b> (ce que les formats ont en commun), puis la liste des <b>formats</b>. La photo est facultative : sans elle, on voit les initiales.</p>
+  <div class="panel stack">
+    <h2>Eau minérale</h2>
+    <div class="cols">
+      <div><label class="l">Nom du produit</label><input class="field" value="Eau minérale"></div>
+      <div><label class="l">Catégorie (facultatif)</label><input class="field" value="Boissons"></div>
+    </div>
+    <div>
+      <label class="l">Photo (facultatif)</label>
+      <div class="row">
+        <span class="initials photo" style="width:96px;height:96px;font-size:28px">EM</span>
+        <div class="stack">
+          <div class="row"><button class="btn">Prendre une photo</button><button class="btn">Choisir un fichier</button><button class="btn-danger">Retirer la photo</button></div>
+          <p class="help">L'image est réduite automatiquement. Si vous n'en mettez pas, ce n'est pas grave : la caisse affiche les initiales.</p>
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary">Enregistrer la famille</button>
+  </div>
+
+  <h3 style="margin:20px 0 10px">Formats de « Eau minérale »</h3>
+  <div class="fmt-edit">
+    <div class="row" style="justify-content:space-between"><strong>1,5 L</strong><span class="row"><button class="btn">Modifier</button><button class="btn">Photo du format</button><button class="btn-danger">Désactiver</button></span></div>
+    <div class="muted">Code-barres 6111000000011 · achat 250 F · vente 400 F · stock 12 · seuil 5</div>
+  </div>
+  <div class="fmt-edit">
+    <div class="row" style="justify-content:space-between"><strong>1 L</strong><span class="row"><button class="btn">Modifier</button><button class="btn">Photo du format</button><button class="btn-danger">Désactiver</button></span></div>
+    <div class="muted">Code-barres 6111000000028 · achat 180 F · vente 300 F · stock 3 · seuil 5</div>
+  </div>
+  <div class="fmt-edit">
+    <div class="row" style="justify-content:space-between"><strong>30 cl</strong><span class="row"><button class="btn">Modifier</button><button class="btn">Photo du format</button><button class="btn-danger">Désactiver</button></span></div>
+    <div class="muted">Sans code-barres · achat 80 F · vente 150 F · stock 0 · seuil 10</div>
+  </div>
+  <p style="margin-top:12px"><button class="btn-primary">Ajouter un format</button></p>
+  <div class="legend">« Photo du format » sert quand l'emballage change d'un format à l'autre. Sans photo propre, le format montre celle de la famille. « Désactiver » demande une confirmation : le format reste dans l'historique mais n'est plus vendu.</div>
+</section>
+
+<!-- 5. CREER LE RIZ -->
+<section class="screen" id="riz">
+  <p class="why">Création d'une famille neuve, tout en un seul écran : le nom, puis les formats avec leurs prix. Rien n'est enregistré tant qu'on n'appuie pas sur le bouton du bas. Une famille a besoin d'au moins un format.</p>
+  <div class="panel stack">
+    <h2>Nouveau produit</h2>
+    <div class="cols">
+      <div><label class="l">Nom du produit</label><input class="field" value="Riz parfumé"></div>
+      <div><label class="l">Catégorie (facultatif)</label><input class="field" value="Épicerie"></div>
+    </div>
+    <div><label class="l">Photo (facultatif)</label><div class="row"><button class="btn">Prendre une photo</button><button class="btn">Choisir un fichier</button></div></div>
+
+    <h3>Formats</h3>
+    <p class="help" style="margin-top:-8px">Un seul format ? Laissez « Format » vide. Dès deux formats, chacun doit avoir le sien (5 kg, 25 kg, 50 kg…).</p>
+
+    <div class="fmt-edit">
+      <div class="cols">
+        <div><label class="l">Format</label><input class="field" value="5 kg"></div>
+        <div><label class="l">Code-barres (facultatif)</label><input class="field" placeholder="Scannez ou tapez"></div>
+        <div><label class="l">Prix d'achat (FCFA)</label><input class="field" value="2 400" inputmode="numeric"></div>
+        <div><label class="l">Prix de vente (FCFA)</label><input class="field" value="3 200" inputmode="numeric"></div>
+        <div><label class="l">Alerte quand il reste</label><input class="field" value="5" inputmode="numeric"></div>
+      </div>
+      <label class="check"><input type="checkbox" checked> Suivre le stock de ce format</label>
+    </div>
+    <div class="fmt-edit">
+      <div class="cols">
+        <div><label class="l">Format</label><input class="field" value="25 kg"></div>
+        <div><label class="l">Code-barres (facultatif)</label><input class="field"></div>
+        <div><label class="l">Prix d'achat (FCFA)</label><input class="field" value="11 500" inputmode="numeric"></div>
+        <div><label class="l">Prix de vente (FCFA)</label><input class="field" value="14 500" inputmode="numeric"></div>
+        <div><label class="l">Alerte quand il reste</label><input class="field" value="2" inputmode="numeric"></div>
+      </div>
+      <label class="check"><input type="checkbox" checked> Suivre le stock de ce format</label>
+    </div>
+    <div class="fmt-edit">
+      <div class="cols">
+        <div><label class="l">Format</label><input class="field" value="50 kg"></div>
+        <div><label class="l">Code-barres (facultatif)</label><input class="field"></div>
+        <div><label class="l">Prix d'achat (FCFA)</label><input class="field" value="22 000" inputmode="numeric"></div>
+        <div><label class="l">Prix de vente (FCFA)</label><input class="field" value="27 000" inputmode="numeric"></div>
+        <div><label class="l">Alerte quand il reste</label><input class="field" value="1" inputmode="numeric"></div>
+      </div>
+      <label class="check"><input type="checkbox" checked> Suivre le stock de ce format</label>
+    </div>
+    <div class="row"><button class="btn">+ Ajouter un autre format</button></div>
+    <div class="row"><button class="btn-primary">Enregistrer le produit</button><button class="btn">Annuler</button></div>
+    <p class="field-error" style="color:var(--erreur);font-weight:600" hidden></p>
+  </div>
+  <div class="legend">Messages prévus, en français simple : « Le format « 25 kg » existe déjà dans ce produit. » · « Ce code-barres est déjà utilisé par « Sel fin ». » · « Donnez un format à chaque produit de la famille (1 L, 50 kg…). »</div>
+</section>
+
+<!-- 6. REGROUPER -->
+<section class="screen" id="regrouper">
+  <p class="why">Pour la boutique qui a déjà saisi « Eau 1,5 L » et « Eau 50 cl » comme deux produits séparés. Le gérant les choisit, donne le nom de la famille et le format de chacun. <b>Les stocks, les prix et les ventes passées ne changent pas</b> ; seul le nom affiché change.</p>
+  <div class="panel stack">
+    <h2>Regrouper dans une famille</h2>
+    <div><label class="l">1. Quels produits regrouper ?</label>
+      <label class="check"><input type="checkbox" checked> Eau 1,5 L <span class="muted">(stock 12)</span></label>
+      <label class="check"><input type="checkbox" checked> Eau 50 cl <span class="muted">(stock 7)</span></label>
+      <label class="check"><input type="checkbox"> Jus d'orange 1 L <span class="muted">(stock 9)</span></label>
+    </div>
+    <div class="cols">
+      <div><label class="l">2. Nom de la famille</label><input class="field" value="Eau minérale"></div>
+      <div><label class="l">Catégorie (facultatif)</label><input class="field" value="Boissons"></div>
+    </div>
+    <div><label class="l">3. Format de chaque produit</label>
+      <div class="cols">
+        <div><span class="muted">Eau 1,5 L devient</span><input class="field" value="1,5 L"></div>
+        <div><span class="muted">Eau 50 cl devient</span><input class="field" value="50 cl"></div>
+      </div>
+    </div>
+    <div class="sheet" style="border-color:var(--avert)">
+      <strong>Avant de confirmer</strong>
+      <p>Dans la caisse, vous verrez « Eau minérale · 1,5 L » et « Eau minérale · 50 cl » au lieu de « Eau 1,5 L » et « Eau 50 cl ». Les anciennes ventes gardent leur ancien nom.</p>
+    </div>
+    <div class="row"><button class="btn-primary">Regrouper ces 2 produits</button><button class="btn">Annuler</button></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    tabs.forEach(other => other.setAttribute('aria-selected', String(other === tab)));
+    document.querySelectorAll('.screen').forEach(screen => screen.classList.toggle('on', screen.id === tab.dataset.t));
+  }));
+  const carts = { caisse1: { lines: [], el: 'cart1', total: 'tot1' }, caisse2: { lines: [], el: 'cart2', total: 'tot2' } };
+  const fmt = n => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' FCFA';
+  document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => {
+    const [name, price] = button.dataset.add.split('|');
+    const cart = carts[button.closest('.screen').id];
+    const line = cart.lines.find(l => l.name === name);
+    if (line) line.qty++; else cart.lines.push({ name, price: Number(price), qty: 1 });
+    document.getElementById(cart.el).innerHTML = cart.lines.map(l =>
+      `<div class="cart-line"><span>${l.name}<br><span class="muted">${l.qty} × ${fmt(l.price)}</span></span><span class="price">${fmt(l.qty * l.price)}</span></div>`).join('');
+    document.getElementById(cart.total).textContent = fmt(cart.lines.reduce((s, l) => s + l.qty * l.price, 0));
+  }));
+  document.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => {
+    const target = document.getElementById(button.dataset.open);
+    target.hidden = !target.hidden;
+  }));
+</script>
+</body>
+</html>
