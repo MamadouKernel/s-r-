@@ -351,3 +351,23 @@ internal sealed class FakeAuditLogQueries : IAuditLogQueries
         return Task.FromResult(new AuditPage([], false));
     }
 }
+
+internal sealed class FakeSheetReader : IProductSheetReader
+{
+    public SheetRead Next { get; set; } = new(null, []);
+
+    public int Calls { get; private set; }
+
+    public SheetRead Read(byte[] file)
+    {
+        Calls++;
+        return Next;
+    }
+}
+
+internal sealed class FakeTemplateWriter : IProductTemplateWriter
+{
+    public byte[] Bytes { get; } = [1, 2, 3];
+
+    public byte[] Write() => Bytes;
+}

@@ -18,7 +18,8 @@ import { ProductAvatar } from '../shared/product-avatar';
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <h2 id="produits-titre" class="text-xl font-bold">Produits</h2>
         @if (canCreate()) {
-          <a class="btn ml-auto" routerLink="/gestion/produits/regrouper">Regrouper dans une famille</a>
+          <a class="btn ml-auto" routerLink="/gestion/produits/importer">Importer depuis Excel</a>
+          <a class="btn" routerLink="/gestion/produits/regrouper">Regrouper dans une famille</a>
           <a class="btn-primary" routerLink="/gestion/produits/nouveau">Nouveau produit</a>
         }
       </div>

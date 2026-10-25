@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductFamilyRepository, ProductFamilyRepository>();
         services.AddScoped<IPhotoStore, PhotoStore>();
+        services.AddSingleton<IProductSheetReader, Soro.Infrastructure.Import.ClosedXmlProductSheetReader>();
+        services.AddSingleton<IProductTemplateWriter, Soro.Infrastructure.Import.ClosedXmlProductTemplateWriter>();
         services.AddScoped<IStockMovementRepository, StockMovementRepository>();
         services.AddScoped<IReportingQueries, ReportingQueries>();
         services.AddScoped<IAuditLogQueries, AuditLogQueries>();

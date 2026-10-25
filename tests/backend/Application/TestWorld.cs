@@ -86,6 +86,10 @@ internal sealed class TestWorld
 
     public InMemoryPhotoStore Photos { get; } = new();
 
+    public FakeSheetReader SheetReader { get; } = new();
+
+    public FakeTemplateWriter TemplateWriter { get; } = new();
+
     public InMemoryStockMovementRepository Movements { get; } = new();
 
     public InMemoryUserRepository Users { get; } = new();
@@ -171,6 +175,12 @@ internal sealed class TestWorld
     public RemovePhotoHandler RemovePhoto => new(Current, Families, Products, Photos, UnitOfWork);
 
     public GetPhotoHandler GetPhoto => new(Current, Photos);
+
+    public GetImportTemplateHandler ImportTemplate => new(Current, TemplateWriter);
+
+    public PreviewProductImportHandler PreviewImport => new(Current, SheetReader, Families, Products);
+
+    public ImportProductsHandler ImportProducts => new(Current, SheetReader, Families, Products, Movements, Audit, Clock, UnitOfWork);
 
     public DeactivateProductHandler DeactivateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
 
