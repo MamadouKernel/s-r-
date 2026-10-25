@@ -6,6 +6,7 @@ using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Soro.Domain.Sales;
 using Soro.Infrastructure.Persistence;
+using Soro.Infrastructure.Security;
 using Soro.Domain.Identity;
 
 namespace Soro.Integration.Tests;
@@ -33,7 +34,9 @@ public class SynchronisationTests(PostgresFixture fixture)
             new StockMovementRepository(db),
             new CustomerRepository(db),
             new DefaultSettings(),
-            new EmptyDirectory(),
+            new UserRepository(db),
+            new Pbkdf2PinHasher(new byte[32]),
+            new DebtRepaymentRepository(db),
             new AuditTrail(db),
             new FixedClock(),
             new EfUnitOfWork(db));

@@ -58,7 +58,7 @@ public sealed class ApiCustomerTests(PostgresFixture fixture) : IDisposable
     {
         saleId = saleId ?? Guid.NewGuid(), sessionId = session, localSequence = sequence, at = DateTimeOffset.UtcNow.AddMinutes(-sequence),
         lines = new[] { new { productId = Guid.NewGuid(), name = "Produit", quantity = 1, unitPriceFcfa = credit } },
-        discountFcfa = 0, customerId = customer, creditApproverId = approver,
+        discountFcfa = 0, customerId = customer, creditApproverId = approver, creditApproverPin = approver is null ? null : "1234",
         payments = new[] { new { paymentId = Guid.NewGuid(), method = "Credit", amountFcfa = credit, tenderedFcfa = (long?)null, reference = (string?)null } },
     };
 
