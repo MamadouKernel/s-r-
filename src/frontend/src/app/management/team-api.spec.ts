@@ -53,4 +53,27 @@ describe('TeamApi', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 409, code: 'identifier_taken' });
   });
+
+  it('gives a new pin, reactivates and changes a role on the right routes', async () => {
+    const reset = api.resetPin('u-1', '4821');
+    const first = http.expectOne('/api/v1/users/u-1/pin');
+    expect(first.request.method).toBe('POST');
+    expect(first.request.body).toEqual({ pin: '4821' });
+    first.flush(null, { status: 204, statusText: 'No Content' });
+    await reset;
+
+    const enabled = api.enable('u-1', '6666');
+    const second = http.expectOne('/api/v1/users/u-1/enable');
+    expect(second.request.method).toBe('POST');
+    expect(second.request.body).toEqual({ pin: '6666' });
+    second.flush(null, { status: 204, statusText: 'No Content' });
+    await enabled;
+
+    const changed = api.changeRole('u-1', 'Manager');
+    const third = http.expectOne('/api/v1/users/u-1/role');
+    expect(third.request.method).toBe('PUT');
+    expect(third.request.body).toEqual({ role: 'Manager' });
+    third.flush(null, { status: 204, statusText: 'No Content' });
+    await changed;
+  });
 });

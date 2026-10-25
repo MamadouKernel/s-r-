@@ -2,7 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { SafeUrl } from '@angular/platform-browser';
 import { QrService } from '../onboarding/qr.service';
 import { NetworkService } from '../services/network.service';
-import { DeviceInvitation, DevicesApi, ManagedDevice } from './devices-api';
+import { DeviceInvitation, DevicesApi, ManagedDevice, PendingLink } from './devices-api';
 import { describeError } from './errors';
 
 /**
@@ -65,6 +65,39 @@ import { describeError } from './errors';
         </div>
       }
 
+      @if (!loading() && !error()) {
+        <section class="mb-4" aria-labelledby="liens-titre">
+          <h3 id="liens-titre" class="mb-2 text-sm font-bold uppercase tracking-wide text-ardoise">Liens en attente</h3>
+          @if (links().length === 0) {
+            <p class="panel text-ardoise">Aucun lien en attente.</p>
+          } @else {
+            <ul class="flex flex-col gap-3">
+              @for (link of links(); track link.id) {
+                <li class="panel">
+                  <div class="flex flex-wrap items-start gap-3">
+                    <div class="min-w-0 flex-1">
+                      <p class="break-words text-lg font-semibold">{{ link.name }}</p>
+                      <p class="text-sm text-ardoise">Créé par {{ link.createdByName }} · {{ expires(link) }}</p>
+                    </div>
+                    @if (cancelling() === link.id) {
+                      <div class="flex w-full flex-wrap items-center gap-2">
+                        <p class="w-full font-semibold text-erreur" role="alert">
+                          Annuler ce lien ? La personne qui l’a reçu ne pourra plus s’en servir : le lien répondra qu’il a expiré. Vous pourrez toujours en créer un autre.
+                        </p>
+                        <button type="button" class="btn" (click)="cancelling.set(null)">Non, le garder</button>
+                        <button type="button" class="btn-primary !border-erreur !bg-erreur" (click)="cancelLink(link)" [disabled]="busy()">Oui, annuler ce lien</button>
+                      </div>
+                    } @else {
+                      <button type="button" class="btn" [attr.aria-label]="'Annuler le lien ' + link.name" (click)="cancelling.set(link.id)">Annuler ce lien</button>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      }
+
       @if (loading()) {
         <p class="panel text-ardoise" role="status">Chargement des appareils…</p>
       } @else if (error()) {
@@ -116,6 +149,8 @@ export class DevicesPage implements OnInit {
   protected readonly notice = signal('');
   protected readonly busy = signal(false);
   protected readonly confirming = signal<string | null>(null);
+  protected readonly links = signal<PendingLink[]>([]);
+  protected readonly cancelling = signal<string | null>(null);
 
   protected readonly inviting = signal(false);
   protected readonly suggestedName = signal('');
@@ -135,7 +170,9 @@ export class DevicesPage implements OnInit {
     this.loading.set(true);
     this.error.set('');
     try {
-      this.devices.set(await this.api.list());
+      const [devices, links] = await Promise.all([this.api.list(), this.api.pendingInvitations()]);
+      this.devices.set(devices);
+      this.links.set(links);
     } catch (error) {
       this.error.set(describeError(error));
     } finally {
@@ -213,6 +250,34 @@ export class DevicesPage implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async cancelLink(link: PendingLink): Promise<void> {
+    if (this.busy()) {
+      return;
+    }
+    this.busy.set(true);
+    this.notice.set('');
+    try {
+      await this.api.revokeInvitation(link.id);
+      this.cancelling.set(null);
+      this.notice.set('Le lien a été annulé.');
+      await this.load();
+    } catch (error) {
+      this.cancelling.set(null);
+      this.error.set(describeError(error));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** « expire dans 5 h » : le temps restant, arrondi à l'heure, jamais une date technique. */
+  protected expires(link: PendingLink): string {
+    const minutes = Math.round((Date.parse(link.expiresAt) - Date.now()) / 60_000);
+    if (minutes < 60) {
+      return `expire dans ${Math.max(minutes, 1)} min`;
+    }
+    return `expire dans ${Math.round(minutes / 60)} h`;
   }
 
   protected state(device: ManagedDevice): string {

@@ -4,16 +4,18 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { QrService } from '../onboarding/qr.service';
 import { NetworkService } from '../services/network.service';
 import { ApiError } from '../sync/sync-api';
-import { DevicesApi, ManagedDevice } from './devices-api';
+import { DevicesApi, ManagedDevice, PendingLink } from './devices-api';
 import { DevicesPage } from './devices-page';
 
 const device = (overrides: Partial<ManagedDevice> = {}): ManagedDevice => ({
   id: 'd-1', name: 'Caisse 1', enrolledAt: '2026-10-20T08:00:00.000Z', lastSeenAt: '2026-10-24T09:30:00.000Z', isActive: true, revokedAt: null, ...overrides,
 });
 
-async function open(devices: ManagedDevice[] = [device()], options: { online?: boolean } = {}) {
+async function open(devices: ManagedDevice[] = [device()], options: { online?: boolean; links?: PendingLink[] } = {}) {
   const api = {
     list: vi.fn().mockResolvedValue(devices),
+    pendingInvitations: vi.fn().mockResolvedValue(options.links ?? []),
+    revokeInvitation: vi.fn().mockResolvedValue(undefined),
     invite: vi.fn().mockResolvedValue({ invitationId: 'i-1', token: 'jeton-du-lien', expiresAt: '2026-10-25T08:00:00.000Z' }),
     revoke: vi.fn().mockResolvedValue(undefined),
   };
@@ -169,5 +171,56 @@ describe('DevicesPage', () => {
 
     expect(page.has('hors ligne')).toBe(true);
     expect(page.root.querySelector<HTMLButtonElement>('button.btn-primary')!.disabled).toBe(true);
+  });
+
+  describe('pending links', () => {
+    const link = (overrides: Partial<PendingLink> = {}): PendingLink => ({
+      id: 'l-1', name: 'Caisse 2', createdByName: 'Issa Traoré', createdAt: '2026-10-25T08:00:00.000Z', expiresAt: new Date(Date.now() + 5 * 3600_000).toISOString(), ...overrides,
+    });
+
+    it('lists the links not yet used with who made them and when they expire, and no code', async () => {
+      const page = await open([device()], { links: [link(), link({ id: 'l-2', name: 'Appareil sans nom', createdByName: 'Mamadou Konaté', expiresAt: new Date(Date.now() + 22 * 3600_000).toISOString() })] });
+
+      expect(page.has('Liens en attente')).toBe(true);
+      expect(page.has('Caisse 2')).toBe(true);
+      expect(page.has('Créé par Issa Traoré')).toBe(true);
+      expect(page.has('expire dans 5 h')).toBe(true);
+      expect(page.has('expire dans 22 h')).toBe(true);
+      expect(page.has('Appareil sans nom')).toBe(true);
+    });
+
+    it('says when there is none', async () => {
+      const page = await open();
+      expect(page.has('Aucun lien en attente.')).toBe(true);
+    });
+
+    it('asks for a confirmation, then cancels the link and says so', async () => {
+      const page = await open([device()], { links: [link()] });
+
+      await page.click('Annuler le lien Caisse 2');
+      expect(page.has('le lien répondra qu’il a expiré')).toBe(true);
+      expect(page.api.revokeInvitation).not.toHaveBeenCalled();
+
+      await page.click('Non, le garder');
+      expect(page.api.revokeInvitation).not.toHaveBeenCalled();
+
+      page.api.pendingInvitations.mockResolvedValue([]);
+      await page.click('Annuler le lien Caisse 2');
+      await page.click('Oui, annuler ce lien');
+
+      expect(page.api.revokeInvitation).toHaveBeenCalledWith('l-1');
+      expect(page.root.querySelector('[role="status"]')?.textContent).toContain('Le lien a été annulé.');
+      expect(page.has('Aucun lien en attente.')).toBe(true);
+    });
+
+    it('shows the refusal of the server', async () => {
+      const page = await open([device()], { links: [link()] });
+      page.api.revokeInvitation.mockRejectedValue(new ApiError(422, 'rule_violation', 'Ce lien a déjà servi : l’appareil figure dans la liste des appareils, où vous pouvez le retirer.'));
+
+      await page.click('Annuler le lien Caisse 2');
+      await page.click('Oui, annuler ce lien');
+
+      expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('liste des appareils');
+    });
   });
 });

@@ -48,7 +48,7 @@ public class OwnerLogInTests
         var wrongPassword = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", WrongPassword));
         var unknown = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("awa@exemple.ci", Password));
         var malformed = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("pas une adresse", Password));
-        (await world.Users.GetAsync(owner.UserId, owner.Tenant, CancellationToken.None))!.Disable();
+        (await world.Users.GetAsync(owner.UserId, owner.Tenant, CancellationToken.None))!.Disable(world.Clock.UtcNow);
         var disabled = await world.OwnerLogIn.HandleAsync(new OwnerLogInCommand("mamadou@exemple.ci", Password));
 
         var answers = new[] { wrongPassword, unknown, malformed, disabled }.Select(result => (result.Error!.Code, result.Error.Message)).Distinct().ToList();

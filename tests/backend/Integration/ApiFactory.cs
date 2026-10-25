@@ -8,6 +8,7 @@ using Soro.Application.Identity;
 using Soro.Application.Signup;
 using Soro.Domain.Common;
 using Soro.Domain.Identity;
+using Soro.Infrastructure.Persistence;
 using Soro.Infrastructure.Security;
 
 namespace Soro.Integration.Tests;
@@ -53,6 +54,7 @@ internal sealed class ApiFactory(
         // Les tests d'identité d'avant les appareils se connectent sans appareil ; les tests d'appareils l'exigent.
         // Pas de mémoire d'état d'abonnement dans les tests : chaque requête relit la base.
         builder.UseSetting("Subscription:StateCacheSeconds", "0");
+        builder.UseSetting("Sessions:StateCacheSeconds", "0");
         builder.UseSetting("Devices:Required", devicesRequired ? "true" : "false");
         if (publicPermitsPerMinute is { } publicPermits)
         {
@@ -66,14 +68,39 @@ internal sealed class ApiFactory(
     }
 
     /// <summary>Client authentifié comme cet utilisateur du commerce donné.</summary>
-    public HttpClient ClientFor(TenantId tenant, UserId user, Role role)
+    public HttpClient ClientFor(TenantId tenant, UserId user, Role role, DateTimeOffset? issuedAt = null)
     {
+        EnsureUserExists(tenant, user, role);
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new("Bearer", Token(tenant.Value.ToString(), user.Value.ToString(), role));
+        client.DefaultRequestHeaders.Authorization = new("Bearer", Token(tenant.Value.ToString(), user.Value.ToString(), role, issuedAt));
         return client;
     }
 
-    public string Token(string? tenant, string? user, Role role)
+    /// <summary>
+    /// Le serveur refuse le jeton d'un membre qui n'existe pas (fin des sessions périmées) : un test qui s'authentifie « comme » un utilisateur
+    /// qu'il n'a pas créé en reçoit un, sans toucher à ceux qu'il a créés lui-même.
+    /// </summary>
+    private void EnsureUserExists(TenantId tenant, UserId user, Role role)
+    {
+        using var db = Db.App(fixture, tenant);
+        var repository = new UserRepository(db);
+        if (repository.GetAsync(user, tenant, CancellationToken.None).GetAwaiter().GetResult() is not null)
+        {
+            return;
+        }
+
+        var identifier = "t" + user.Value.ToString("N")[..12];
+        repository.AddAsync(
+            User.Register(user, tenant, identifier, "Utilisateur de test", role, PinHasher.Hash("1234"), DateTimeOffset.UtcNow.AddDays(-30)),
+            CancellationToken.None).GetAwaiter().GetResult();
+        new EfUnitOfWork(db).CommitAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    /// <param name="tenant">Commerce du jeton.</param>
+    /// <param name="user">Utilisateur du jeton.</param>
+    /// <param name="role">Profil du jeton.</param>
+    /// <param name="issuedAt">Instant d'émission ; sans lui le jeton ne porte pas de date et compte comme le plus ancien possible.</param>
+    public string Token(string? tenant, string? user, Role role, DateTimeOffset? issuedAt = null)
     {
         var claims = new Dictionary<string, object> { ["role"] = role.ToString() };
         if (tenant is not null)
@@ -90,6 +117,7 @@ internal sealed class ApiFactory(
         {
             Issuer = Issuer,
             Audience = Audience,
+            IssuedAt = issuedAt?.UtcDateTime,
             Expires = DateTime.UtcNow.AddMinutes(10),
             Claims = claims,
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256),

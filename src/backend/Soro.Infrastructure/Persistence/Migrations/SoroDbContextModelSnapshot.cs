@@ -262,6 +262,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
                     b.Property<string>("SecretHash")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1078,6 +1082,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("role");
+
+                    b.Property<DateTimeOffset?>("SessionsValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sessions_valid_from");
 
                     b.Property<string>("Status")
                         .IsRequired()

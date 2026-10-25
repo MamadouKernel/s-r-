@@ -31,7 +31,7 @@ internal static class ResultHttpMapping
         ErrorCodes.DeviceNotAuthorized or ErrorCodes.CreditLimitExceeded or ErrorCodes.SubscriptionExpired => StatusCodes.Status403Forbidden,
         ErrorCodes.TooManyRequests => StatusCodes.Status429TooManyRequests,
         ErrorCodes.EmailNotSent => StatusCodes.Status503ServiceUnavailable,
-        ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
+        ErrorCodes.InvalidCredentials or ErrorCodes.SessionOutdated => StatusCodes.Status401Unauthorized,
         ErrorCodes.AccountLocked => StatusCodes.Status423Locked,
         _ => StatusCodes.Status400BadRequest,
     };

@@ -18,6 +18,9 @@ public interface IDeviceInvitationRepository
 {
     Task<DeviceInvitation?> GetAsync(DeviceInvitationId id, TenantId tenant, CancellationToken cancellationToken);
 
+    /// <summary>Les invitations encore en attente à <paramref name="now"/> : ni utilisées, ni annulées, ni périmées.</summary>
+    Task<IReadOnlyList<DeviceInvitation>> ListPendingAsync(TenantId tenant, DateTimeOffset now, CancellationToken cancellationToken);
+
     Task AddAsync(DeviceInvitation invitation, CancellationToken cancellationToken);
 
     Task UpdateAsync(DeviceInvitation invitation, CancellationToken cancellationToken);

@@ -91,14 +91,15 @@ public sealed class TeamTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task Another_shop_never_sees_these_users()
     {
-        await SeedAsync("awa", Role.Cashier);
+        var awa = await SeedAsync("awa", Role.Cashier);
         using var stranger = _factory.ClientFor(TenantId.New(), UserId.New(), Role.Owner);
 
         var team = await stranger.GetFromJsonAsync<JsonElement>("/api/v1/users");
         var directory = await stranger.GetFromJsonAsync<JsonElement>("/api/v1/users/directory");
 
-        Assert.Equal(0, team.GetProperty("users").GetArrayLength());
-        Assert.Equal(0, directory.GetArrayLength());
+        // Seul l'utilisateur de test de cet autre commerce y figure : aucun membre du premier.
+        Assert.DoesNotContain(team.GetProperty("users").EnumerateArray(), user => user.GetProperty("id").GetGuid() == awa.Id.Value);
+        Assert.DoesNotContain(directory.EnumerateArray(), entry => entry.GetProperty("id").GetGuid() == awa.Id.Value);
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public sealed class TeamTests(PostgresFixture fixture) : IDisposable
         var refused = await cashier.GetAsync("/api/v1/users/directory");
 
         var entries = directory.EnumerateArray().ToList();
-        Assert.Equal(2, entries.Count); // l'ancien employé reste l'auteur de mouvements passés
+        Assert.Contains(entries, entry => entry.GetProperty("id").GetString() == ancien.Id.Value.ToString()); // l'ancien employé reste l'auteur de mouvements passés
         Assert.Contains(entries, entry => entry.GetProperty("id").GetString() == awa.Id.Value.ToString() && entry.GetProperty("displayName").GetString() == "Awa awa");
         Assert.DoesNotContain(entries, entry => entry.TryGetProperty("identifier", out _));
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
@@ -130,7 +131,7 @@ public sealed class TeamTests(PostgresFixture fixture) : IDisposable
 
         var team = await manager.GetFromJsonAsync<JsonElement>("/api/v1/users");
 
-        var view = Assert.Single(team.GetProperty("users").EnumerateArray());
+        var view = Assert.Single(team.GetProperty("users").EnumerateArray(), user => user.GetProperty("id").GetGuid() == awa.Id.Value);
         Assert.Equal("Disabled", view.GetProperty("status").GetString());
         Assert.False(view.GetProperty("canDisable").GetBoolean());
     }

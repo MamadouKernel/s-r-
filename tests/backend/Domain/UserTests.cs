@@ -122,7 +122,7 @@ public class UserTests
     {
         var user = NewUser();
 
-        user.Disable();
+        user.Disable(Now);
 
         Assert.Equal(UserStatus.Disabled, user.Status);
         Assert.False(user.CanLogIn(Now));
@@ -133,9 +133,9 @@ public class UserTests
     public void Disabling_twice_is_harmless()
     {
         var user = NewUser();
-        user.Disable();
+        user.Disable(Now);
 
-        user.Disable();
+        user.Disable(Now);
 
         Assert.Equal(UserStatus.Disabled, user.Status);
     }

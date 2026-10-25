@@ -146,6 +146,9 @@ internal sealed class UserRow
     public DateTimeOffset? LockedUntil { get; set; }
 
     public DateTimeOffset? LastLoginAt { get; set; }
+
+    /// <summary>Les sessions ouvertes avant cet instant ne sont plus valables (nouveau PIN, désactivation, changement de rôle).</summary>
+    public DateTimeOffset? SessionsValidFrom { get; set; }
 }
 
 internal sealed class AuditRow
@@ -349,6 +352,8 @@ internal sealed class DeviceInvitationRow
     public DateTimeOffset ExpiresAt { get; set; }
 
     public DateTimeOffset? ConsumedAt { get; set; }
+
+    public DateTimeOffset? RevokedAt { get; set; }
 }
 
 internal sealed class CustomerRow

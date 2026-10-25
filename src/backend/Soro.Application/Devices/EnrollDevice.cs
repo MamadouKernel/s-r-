@@ -56,7 +56,7 @@ public sealed class EnrollDeviceHandler(
                 ErrorCodes.InvalidInvitation, "Ce lien a déjà été utilisé. Demandez-en un nouveau au propriétaire."));
         }
 
-        if (invitation.IsExpired(now))
+        if (invitation.IsRevoked || invitation.IsExpired(now))
         {
             return Result<DeviceEnrolled>.Failure(new ApplicationError(
                 ErrorCodes.InvalidInvitation, "Ce lien a expiré. Demandez-en un nouveau au propriétaire."));

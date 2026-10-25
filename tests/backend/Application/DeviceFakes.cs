@@ -43,6 +43,10 @@ internal sealed class InMemoryDeviceInvitationRepository : IDeviceInvitationRepo
     public Task<DeviceInvitation?> GetAsync(DeviceInvitationId id, TenantId tenant, CancellationToken cancellationToken) =>
         Task.FromResult(_invitations.TryGetValue(id, out var invitation) && invitation.Tenant == tenant ? invitation : null);
 
+    public Task<IReadOnlyList<DeviceInvitation>> ListPendingAsync(TenantId tenant, DateTimeOffset now, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DeviceInvitation>>(
+            _invitations.Values.Where(invitation => invitation.Tenant == tenant && invitation.IsPending(now)).ToArray());
+
     public Task AddAsync(DeviceInvitation invitation, CancellationToken cancellationToken)
     {
         _invitations[invitation.Id] = invitation;

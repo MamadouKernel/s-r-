@@ -13,6 +13,9 @@ internal static class UserEndpoints
         users.MapGet("/directory", DirectoryAsync);
         users.MapPost("", RegisterAsync);
         users.MapPost("/{userId:guid}/disable", DisableAsync);
+        users.MapPost("/{userId:guid}/pin", ResetPinAsync);
+        users.MapPost("/{userId:guid}/enable", EnableAsync);
+        users.MapPut("/{userId:guid}/role", ChangeRoleAsync);
         return api;
     }
 
@@ -41,6 +44,36 @@ internal static class UserEndpoints
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new DisableUserCommand(new UserId(userId)), cancellationToken);
+        return result.ToHttp(_ => Results.NoContent());
+    }
+
+    private static async Task<IResult> ResetPinAsync(
+        Guid userId,
+        SetPinRequest request,
+        ResetUserPinHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ResetUserPinCommand(new UserId(userId), request.Pin), cancellationToken);
+        return result.ToHttp(_ => Results.NoContent());
+    }
+
+    private static async Task<IResult> EnableAsync(
+        Guid userId,
+        SetPinRequest request,
+        EnableUserHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new EnableUserCommand(new UserId(userId), request.Pin), cancellationToken);
+        return result.ToHttp(_ => Results.NoContent());
+    }
+
+    private static async Task<IResult> ChangeRoleAsync(
+        Guid userId,
+        ChangeRoleRequest request,
+        ChangeUserRoleHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ChangeUserRoleCommand(new UserId(userId), request.Role), cancellationToken);
         return result.ToHttp(_ => Results.NoContent());
     }
 }

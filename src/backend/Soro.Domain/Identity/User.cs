@@ -54,10 +54,10 @@ public sealed class User
 
     public string DisplayName { get; }
 
-    public Role Role { get; }
+    public Role Role { get; private set; }
 
     /// <summary>Condensat du PIN des caissiers et de l'équipe ; <c>null</c> pour un propriétaire, qui se connecte par mot de passe.</summary>
-    public string? PinHash { get; }
+    public string? PinHash { get; private set; }
 
     /// <summary>Adresse e-mail du propriétaire (identifiant de connexion) ; <c>null</c> pour les profils à PIN.</summary>
     public EmailAddress? Email { get; private set; }
@@ -74,6 +74,12 @@ public sealed class User
     public DateTimeOffset? LockedUntil { get; private set; }
 
     public DateTimeOffset? LastLoginAt { get; private set; }
+
+    /// <summary>
+    /// Les sessions ouvertes avant cet instant ne sont plus valables (nouveau PIN, désactivation, réactivation, changement de rôle) ;
+    /// <c>null</c> tant qu'aucun de ces changements n'a eu lieu. Ne recule jamais.
+    /// </summary>
+    public DateTimeOffset? SessionsValidFrom { get; private set; }
 
     public static User Register(
         UserId id,
@@ -156,7 +162,70 @@ public sealed class User
         LastLoginAt = now;
     }
 
-    public void Disable() => Status = UserStatus.Disabled;
+    public void Disable(DateTimeOffset at)
+    {
+        if (Status == UserStatus.Disabled)
+        {
+            return;
+        }
+
+        Status = UserStatus.Disabled;
+        InvalidateSessions(at);
+    }
+
+    /// <summary>Nouveau code PIN d'un membre actif (PIN oublié ou compte verrouillé) : lève le verrouillage et met fin aux sessions ouvertes.</summary>
+    public void ResetPin(string pinHash, DateTimeOffset at)
+    {
+        Ensure.That(Role != Role.Owner, "Le propriétaire se connecte par mot de passe : il n'a pas de code PIN.");
+        Ensure.That(Status == UserStatus.Active, "Ce membre est désactivé : réactivez-le d'abord.");
+        Ensure.That(!string.IsNullOrWhiteSpace(pinHash), "Le condensat du code PIN est obligatoire.");
+        ApplyNewPin(pinHash, at);
+    }
+
+    /// <summary>Retour d'un membre désactivé, avec un nouveau code PIN : son ancien PIN n'est jamais remis en service.</summary>
+    public void Reactivate(string pinHash, DateTimeOffset at)
+    {
+        Ensure.That(Role != Role.Owner, "Le propriétaire se connecte par mot de passe : il n'a pas de code PIN.");
+        Ensure.That(Status == UserStatus.Disabled, "Ce membre est déjà actif.");
+        Ensure.That(!string.IsNullOrWhiteSpace(pinHash), "Le condensat du code PIN est obligatoire.");
+        Status = UserStatus.Active;
+        ApplyNewPin(pinHash, at);
+    }
+
+    /// <summary>Change le profil d'un membre actif. Personne ne devient propriétaire et le propriétaire ne change pas de profil.</summary>
+    public void ChangeRole(Role role, DateTimeOffset at)
+    {
+        Ensure.That(Role != Role.Owner && role != Role.Owner, "Le profil de propriétaire ne se change pas.");
+        Ensure.That(Status == UserStatus.Active, "Ce membre est désactivé : réactivez-le d'abord.");
+        Ensure.That(role != Role, "Ce membre a déjà ce profil.");
+        Role = role;
+        InvalidateSessions(at);
+    }
+
+    /// <summary>Met fin aux sessions ouvertes avant <paramref name="at"/>. Un instant plus ancien que le dernier ne fait rien.</summary>
+    public void InvalidateSessions(DateTimeOffset at)
+    {
+        if (SessionsValidFrom is null || at > SessionsValidFrom)
+        {
+            SessionsValidFrom = at;
+        }
+    }
+
+    /// <summary>
+    /// Une session émise à <paramref name="issuedAt"/> est-elle périmée ? Comparaison à la seconde près : un jeton ne porte que des secondes entières,
+    /// et la reconnexion qui suit un changement ne peut pas avoir lieu dans la même seconde.
+    /// </summary>
+    public bool AreSessionsOutdated(DateTimeOffset issuedAt) =>
+        SessionsValidFrom is { } from
+        && issuedAt < new DateTimeOffset(from.Ticks - (from.Ticks % TimeSpan.TicksPerSecond), from.Offset);
+
+    private void ApplyNewPin(string pinHash, DateTimeOffset at)
+    {
+        PinHash = pinHash;
+        FailedAttempts = 0;
+        LockedUntil = null;
+        InvalidateSessions(at);
+    }
 
     /// <summary>Reconstruction depuis le stockage : l'état a déjà été validé par les opérations métier.</summary>
     internal static User Restore(
@@ -172,7 +241,8 @@ public sealed class User
         DateTimeOffset? lockedUntil,
         DateTimeOffset? lastLoginAt,
         EmailAddress? email,
-        string? passwordHash) =>
+        string? passwordHash,
+        DateTimeOffset? sessionsValidFrom) =>
         new(id, tenant, identifier, displayName, role, pinHash, createdAt)
         {
             Email = email,
@@ -181,6 +251,7 @@ public sealed class User
             FailedAttempts = failedAttempts,
             LockedUntil = lockedUntil,
             LastLoginAt = lastLoginAt,
+            SessionsValidFrom = sessionsValidFrom,
         };
 
     /// <summary>Forme canonique d'un identifiant saisi : sans espaces autour, en minuscules.</summary>

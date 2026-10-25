@@ -29,6 +29,17 @@ public sealed record RegisterUserRequest
     public required string Pin { get; init; }
 }
 
+/// <summary>Nouveau code PIN d'un membre (PIN oublié) ou code PIN de son retour (réactivation). Jamais rendu, jamais journalisé.</summary>
+public sealed record SetPinRequest
+{
+    public required string Pin { get; init; }
+}
+
+public sealed record ChangeRoleRequest
+{
+    public required Role Role { get; init; }
+}
+
 public sealed record UserSummary(Guid Id, string DisplayName, Role Role);
 
 public sealed record LogInResponse(string AccessToken, string TokenType, DateTimeOffset ExpiresAt, UserSummary User);
