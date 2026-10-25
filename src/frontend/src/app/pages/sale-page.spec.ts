@@ -1,5 +1,7 @@
 import 'fake-indexeddb/auto';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Journal } from '../data/journal';
 import { CatalogueProduct } from '../domain/types';
 import { ApiService } from '../services/api.service';
@@ -8,6 +10,7 @@ import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { JournalService } from '../services/journal.service';
 import { SyncService } from '../services/sync.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { ClosePage } from './close-page';
 import { SalePage } from './sale-page';
 
@@ -15,15 +18,17 @@ const jus: CatalogueProduct = {
   id: 'p-jus', name: 'Jus', barcode: '111', category: null, salePriceFcfa: 600, tracksStock: true, quantityOnHand: 24,
 };
 
-async function setup(api: Partial<ApiService> = {}, catalogue: CatalogueProduct[] = [jus]) {
+async function setup(api: Partial<ApiService> = {}, catalogue: CatalogueProduct[] = [jus], role = 'Cashier', readOnly = signal(false)) {
   const journal = await Journal.open(`soro-ui-${Math.random()}`);
   await journal.replaceCatalogue(catalogue);
   TestBed.configureTestingModule({
     providers: [
+      provideRouter([]),
       { provide: JournalService, useValue: { get: () => Promise.resolve(journal) } },
       { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null), counts: () => ({ pending: 0, synced: 0, rejected: 0 }) } },
       { provide: ApiService, useValue: api },
-      { provide: AuthService, useValue: { device: () => ({ tenantId: 't', registerId: 'r', pointOfSaleId: 'p' }) } },
+      { provide: AuthService, useValue: { device: () => ({ tenantId: 't', registerId: 'r', pointOfSaleId: 'p' }), user: () => ({ id: 'u', displayName: 'Awa', role }) } },
+      { provide: SubscriptionService, useValue: { readOnly } },
     ],
   });
   const cash = TestBed.inject(CashService);
@@ -298,5 +303,48 @@ describe('SalePage: catalogue', () => {
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).textContent).toContain('Baguette');
     });
+  });
+});
+
+describe('SalePage: abonnement terminé', () => {
+  async function open(role: string, readOnly: boolean) {
+    const { cash } = await setup({}, [jus], role, signal(readOnly));
+    cash.add(jus, 1);
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const ui = helpers(root, () => fixture.whenStable());
+    return { root, ui, fixture };
+  }
+
+  const pay = (root: HTMLElement) => [...root.querySelectorAll('button')].filter((button) => (button.textContent ?? '').trim() === 'Encaisser');
+
+  it('lets the till charge normally when the subscription is fine', async () => {
+    const { root, ui } = await open('Cashier', false);
+
+    expect(pay(root).every((button) => !button.disabled)).toBe(true);
+    expect(root.textContent).not.toContain('Vente suspendue');
+    await ui.click('Encaisser');
+    expect(root.querySelector('app-payment-panel')).not.toBeNull();
+  });
+
+  it('turns « Encaisser » off for a cashier and tells them to warn their manager, without any price', async () => {
+    const { root, fixture } = await open('Cashier', true);
+
+    expect(pay(root).length).toBeGreaterThan(0);
+    expect(pay(root).every((button) => button.disabled)).toBe(true);
+    expect(root.textContent).toContain('Vente suspendue. Prévenez votre responsable');
+    expect(root.querySelector('a[href="/gestion/abonnement"]')).toBeNull();
+    pay(root)[0].click();
+    await fixture.whenStable();
+    expect(root.querySelector('app-payment-panel')).toBeNull();
+  });
+
+  it('gives the owner the reason and a link to the subscription page', async () => {
+    const { root } = await open('Owner', true);
+
+    expect(pay(root).every((button) => button.disabled)).toBe(true);
+    expect(root.textContent).toContain('La vente est suspendue : l’abonnement est terminé.');
+    expect(root.querySelector('a[href="/gestion/abonnement"]')?.textContent).toContain('Voir mon abonnement');
   });
 });

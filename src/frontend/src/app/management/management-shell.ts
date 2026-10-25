@@ -13,6 +13,9 @@ import { canManageDevices, canManageTeam } from './roles';
       @if (showTeam()) {
         <a class="btn" routerLink="/gestion/equipe" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Équipe</a>
       }
+      @if (showTeam()) {
+        <a class="btn" routerLink="/gestion/abonnement" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Mon abonnement</a>
+      }
       @if (showDevices()) {
         <a class="btn" routerLink="/gestion/appareils" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Appareils</a>
       }

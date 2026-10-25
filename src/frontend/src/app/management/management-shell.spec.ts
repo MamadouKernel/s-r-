@@ -26,6 +26,12 @@ describe('ManagementShell', () => {
     expect(await render('StockKeeper')).not.toContain('Appareils');
   });
 
+  it('shows « Mon abonnement » to the owner and the manager, not to the stock keeper', async () => {
+    expect(await render('Owner')).toContain('Mon abonnement');
+    expect(await render('Manager')).toContain('Mon abonnement');
+    expect(await render('StockKeeper')).not.toContain('Mon abonnement');
+  });
+
   it('keeps the team section away from the stock keeper, who still sees the products (SC-E3)', async () => {
     const text = await render('StockKeeper');
     expect(text).toContain('Produits et stock');

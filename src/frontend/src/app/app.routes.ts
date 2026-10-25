@@ -93,6 +93,11 @@ export const routes: Routes = [
         loadComponent: () => import('./management/product-stock-page').then((m) => m.ProductStockPage),
       },
       {
+        path: 'abonnement',
+        canActivate: [teamGuard],
+        loadComponent: () => import('./subscription/subscription-page').then((m) => m.SubscriptionPage),
+      },
+      {
         path: 'equipe',
         canActivate: [teamGuard],
         loadComponent: () => import('./management/team-page').then((m) => m.TeamPage),
