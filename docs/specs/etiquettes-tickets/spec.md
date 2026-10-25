@@ -52,8 +52,14 @@ Le ticket se compose avec les données de la vente connues de l'appareil : il s'
 ### TKT-05 La mise en page
 Largeur **80 mm** par défaut, **58 mm** au choix (réglage gardé sur l'appareil), texte noir sur blanc, police lisible, sans image ; la hauteur suit le contenu (pas de page A4 gâchée). L'impression passe par la fenêtre d'impression de l'appareil : toute imprimante installée convient.
 
-### TKT-06 Rien n'est envoyé
-Aucun ticket n'est envoyé par e-mail, WhatsApp ou SMS dans cette version.
+### TKT-06 Rien n'est envoyé par l'application
+L'application n'envoie jamais un ticket elle-même (e-mail, WhatsApp, SMS) dans cette version : c'est l'utilisateur qui le dirige, avec TKT-07.
+
+### TKT-07 Trois façons de sortir le ticket (imprimantes Bluetooth des téléphones)
+- **Imprimer le ticket** : fenêtre d'impression de l'appareil (imprimante installée).
+- **Partager le ticket** : menu de partage du téléphone, avec le ticket en **texte** ; l'utilisateur choisit l'application de son imprimante Bluetooth, ou la messagerie du client s'il le décide. Le bouton n'apparaît que si l'appareil sait partager.
+- **Copier le ticket** : le texte est mis dans le presse-papiers (« Ticket copié. Collez-le dans l'application de votre imprimante. »).
+Le texte est en **32 colonnes** (58 mm) ou **42 colonnes** (80 mm), en caractères d'espacement fixe, avec les montants alignés à droite et l'en-tête centré ; aucune ligne ne dépasse la largeur (les noms longs passent à la ligne). Les espaces insécables sont remplacés par des espaces ordinaires (certaines imprimantes les rendent mal).
 
 ## Scénarios d'acceptation
 
@@ -69,6 +75,7 @@ Aucun ticket n'est envoyé par e-mail, WhatsApp ou SMS dans cette version.
 10. **Hors ligne.** Le réseau coupé, le ticket s'imprime.
 11. **Réimpression.** Le dernier ticket se réimprime à l'identique.
 12. **Format 58 mm.** Le choix change la largeur du ticket et reste après rechargement.
+13. **Imprimante Bluetooth.** Sur un téléphone qui sait partager, « Partager le ticket » ouvre le menu de partage avec le texte du ticket en 32 colonnes ; « Copier le ticket » met le même texte dans le presse-papiers.
 
 ## Hors lot
 
