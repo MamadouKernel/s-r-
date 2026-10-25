@@ -139,11 +139,13 @@ describe('ProductsPage', () => {
       const link = manager.root.querySelector('[aria-label="Famille Eau minérale"]');
       expect(link?.getAttribute('href')).toBe('/gestion/produits/famille/eau');
       expect(manager.has('Regrouper dans une famille')).toBe(true);
+      expect(manager.root.querySelector('a[href="/gestion/produits/importer"]')?.textContent).toContain('Importer depuis Excel');
 
       TestBed.resetTestingModule();
       const keeper = await render(ProductsPage, { api, role: 'StockKeeper' });
       expect(keeper.root.querySelector('[aria-label^="Famille"]')).toBeNull();
       expect(keeper.has('Regrouper dans une famille')).toBe(false);
+      expect(keeper.has('Importer depuis Excel')).toBe(false);
       expect(keeper.root.querySelector('[aria-label="Stock de Eau minérale · 1 L"]')).toBeTruthy();
     });
 

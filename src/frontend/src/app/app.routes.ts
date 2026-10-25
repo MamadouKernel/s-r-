@@ -69,6 +69,11 @@ export const routes: Routes = [
         loadComponent: () => import('./management/family-form-page').then((m) => m.FamilyFormPage),
       },
       {
+        path: 'produits/importer',
+        canActivate: [catalogueGuard],
+        loadComponent: () => import('./management/import-page').then((m) => m.ImportPage),
+      },
+      {
         path: 'produits/regrouper',
         canActivate: [catalogueGuard],
         loadComponent: () => import('./management/group-page').then((m) => m.GroupPage),

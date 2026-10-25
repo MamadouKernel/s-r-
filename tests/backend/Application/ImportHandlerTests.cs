@@ -94,6 +94,7 @@ public class ImportHandlerTests
         Assert.Equal(2, result.Value!.NewProducts);
         Assert.Equal(3, result.Value.NewFormats);
         Assert.Equal(3, result.Value.RowsRead);
+        Assert.Equal(2, result.Value.StockMovements);
         Assert.True(result.Value.CanImport);
         Assert.False(result.Value.Imported);
         Assert.Empty(await AllAsync(world));

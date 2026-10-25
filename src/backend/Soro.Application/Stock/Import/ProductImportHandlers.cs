@@ -76,12 +76,12 @@ internal static class ProductImportSupport
             allProducts.Where(product => product.Barcode is not null).Select(product => product.Barcode!).ToHashSet());
     }
 
-    public static ImportReport Report(ImportPlan plan, bool imported, bool alreadyProcessed, int stockMovements = 0) =>
+    public static ImportReport Report(ImportPlan plan, bool imported, bool alreadyProcessed) =>
         new(
             plan.RowsRead,
             plan.NewFamilies.Count,
             plan.NewFormats,
-            stockMovements,
+            plan.NewFamilies.SelectMany(family => family.Formats).Concat(plan.Additions.Select(addition => addition.Format)).Count(format => format.InitialStock > 0),
             plan.Skipped.Count,
             plan.Skipped.Take(ProductImportPlanner.MaxListedProblems).ToArray(),
             plan.ProblemCount,
@@ -199,7 +199,6 @@ public sealed class ImportProductsHandler(
 
         try
         {
-            var movementCount = 0;
             foreach (var planned in plan.NewFamilies)
             {
                 var family = ProductFamily.Create(
@@ -211,7 +210,7 @@ public sealed class ImportProductsHandler(
                 await families.AddAsync(family, cancellationToken);
                 foreach (var format in planned.Formats)
                 {
-                    movementCount += await CreateFormatAsync(family, format, command.ImportId, cancellationToken);
+                    await CreateFormatAsync(family, format, command.ImportId, cancellationToken);
                 }
             }
 
@@ -219,7 +218,7 @@ public sealed class ImportProductsHandler(
             {
                 var family = await families.GetAsync(addition.Family, user.Tenant, cancellationToken)
                     ?? throw new InvalidOperationException("La famille a disparu pendant l'import.");
-                movementCount += await CreateFormatAsync(family, addition.Format, command.ImportId, cancellationToken);
+                await CreateFormatAsync(family, addition.Format, command.ImportId, cancellationToken);
             }
 
             await audit.RecordAsync(
@@ -232,7 +231,7 @@ public sealed class ImportProductsHandler(
                     clock.UtcNow),
                 cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
-            return Result<ImportReport>.Success(ProductImportSupport.Report(plan, imported: true, alreadyProcessed: false, movementCount));
+            return Result<ImportReport>.Success(ProductImportSupport.Report(plan, imported: true, alreadyProcessed: false));
         }
         catch (DomainException exception)
         {
@@ -240,8 +239,8 @@ public sealed class ImportProductsHandler(
         }
     }
 
-    /// <summary>Crée un format et, s'il y a un stock de départ, la réception qui le porte. Renvoie le nombre de mouvements créés.</summary>
-    private async Task<int> CreateFormatAsync(ProductFamily family, PlannedFormat format, Guid importId, CancellationToken cancellationToken)
+    /// <summary>Crée un format et, s'il y a un stock de départ, la réception qui le porte.</summary>
+    private async Task CreateFormatAsync(ProductFamily family, PlannedFormat format, Guid importId, CancellationToken cancellationToken)
     {
         var key = ProductImportSupport.ProductKey(family.Name, format.Label);
         var product = Product.Create(
@@ -260,7 +259,7 @@ public sealed class ImportProductsHandler(
         if (format.InitialStock <= 0)
         {
             await products.AddAsync(product, cancellationToken);
-            return 0;
+            return;
         }
 
         // La réception se fait avant l'enregistrement : le dépôt copie l'état du produit au moment où il l'ajoute.
@@ -273,6 +272,5 @@ public sealed class ImportProductsHandler(
             format.PurchasePriceFcfa > 0 ? Money.Fcfa(format.PurchasePriceFcfa) : null);
         await products.AddAsync(product, cancellationToken);
         await movements.AddAsync(movement, cancellationToken);
-        return 1;
     }
 }
