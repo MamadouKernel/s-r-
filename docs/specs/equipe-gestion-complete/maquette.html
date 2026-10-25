@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — gérer l'équipe</title>
+<style>
+  :root { --ivoire:#f7f7f2; --surface:#fff; --charbon:#20231f; --ardoise:#626a63; --sauge:#dde2da; --feuille:#287a52; --avert:#a86412; --erreur:#b43a32; --info:#426a82; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ivoire); color:var(--charbon); font:16px/1.4 "Source Sans 3", system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1,h2,h3,p { margin:0; }
+  .note { background:#fff7e6; border-bottom:1px solid #ecd9a8; padding:10px 16px; font-size:14px; color:#6b4a0b; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--sauge); position:sticky; top:0; z-index:5; }
+  .tab { min-height:44px; padding:8px 14px; border:1px solid var(--sauge); border-radius:4px; background:var(--surface); font:inherit; font-weight:600; cursor:pointer; }
+  .tab[aria-selected="true"] { border-color:var(--feuille); color:var(--feuille); box-shadow:inset 0 -3px 0 var(--feuille); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  .screen { display:none; } .screen.on { display:block; }
+  .why { margin:0 0 16px; color:var(--ardoise); font-size:15px; }
+  .panel { background:var(--surface); border:1px solid var(--sauge); border-radius:4px; padding:16px; }
+  .panel + .panel { margin-top:12px; }
+  .btn,.btn-primary,.btn-danger { min-height:48px; display:inline-flex; align-items:center; justify-content:center; padding:8px 16px; border-radius:4px; font:inherit; font-weight:600; cursor:pointer; border:1px solid var(--sauge); background:var(--surface); color:var(--charbon); }
+  .btn-primary { background:var(--feuille); border-color:var(--feuille); color:#fff; }
+  .btn-danger { border-color:var(--erreur); color:var(--erreur); }
+  .btn.small,.btn-danger.small { min-height:44px; padding:4px 12px; font-size:15px; }
+  .stack > * + * { margin-top:12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .muted { color:var(--ardoise); font-size:14px; }
+  .field { min-height:48px; width:100%; padding:8px 12px; border:1px solid var(--ardoise); border-radius:4px; font:inherit; background:var(--surface); }
+  label.l { display:block; font-weight:600; margin-bottom:4px; }
+  .member { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid var(--sauge); }
+  .member:first-of-type { border-top:0; }
+  .member .who b { display:block; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:13px; font-weight:600; background:var(--sauge); }
+  .tag.off { background:#f3dedc; color:#7d2620; } .tag.lock { background:#fff4e2; color:#6b4a0b; }
+  .banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 14px; border-radius:4px; border:1px solid; font-size:15px; }
+  .b-warn { background:#fff4e2; border-color:var(--avert); color:#6b4a0b; }
+  .b-err { background:#fdf1f0; border-color:var(--erreur); color:#7d2620; }
+  .b-ok { background:#eef7f1; border-color:var(--feuille); color:#1f5a3c; }
+  .b-info { background:#eef4f8; border-color:var(--info); color:#26485c; }
+  .dialog { border:2px solid var(--charbon); border-radius:6px; background:var(--surface); padding:16px; box-shadow:0 6px 24px rgba(0,0,0,.18); }
+  .legend { margin-top:20px; padding:12px 16px; border-left:4px solid var(--info); background:#eef4f8; font-size:15px; }
+  .nav { display:flex; gap:8px; flex-wrap:wrap; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--sauge); }
+  .nav .btn { min-height:44px; } .nav .on { border-color:var(--feuille); color:var(--feuille); }
+  .cap { font-size:13px; font-weight:700; color:var(--ardoise); text-transform:uppercase; letter-spacing:.03em; margin:18px 0 6px; }
+  .check { display:flex; gap:8px; align-items:center; min-height:44px; }
+  .check input { width:22px; height:22px; }
+  .phone { max-width:360px; border:2px solid var(--charbon); border-radius:16px; padding:14px; background:var(--surface); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div class="note"><strong>Maquette à valider</strong> — pas encore le vrai programme. Les mots, l'ordre des gestes et ce que voit chaque personne sont ceux qui seront construits. Cliquez sur les onglets et sur les boutons.</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-t="s1">1. La liste de l'équipe</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s2">2. Nouveau PIN</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s3">3. Changer le rôle</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s4">4. Réactiver</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s5">5. Liens en attente</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s6">6. Accès changé</button>
+</div>
+
+<main>
+
+<!-- 1 LISTE -->
+<section class="screen on" id="s1">
+  <p class="why">L'écran <b>Équipe</b> existe déjà. Chaque ligne gagne les gestes que <b>vous avez le droit de faire</b> sur cette personne : un bouton qui n'est pas permis n'apparaît pas. Ici, vue du <b>propriétaire</b>.</p>
+  <div class="nav"><a class="btn" href="#">Produits et stock</a><a class="btn on" href="#">Équipe</a><a class="btn" href="#">Appareils</a><a class="btn" href="#">Mon abonnement</a></div>
+
+  <div class="panel stack">
+    <div class="row" style="justify-content:space-between"><h1>Équipe</h1><button class="btn-primary" type="button">Ajouter un membre</button></div>
+    <label class="check"><input type="checkbox" id="showOff"> Afficher les membres désactivés</label>
+
+    <div>
+      <div class="member"><div class="who"><b>Mamadou Konaté</b><span class="muted">Propriétaire · c'est vous</span></div></div>
+      <div class="member">
+        <div class="who"><b>Fatou Diallo <span class="tag lock">Compte bloqué 12 min</span></b><span class="muted">Caissier · dernière connexion hier</span></div>
+        <div class="row"><button class="btn small go" data-go="s2" data-name="Fatou Diallo">Nouveau PIN</button><button class="btn small go" data-go="s3" data-name="Fatou Diallo">Changer le rôle</button><button class="btn-danger small" type="button">Désactiver</button></div>
+      </div>
+      <div class="member">
+        <div class="who"><b>Awa Koné</b><span class="muted">Caissier · dernière connexion aujourd'hui</span></div>
+        <div class="row"><button class="btn small go" data-go="s2" data-name="Awa Koné">Nouveau PIN</button><button class="btn small go" data-go="s3" data-name="Awa Koné">Changer le rôle</button><button class="btn-danger small" type="button">Désactiver</button></div>
+      </div>
+      <div class="member">
+        <div class="who"><b>Issa Traoré</b><span class="muted">Gérant · dernière connexion aujourd'hui</span></div>
+        <div class="row"><button class="btn small go" data-go="s2" data-name="Issa Traoré">Nouveau PIN</button><button class="btn small go" data-go="s3" data-name="Issa Traoré">Changer le rôle</button><button class="btn-danger small" type="button">Désactiver</button></div>
+      </div>
+      <div class="member off" hidden>
+        <div class="who"><b>Moussa Camara <span class="tag off">Désactivé</span></b><span class="muted">Caissier · parti le 3 octobre</span></div>
+        <div class="row"><button class="btn small go" data-go="s4" data-name="Moussa Camara">Réactiver</button></div>
+      </div>
+    </div>
+    <p class="muted">Un <b>gérant</b> qui ouvre cet écran ne voit ces boutons que sur les caissiers et les magasiniers : jamais sur un autre gérant, ni sur le propriétaire, ni sur lui-même.</p>
+  </div>
+</section>
+
+<!-- 2 NOUVEAU PIN -->
+<section class="screen" id="s2">
+  <p class="why">Pour une personne qui a <b>oublié son PIN</b> ou dont le compte est <b>bloqué</b> après trop d'essais. Vous choisissez un nouveau PIN et vous le lui dites <b>de vive voix</b> : il n'est ni envoyé, ni affiché, ni gardé dans le journal.</p>
+  <div class="dialog stack" role="dialog" aria-labelledby="t2" id="d2">
+    <h2 id="t2">Nouveau PIN pour <span class="who2">Awa Koné</span></h2>
+    <div><label class="l" for="p1">Nouveau PIN (4 à 6 chiffres)</label><input id="p1" class="field" type="password" inputmode="numeric" autocomplete="off" maxlength="6"></div>
+    <div><label class="l" for="p2">Écrivez-le encore une fois</label><input id="p2" class="field" type="password" inputmode="numeric" autocomplete="off" maxlength="6"></div>
+    <p class="muted" id="e2" role="alert"></p>
+    <div class="attention banner b-info">Si cette personne est connectée en ce moment, elle devra se reconnecter avec ce nouveau PIN. Son ancien PIN ne marchera plus.</div>
+    <div class="row"><button class="btn-primary" id="ok2" type="button">Enregistrer le nouveau PIN</button><button class="btn" type="button" data-back>Annuler</button></div>
+  </div>
+  <div class="banner b-ok" id="done2" style="margin-top:12px" hidden>Le PIN d'<span class="who2">Awa Koné</span> a été changé. <b>Dites-le-lui de vive voix.</b></div>
+  <div class="legend"><b>Erreurs possibles, en français :</b> « Les deux PIN ne sont pas identiques. » · « Le PIN doit comporter 4 à 6 chiffres. » · « Vous n'avez pas le droit de changer le PIN de cette personne. »</div>
+</section>
+
+<!-- 3 ROLE -->
+<section class="screen" id="s3">
+  <p class="why">Pour <b>promouvoir</b> (caissier → gérant) ou <b>réaffecter</b> (caissier ↔ magasinier) quelqu'un, sans le supprimer ni perdre son historique. Seuls les rôles <b>que vous avez le droit de donner</b> sont proposés : le propriétaire propose gérant, caissier, magasinier, comptable ; un gérant propose seulement caissier et magasinier.</p>
+  <div class="dialog stack" role="dialog" aria-labelledby="t3">
+    <h2 id="t3">Changer le rôle de <span class="who3">Awa Koné</span></h2>
+    <p>Rôle actuel : <b>Caissier</b></p>
+    <div><label class="l" for="r">Nouveau rôle</label>
+      <select id="r" class="field"><option>Choisir un rôle</option><option>Gérant</option><option>Magasinier</option><option>Comptable</option></select></div>
+    <div class="banner b-warn" id="w3" hidden>Awa Koné devra <b>se reconnecter</b> pour avoir ses nouveaux droits. Elle sera déconnectée dans les secondes qui viennent.</div>
+    <div class="row"><button class="btn-primary" id="ok3" type="button">Changer le rôle</button><button class="btn" type="button" data-back>Annuler</button></div>
+  </div>
+  <div class="banner b-ok" id="done3" style="margin-top:12px" hidden>Le rôle d'<span class="who3">Awa Koné</span> est maintenant <b id="newRole">Gérant</b>. Le journal garde la trace : « Awa Koné : Caissier → Gérant ».</div>
+  <div class="legend"><b>Ce qui n'est pas possible, avec le message :</b> changer son propre rôle · changer le rôle du propriétaire · nommer un second propriétaire · donner le rôle qu'on a déjà (« Cette personne a déjà ce rôle. ») · changer le rôle d'une personne désactivée (« Réactivez-la d'abord. »).</div>
+</section>
+
+<!-- 4 REACTIVER -->
+<section class="screen" id="s4">
+  <p class="why">Un caissier parti puis revenu : on le <b>réactive</b>, avec un <b>nouveau PIN</b>. Son ancien PIN n'est jamais remis en service. Il retrouve son historique (ses ventes passées restent à son nom).</p>
+  <div class="dialog stack" role="dialog" aria-labelledby="t4">
+    <h2 id="t4">Réactiver <span class="who4">Moussa Camara</span></h2>
+    <div><label class="l" for="q1">Nouveau PIN (4 à 6 chiffres)</label><input id="q1" class="field" type="password" inputmode="numeric" autocomplete="off" maxlength="6"></div>
+    <div><label class="l" for="q2">Écrivez-le encore une fois</label><input id="q2" class="field" type="password" inputmode="numeric" autocomplete="off" maxlength="6"></div>
+    <div class="row"><button class="btn-primary" id="ok4" type="button">Réactiver ce membre</button><button class="btn" type="button" data-back>Annuler</button></div>
+  </div>
+  <div class="banner b-ok" id="done4" style="margin-top:12px" hidden><span class="who4">Moussa Camara</span> est de nouveau actif. <b>Dites-lui son nouveau PIN de vive voix.</b></div>
+</section>
+
+<!-- 5 LIENS -->
+<section class="screen" id="s5">
+  <p class="why">Sur l'écran <b>Appareils</b>, sous « Ajouter un appareil » : les liens créés qui n'ont <b>pas encore servi</b>. Pratique quand on a envoyé un lien à la mauvaise personne : on l'annule, et le lien ne marche plus.</p>
+  <div class="panel stack">
+    <div class="row" style="justify-content:space-between"><h1>Appareils</h1><button class="btn-primary" type="button">Ajouter un appareil</button></div>
+    <div class="cap">Liens en attente</div>
+    <div id="links">
+      <div class="member"><div class="who"><b>Caisse 2</b><span class="muted">Créé par Issa Traoré · expire dans 5 h</span></div><button class="btn-danger small cancel" type="button">Annuler ce lien</button></div>
+      <div class="member"><div class="who"><b>Appareil sans nom</b><span class="muted">Créé par Mamadou Konaté · expire dans 22 h</span></div><button class="btn-danger small cancel" type="button">Annuler ce lien</button></div>
+    </div>
+    <p class="muted" id="noLinks" hidden>Aucun lien en attente.</p>
+    <div class="cap">Appareils</div>
+    <div class="member"><div class="who"><b>Caisse 1</b><span class="muted">Ajouté le 2 octobre · vu aujourd'hui</span></div><button class="btn-danger small" type="button">Retirer</button></div>
+  </div>
+  <div class="dialog stack" id="confirm5" style="margin-top:12px" hidden role="dialog" aria-labelledby="t5">
+    <h2 id="t5">Annuler ce lien ?</h2>
+    <p>La personne qui l'a reçu ne pourra plus s'en servir : le lien répondra qu'il a expiré. Vous pourrez toujours en créer un autre.</p>
+    <div class="row"><button class="btn-danger" id="yes5" type="button">Oui, annuler ce lien</button><button class="btn" id="no5" type="button">Non, le garder</button></div>
+  </div>
+  <div class="banner b-ok" id="done5" style="margin-top:12px" hidden>Le lien a été annulé.</div>
+  <div class="legend">Un lien <b>déjà utilisé</b> n'apparaît plus ici : l'appareil est dans la liste « Appareils », où on peut le <b>Retirer</b>. Les liens périmés (24 h) disparaissent d'eux-mêmes. Le lien lui-même (le code) n'est jamais réaffiché ici.</div>
+</section>
+
+<!-- 6 ACCES CHANGE -->
+<section class="screen" id="s6">
+  <p class="why">Quand on change le PIN, le rôle ou l'état de quelqu'un qui est <b>connecté en ce moment</b>, il n'a pas à attendre la fin de sa journée : à son prochain geste (au plus quelques secondes plus tard) l'application l'arrête poliment.</p>
+  <div class="phone stack">
+    <div class="banner b-warn"><b>Votre accès a changé : reconnectez-vous.</b></div>
+    <p class="muted">Votre responsable a modifié votre compte (nouveau PIN, nouveau rôle ou compte désactivé). Reconnectez-vous pour continuer.</p>
+    <button class="btn-primary" type="button" style="width:100%">Me reconnecter</button>
+    <p class="muted">Si des ventes de cet appareil n'ont pas encore été envoyées, elles <b>sont conservées</b> et partiront dès que vous serez reconnecté.</p>
+  </div>
+  <div class="legend">C'est le même message pour les trois cas, volontairement : la personne n'a pas besoin de savoir lequel. Si son compte est désactivé, la connexion lui répond ensuite « Identifiant ou code PIN incorrect », comme aujourd'hui.</div>
+</section>
+
+</main>
+<script>
+  const tabs = [...document.querySelectorAll('.tab')];
+  let last = 's1';
+  function show(id) {
+    last = id === 's1' ? 's1' : last;
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.t === id)));
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.t)));
+  document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show('s1')));
+  document.querySelectorAll('.go').forEach(b => b.addEventListener('click', () => {
+    const n = b.dataset.name;
+    document.querySelectorAll('.who2,.who3,.who4').forEach(e => e.textContent = n);
+    ['done2','done3','done4'].forEach(i => document.getElementById(i).hidden = true);
+    show(b.dataset.go);
+  }));
+  document.getElementById('showOff').addEventListener('change', e =>
+    document.querySelectorAll('.member.off').forEach(m => m.hidden = !e.target.checked));
+  document.getElementById('ok2').addEventListener('click', () => {
+    const a = document.getElementById('p1').value, b = document.getElementById('p2').value, e = document.getElementById('e2');
+    if (!/^\d{4,6}$/.test(a)) { e.textContent = 'Le PIN doit comporter 4 à 6 chiffres.'; return; }
+    if (a !== b) { e.textContent = 'Les deux PIN ne sont pas identiques.'; return; }
+    e.textContent = ''; document.getElementById('done2').hidden = false;
+  });
+  document.getElementById('r').addEventListener('change', e => {
+    document.getElementById('w3').hidden = e.target.selectedIndex === 0;
+    document.getElementById('newRole').textContent = e.target.value;
+  });
+  document.getElementById('ok3').addEventListener('click', () => {
+    if (document.getElementById('r').selectedIndex > 0) document.getElementById('done3').hidden = false;
+  });
+  document.getElementById('ok4').addEventListener('click', () => {
+    const a = document.getElementById('q1').value, b = document.getElementById('q2').value;
+    if (/^\d{4,6}$/.test(a) && a === b) document.getElementById('done4').hidden = false;
+  });
+  let target = null;
+  document.querySelectorAll('.cancel').forEach(b => b.addEventListener('click', () => {
+    target = b.closest('.member'); document.getElementById('confirm5').hidden = false;
+  }));
+  document.getElementById('no5').addEventListener('click', () => document.getElementById('confirm5').hidden = true);
+  document.getElementById('yes5').addEventListener('click', () => {
+    target.remove(); document.getElementById('confirm5').hidden = true; document.getElementById('done5').hidden = false;
+    if (!document.querySelector('#links .member')) document.getElementById('noLinks').hidden = false;
+  });
+</script>
+</body>
+</html>
