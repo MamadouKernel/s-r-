@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — exporter mes données</title>
+<style>
+  :root { --ivoire:#f7f7f2; --surface:#fff; --charbon:#20231f; --ardoise:#626a63; --sauge:#dde2da; --feuille:#287a52; --avert:#a86412; --erreur:#b43a32; --info:#426a82; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ivoire); color:var(--charbon); font:16px/1.4 "Source Sans 3", system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1,h2,h3,p { margin:0; }
+  .note { background:#fff7e6; border-bottom:1px solid #ecd9a8; padding:10px 16px; font-size:14px; color:#6b4a0b; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--sauge); position:sticky; top:0; z-index:5; }
+  .tab { min-height:44px; padding:8px 14px; border:1px solid var(--sauge); border-radius:4px; background:var(--surface); font:inherit; font-weight:600; cursor:pointer; }
+  .tab[aria-selected="true"] { border-color:var(--feuille); color:var(--feuille); box-shadow:inset 0 -3px 0 var(--feuille); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  .screen { display:none; } .screen.on { display:block; }
+  .why { margin:0 0 16px; color:var(--ardoise); font-size:15px; }
+  .panel { background:var(--surface); border:1px solid var(--sauge); border-radius:4px; padding:16px; }
+  .panel + .panel { margin-top:12px; }
+  .btn,.btn-primary { min-height:48px; display:inline-flex; align-items:center; justify-content:center; padding:8px 16px; border-radius:4px; font:inherit; font-weight:600; cursor:pointer; border:1px solid var(--sauge); background:var(--surface); color:var(--charbon); text-decoration:none; }
+  .btn-primary { background:var(--feuille); border-color:var(--feuille); color:#fff; }
+  .btn-primary[disabled] { opacity:.6; cursor:wait; }
+  .stack > * + * { margin-top:12px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .muted { color:var(--ardoise); font-size:14px; }
+  .field { min-height:48px; padding:8px 12px; border:1px solid var(--ardoise); border-radius:4px; font:inherit; background:var(--surface); }
+  label.l { display:block; font-weight:600; margin-bottom:4px; }
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { min-height:48px; padding:8px 14px; border:2px solid var(--sauge); border-radius:6px; background:var(--surface); font:inherit; font-weight:600; cursor:pointer; }
+  .seg button[aria-pressed="true"] { border-color:var(--feuille); background:#eef7f1; color:var(--feuille); }
+  .banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 14px; border-radius:4px; border:1px solid; font-size:15px; }
+  .banner .btn { min-height:40px; padding:4px 12px; margin-left:auto; }
+  .b-warn { background:#fff4e2; border-color:var(--avert); color:#6b4a0b; }
+  .b-err { background:#fdf1f0; border-color:var(--erreur); color:#7d2620; }
+  .b-ok { background:#eef7f1; border-color:var(--feuille); color:#1f5a3c; }
+  .b-info { background:#eef4f8; border-color:var(--info); color:#26485c; }
+  .attention { border-left:4px solid var(--avert); background:#fff4e2; padding:12px 14px; border-radius:2px; }
+  ul.inc { margin:6px 0 0; padding-left:20px; } ul.inc li { margin:3px 0; }
+  .cap { font-size:13px; font-weight:700; color:var(--ardoise); text-transform:uppercase; letter-spacing:.03em; margin:18px 0 6px; }
+  .legend { margin-top:20px; padding:12px 16px; border-left:4px solid var(--info); background:#eef4f8; font-size:15px; }
+  .nav { display:flex; gap:8px; flex-wrap:wrap; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--sauge); }
+  .nav .btn { min-height:44px; }
+  .nav .on { border-color:var(--feuille); color:var(--feuille); }
+</style>
+</head>
+<body>
+<div class="note"><strong>Maquette à valider</strong> — pas encore le vrai programme. Les mots, l'ordre des gestes et ce que voit le propriétaire sont ceux qui seront construits. Cliquez sur les onglets et sur « Télécharger ».</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-t="s1">1. L'écran</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s2">2. Le téléchargement</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s3">3. Si ça ne marche pas</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s4">4. En lecture seule</button>
+</div>
+
+<main>
+
+<!-- 1 L'ECRAN -->
+<section class="screen on" id="s1">
+  <p class="why">L'écran s'ouvre depuis <b>Gestion → Exporter mes données</b>, visible pour le <b>propriétaire seulement</b> (le gérant ne voit pas la rubrique). Une période, la liste de ce que contient le fichier, un avertissement, un bouton.</p>
+
+  <div class="nav"><a class="btn" href="#">Produits et stock</a><a class="btn" href="#">Équipe</a><a class="btn" href="#">Mon abonnement</a><a class="btn on" href="#">Exporter mes données</a><a class="btn" href="#">Appareils</a></div>
+
+  <div class="panel stack">
+    <h1>Exporter mes données</h1>
+    <p>Téléchargez un fichier Excel avec vos produits, vos clients et l'historique de vos ventes. <b>Cet export reste toujours disponible</b>, même si votre abonnement est terminé : vos données vous appartiennent.</p>
+  </div>
+
+  <div class="panel stack">
+    <h2>1. Quelle période d'historique ?</h2>
+    <div class="seg" id="period" role="group" aria-label="Période">
+      <button type="button" aria-pressed="false" data-days="30" data-label="les 30 derniers jours">1 mois</button>
+      <button type="button" aria-pressed="false" data-days="90" data-label="les 3 derniers mois">3 mois</button>
+      <button type="button" aria-pressed="true" data-days="365" data-label="les 12 derniers mois">12 mois</button>
+      <button type="button" aria-pressed="false" data-days="0" data-label="tout l'historique, depuis le début">Depuis le début</button>
+      <button type="button" aria-pressed="false" data-days="-1" data-label="les dates choisies">Choisir les dates</button>
+    </div>
+    <div class="row" id="dates" hidden>
+      <div><label class="l" for="from">Du</label><input id="from" class="field" type="date" value="2026-10-01"></div>
+      <div><label class="l" for="to">Au (jour compris)</label><input id="to" class="field" type="date" value="2026-10-25"></div>
+    </div>
+    <p class="muted">Vous obtiendrez l'historique de <b id="plabel">les 12 derniers mois</b>. La période s'applique aux ventes, aux versements et aux mouvements de stock. Vos produits et vos clients sont toujours complets.</p>
+  </div>
+
+  <div class="panel stack">
+    <h2>2. Ce que contient le fichier</h2>
+    <ul class="inc">
+      <li><b>Produits</b> : prix, stock, codes-barres, formats, actifs ou désactivés</li>
+      <li><b>Clients</b> : noms, téléphones, plafonds de crédit et dettes</li>
+      <li><b>Ventes</b> et <b>lignes de vente</b> : ce qui a été vendu, à quel prix, par qui</li>
+      <li><b>Versements</b> des clients</li>
+      <li><b>Mouvements de stock</b> : réceptions, ventes, pertes</li>
+    </ul>
+    <p class="muted">Jamais dans le fichier : les codes PIN, les mots de passe, les appareils, les photos.</p>
+    <div class="attention"><b>Gardez ce fichier en lieu sûr.</b> Il contient les numéros de téléphone de vos clients et vos prix d'achat.</div>
+  </div>
+
+  <div class="panel stack">
+    <button class="btn-primary" style="width:100%" onclick="download()">Télécharger l'export Excel</button>
+    <p class="muted">Un export demande quelques secondes. Vous pouvez en faire 5 par heure.</p>
+  </div>
+
+  <div class="legend">Tout tient sur un écran. Les boutons de durée font 48 px de haut ; à 320 px de large ils passent à la ligne.</div>
+</section>
+
+<!-- 2 TELECHARGEMENT -->
+<section class="screen" id="s2">
+  <p class="why">Pendant la fabrication du fichier, le bouton est éteint et dit ce qui se passe. Puis un message confirme et rappelle de garder le fichier en lieu sûr ; le navigateur enregistre le fichier tout seul.</p>
+
+  <p class="cap">Pendant la préparation</p>
+  <div class="panel stack">
+    <button class="btn-primary" style="width:100%" disabled>Préparation du fichier…</button>
+    <p class="muted" role="status">Nous rassemblons vos données : cela prend quelques secondes.</p>
+  </div>
+
+  <p class="cap">C'est prêt</p>
+  <div class="panel stack">
+    <div class="banner b-ok"><span><b>Votre export est prêt.</b> Le fichier <b>soro-export-2026-10-25.xlsx</b> a été enregistré sur cet appareil. Gardez-le en lieu sûr : il contient les téléphones de vos clients et vos prix d'achat.</span></div>
+    <div class="row"><button class="btn-primary" onclick="download()">Télécharger de nouveau</button><span class="muted">Chaque téléchargement compte dans vos 5 exports par heure.</span></div>
+  </div>
+
+  <p class="cap">Ce que le propriétaire retrouve ensuite dans le Journal (catégorie « Export de données »)</p>
+  <div class="panel"><p>25/10 17:30 · <b>Export des données</b> · Période du 25/10/2025 au 25/10/2026 : 12 produits, 8 clients, 1 204 ventes…</p></div>
+</section>
+
+<!-- 3 ERREURS -->
+<section class="screen" id="s3">
+  <p class="why">Chaque cas a sa phrase, en français, sans mot technique, avec ce qu'il faut faire ensuite.</p>
+
+  <p class="cap">Trop de données pour la période</p>
+  <div class="banner b-warn"><span><b>Il y a trop de données pour cette période (143 210 lignes).</b> Choisissez une période plus courte.</span></div>
+
+  <p class="cap">Trop d'exports</p>
+  <div class="banner b-warn"><span><b>Vous avez demandé plusieurs exports :</b> réessayez dans 12 minutes.</span></div>
+
+  <p class="cap">Dates incorrectes</p>
+  <div class="banner b-err"><span>Le début de la période doit être avant sa fin.</span></div>
+  <div class="banner b-err" style="margin-top:8px"><span>La période ne peut pas dépasser 5 ans.</span></div>
+
+  <p class="cap">Pas de réseau</p>
+  <div class="banner b-info"><span>Vous êtes hors ligne : cet écran a besoin du réseau. La caisse, elle, continue de fonctionner.</span></div>
+
+  <p class="cap">Le serveur ne répond pas</p>
+  <div class="banner b-err"><span>L'export n'a pas pu être fabriqué. Vérifiez la connexion puis réessayez dans un instant.</span></div>
+
+  <div class="legend">Un export refusé ne compte pas dans les 5 par heure et ne laisse aucune trace dans le Journal. Le gérant qui taperait l'adresse à la main est renvoyé vers « Produits et stock ».</div>
+</section>
+
+<!-- 4 LECTURE SEULE -->
+<section class="screen" id="s4">
+  <p class="why">Quand l'abonnement est terminé, le bandeau rouge du propriétaire ajoute un <b>second bouton</b> pour récupérer ses données. L'écran d'export est identique et fonctionne exactement pareil : c'est une lecture, jamais bloquée.</p>
+
+  <div class="banner b-err">
+    <span><b>Lecture seule :</b> vos données sont conservées, vous pouvez les consulter. Payez pour reprendre la vente et la gestion.</span>
+    <a class="btn" href="#">Payer pour reprendre</a>
+    <a class="btn" href="#" onclick="show('s1');return false" style="margin-left:0">Récupérer mes données</a>
+  </div>
+
+  <div class="panel stack" style="margin-top:12px">
+    <h2>Exporter mes données</h2>
+    <p>Votre abonnement est terminé, mais <b>vos données restent à vous</b>. Vous pouvez les télécharger quand vous voulez, sans rien payer.</p>
+    <p class="muted">Le reste de l'écran est identique : période, contenu du fichier, avertissement, bouton « Télécharger l'export Excel ».</p>
+  </div>
+</section>
+
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.t === id)));
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.t)));
+  const period = document.getElementById('period');
+  period.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    period.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+    document.getElementById('plabel').textContent = b.dataset.label;
+    document.getElementById('dates').hidden = b.dataset.days !== '-1';
+  }));
+  function download() { show('s2'); }
+</script>
+</body>
+</html>
