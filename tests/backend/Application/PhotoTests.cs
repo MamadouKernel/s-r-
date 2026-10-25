@@ -116,7 +116,9 @@ public class PhotoTests
         var withoutOwn = (await world.ListProducts.HandleAsync(new ListProductsQuery(null, false))).Single();
 
         Assert.Equal(ownPhoto.Value.Value, withOwn.PhotoId);
+        Assert.Equal(familyPhoto.Value.Value, withOwn.FamilyPhotoId);
         Assert.Equal(familyPhoto.Value.Value, withoutOwn.PhotoId);
+        Assert.Equal(familyPhoto.Value.Value, withoutOwn.FamilyPhotoId);
         Assert.Equal(1, world.Photos.Count);
     }
 

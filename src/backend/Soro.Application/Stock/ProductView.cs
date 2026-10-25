@@ -18,7 +18,8 @@ public sealed record ProductView(
     Guid FamilyId,
     string FamilyName,
     string? FormatLabel,
-    Guid? PhotoId)
+    Guid? PhotoId,
+    Guid? FamilyPhotoId)
 {
     /// <param name="family">Sa famille ; absente (produit ancien), le produit est sa propre famille.</param>
     public static ProductView From(Product product, bool showPurchasePrice, ProductFamily? family = null) =>
@@ -37,5 +38,6 @@ public sealed record ProductView(
             product.FamilyId.Value,
             family?.Name ?? product.Name,
             product.FormatLabel,
-            (product.PhotoId ?? family?.PhotoId)?.Value);
+            (product.PhotoId ?? family?.PhotoId)?.Value,
+            family?.PhotoId?.Value);
 }
