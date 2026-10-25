@@ -1,4 +1,5 @@
 import { Provider, signal, Type } from '@angular/core';
+import { typeScan } from '../core/scan-test-support';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -122,4 +123,19 @@ export async function render<T>(
     },
     has: (text: string) => (root.textContent ?? '').includes(text),
   };
+}
+
+/**
+ * Un scan « tapé » dans une zone de saisie : chaque touche arrive, et la zone s'écrit avec le caractère produit par un clavier mal réglé
+ * (ici « x »), comme avec un lecteur américain sur un clavier français. Rend la touche de fin, pour vérifier qu'elle a été retenue.
+ */
+export function scanInto(field: HTMLInputElement, code: string, ending: 'Enter' | 'Tab' | null = 'Enter'): KeyboardEvent | null {
+  return typeScan(field, code, {
+    ending,
+    produced: () => 'x',
+    onKey: () => {
+      field.value += 'x';
+      field.dispatchEvent(new Event('input'));
+    },
+  });
 }

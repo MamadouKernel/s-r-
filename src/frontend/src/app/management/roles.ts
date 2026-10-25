@@ -61,3 +61,8 @@ export function canManageDevices(role: string | undefined): boolean {
 export function canExportData(role: string | undefined): boolean {
   return role === 'Owner';
 }
+
+/** Écran « Lecteur de codes-barres » (test du lecteur) : propriétaire et gérant, ceux qui équipent la caisse. */
+export function canTestScanner(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager';
+}

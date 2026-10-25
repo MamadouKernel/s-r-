@@ -32,6 +32,12 @@ describe('ManagementShell', () => {
     expect(await render('StockKeeper')).not.toContain('Mon abonnement');
   });
 
+  it('shows « Lecteur de codes-barres » to the owner and the manager only', async () => {
+    expect(await render('Owner')).toContain('Lecteur de codes-barres');
+    expect(await render('Manager')).toContain('Lecteur de codes-barres');
+    expect(await render('StockKeeper')).not.toContain('Lecteur de codes-barres');
+  });
+
   it('shows « Exporter mes données » to the owner only', async () => {
     expect(await render('Owner')).toContain('Exporter mes données');
     expect(await render('Manager')).not.toContain('Exporter mes données');

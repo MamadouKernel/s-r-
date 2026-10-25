@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Journal } from '../data/journal';
+import { typeScan } from '../core/scan-test-support';
 import { CatalogueProduct } from '../domain/types';
 import { ApiService } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
@@ -346,5 +347,142 @@ describe('SalePage: abonnement terminé', () => {
     expect(pay(root).every((button) => button.disabled)).toBe(true);
     expect(root.textContent).toContain('La vente est suspendue : l’abonnement est terminé.');
     expect(root.querySelector('a[href="/gestion/abonnement"]')?.textContent).toContain('Voir mon abonnement');
+  });
+});
+
+describe('SalePage: barcode scanner (ADR 0015)', () => {
+  const eau: CatalogueProduct = {
+    id: 'p-eau', name: 'Eau minérale 1,5 L', barcode: '6111000000011', category: null, salePriceFcfa: 500, tracksStock: true, quantityOnHand: 40,
+  };
+
+  /** Les touches d'un code, comme un lecteur les envoie, sur la cible donnée. */
+  function scan(target: EventTarget, code: string, ending: 'Enter' | 'Tab' | null = 'Enter'): void {
+    typeScan(target, code, { ending });
+  }
+
+  /** Attend qu'une vérification passe (le scan est asynchrone : IndexedDB). */
+  async function until(check: () => void, options: { timeout?: number } = {}): Promise<void> {
+    const end = Date.now() + (options.timeout ?? 2000);
+    for (;;) {
+      try {
+        check();
+        return;
+      } catch (error) {
+        if (Date.now() > end) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+  }
+
+  async function open() {
+    const { cash } = await setup({}, [eau, jus]);
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.textContent).toContain('Eau minérale');
+    });
+    return { cash, fixture, root, field: root.querySelector<HTMLInputElement>('#recherche')! };
+  }
+
+  it('adds the product when a scan arrives with nothing focused, and says so', async () => {
+    const { cash, fixture, root } = await open();
+
+    scan(document.body, eau.barcode!);
+    await until(() => expect(cash.cart().map((line) => line.name)).toEqual(['Eau minérale 1,5 L']));
+    await fixture.whenStable();
+    expect(root.querySelector('[role="status"]')?.textContent).toContain('Eau minérale 1,5 L ajouté au panier');
+  });
+
+  it('adds the product when the scan has no ending, after the silence', async () => {
+    const { cash } = await open();
+
+    scan(document.body, eau.barcode!, null);
+
+    await until(() => expect(cash.cart()).toHaveLength(1), { timeout: 1000 });
+  });
+
+  it('adds the product from the search field with Enter, and leaves the field empty', async () => {
+    const { cash, field } = await open();
+    field.focus();
+
+    scan(field, eau.barcode!);
+
+    await until(() => expect(cash.cart()).toHaveLength(1));
+    await until(() => expect(field.value).toBe(''));
+  });
+
+  it('counts two scans of the same product as a quantity of 2', async () => {
+    const { cash } = await open();
+
+    scan(document.body, eau.barcode!);
+    await until(() => expect(cash.cart()).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    scan(document.body, eau.barcode!);
+
+    await until(() => expect(cash.cart()[0].quantity).toBe(2));
+  });
+
+  it('says the code is unknown, with the code, and adds nothing', async () => {
+    const { cash, fixture, root } = await open();
+
+    scan(document.body, '9999999999999');
+
+    await until(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('.field-error')?.textContent).toContain('Aucun produit pour le code 9999999999999.');
+    });
+    expect(cash.cart()).toEqual([]);
+  });
+
+  it('treats the text of a QR code as an unknown code, shortened, and opens nothing', async () => {
+    const { cash, fixture, root } = await open();
+    const text = 'https://exemple.ci/promo/' + '1'.repeat(60);
+
+    // Un QR code est du texte : on le « tape » comme un code (les lettres comptent comme des caractères ordinaires).
+    typeScan(document.body, text);
+
+    await until(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('.field-error')?.textContent).toContain('Aucun produit pour le code');
+    });
+    expect(root.querySelector('.field-error')?.textContent?.length).toBeLessThan(80);
+    expect(cash.cart()).toEqual([]);
+  });
+
+  it('does not steal a scan typed into another field', async () => {
+    const { cash } = await open();
+    const other = document.createElement('input');
+    document.body.append(other);
+    other.focus();
+
+    scan(other, eau.barcode!);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    other.remove();
+
+    expect(cash.cart()).toEqual([]);
+  });
+
+  it('keeps the search by name for a person typing', async () => {
+    const { cash, fixture, root, field } = await open();
+    field.focus();
+
+    for (const character of 'Eau') {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: character, code: `Key${character.toUpperCase()}`, bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 70));
+    }
+    field.value = 'Eau';
+    field.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    await until(() => {
+      fixture.detectChanges();
+      expect(root.textContent).not.toContain('Jus');
+    });
+    expect(root.textContent).toContain('Eau minérale');
+    expect(cash.cart()).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { formatFcfa } from '../core/money';
 import { cartTotal } from '../domain/cart';
 import { FamilyGroup, groupByFamily } from '../domain/families';
@@ -6,6 +6,7 @@ import { CartLine, CatalogueProduct } from '../domain/types';
 import { CashService } from '../services/cash.service';
 import { AuthService } from '../services/auth.service';
 import { CatalogueService } from '../services/catalogue.service';
+import { isEditable, ScanService } from '../services/scan.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ProductAvatar } from '../shared/product-avatar';
 import { RouterLink } from '@angular/router';
@@ -64,6 +65,7 @@ const LOW_STOCK_HINT = 5;
               id="recherche"
               class="field"
               type="search"
+              data-scan="search"
               autocomplete="off"
               enterkeyhint="done"
               [value]="term()"
@@ -73,7 +75,7 @@ const LOW_STOCK_HINT = 5;
             <p id="recherche-aide" class="field-help">Un code-barres exact s’ajoute au panier avec la touche Entrée.</p>
           </form>
           @if (unknownCode()) {
-            <p class="field-error" role="alert">Aucun produit pour le code {{ unknownCode() }}.</p>
+            <p class="field-error" role="alert">Aucun produit pour le code {{ shortCode(unknownCode()) }}.</p>
           }
           @if (catalogue.refreshFailed()) {
             <p class="mt-2 text-sm text-avertissement" role="note">
@@ -234,6 +236,16 @@ export class SalePage implements OnInit {
   protected readonly catalogue = inject(CatalogueService);
   private readonly subscription = inject(SubscriptionService);
   private readonly auth = inject(AuthService);
+  private readonly scanner = inject(ScanService);
+
+  constructor() {
+    // Lecteur de codes-barres (ADR 0015) : un scan est pris sur la page ou dans la zone de recherche, jamais dans un autre champ de saisie.
+    const stop = this.scanner.listen({
+      accept: (target) => !this.paying() && (!isEditable(target) || (target as HTMLElement).dataset['scan'] === 'search'),
+      onScan: (scan) => void this.onScan(scan.code),
+    });
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   /** Abonnement terminé (lecture seule) : on ne démarre plus de nouvel encaissement ; l'écran dit pourquoi et vers qui se tourner. */
   protected readonly suspended = this.subscription.readOnly;
@@ -278,10 +290,31 @@ export class SalePage implements OnInit {
     const product = await this.catalogue.findByBarcode(code);
     if (product) {
       this.add(product);
+      this.scanner.feedback(true);
       await this.search('');
     } else if (/^\d{6,}$/.test(code)) {
       this.unknownCode.set(code);
+      this.scanner.feedback(false);
     }
+  }
+
+  /** Un scan reconnu par sa vitesse : produit ajouté, ou code inconnu dit à voix haute et à l'écran. La zone de recherche est toujours vidée. */
+  private async onScan(code: string): Promise<void> {
+    const product = await this.catalogue.findByBarcode(code);
+    await this.search('');
+    if (product) {
+      this.add(product);
+      this.scanner.feedback(true);
+    } else {
+      this.unknownCode.set(code);
+      this.announcement.set(`Aucun produit pour le code ${this.shortCode(code)}`);
+      this.scanner.feedback(false);
+    }
+  }
+
+  /** Le texte d'un QR code peut être long : on n'en montre que le début. */
+  protected shortCode(code: string): string {
+    return code.length > 30 ? `${code.slice(0, 30)}…` : code;
   }
 
   protected articleCount(lines: readonly CartLine[]): string {
