@@ -4,7 +4,7 @@ import { ApiError } from '../sync/sync-api';
 export function describeError(error: unknown): string {
   if (error instanceof ApiError) {
     // Le serveur explique lui-même pourquoi (abonnement terminé, référence déjà utilisée…) : on garde ses mots.
-    if (error.code === 'subscription_expired' && error.message) {
+    if ((error.code === 'subscription_expired' || error.code === 'too_many_requests') && error.message) {
       return error.message;
     }
     switch (error.status) {

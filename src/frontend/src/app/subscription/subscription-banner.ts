@@ -15,6 +15,9 @@ import { SubscriptionService } from './subscription.service';
         @if (current.action; as action) {
           <a class="btn" [routerLink]="action.link">{{ action.label }}</a>
         }
+        @if (current.secondaryAction; as second) {
+          <a class="btn" [routerLink]="second.link">{{ second.label }}</a>
+        }
       </div>
     }
   `,

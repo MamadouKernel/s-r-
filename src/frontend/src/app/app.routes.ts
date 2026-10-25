@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, exportGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', pathMatch: 'full', redirectTo: 'bienvenue' },
@@ -91,6 +91,11 @@ export const routes: Routes = [
       {
         path: 'produits/:id/stock',
         loadComponent: () => import('./management/product-stock-page').then((m) => m.ProductStockPage),
+      },
+      {
+        path: 'export',
+        canActivate: [exportGuard],
+        loadComponent: () => import('./export/export-page').then((m) => m.ExportPage),
       },
       {
         path: 'abonnement',

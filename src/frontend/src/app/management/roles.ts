@@ -56,3 +56,8 @@ export function canSeeRepayments(role: string | undefined): boolean {
 export function canManageDevices(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager';
 }
+
+/** Export de toutes les données (téléphones des clients, prix d'achat) : le propriétaire seul, comme le serveur. */
+export function canExportData(role: string | undefined): boolean {
+  return role === 'Owner';
+}

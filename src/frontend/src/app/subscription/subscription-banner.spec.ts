@@ -42,6 +42,13 @@ describe('SubscriptionBanner', () => {
     expect(link?.textContent).toContain('Payer maintenant');
   });
 
+  it('gives the owner a second button to take their data back when the shop is read-only', async () => {
+    const root = await render({ ...base, status: 'ReadOnly', isReadOnly: true, daysLeft: 0 });
+
+    const links = [...root.querySelectorAll('a')].map((link) => [link.textContent?.trim(), link.getAttribute('href')]);
+    expect(links).toEqual([['Payer pour reprendre', '/gestion/abonnement'], ['Récupérer mes données', '/gestion/export']]);
+  });
+
   it('shows a cashier a short message with no button and no price', async () => {
     const root = await render({ ...base, status: 'ReadOnly', isReadOnly: true, daysLeft: 0 }, 'Cashier');
 

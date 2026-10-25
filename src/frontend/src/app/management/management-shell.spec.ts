@@ -32,6 +32,12 @@ describe('ManagementShell', () => {
     expect(await render('StockKeeper')).not.toContain('Mon abonnement');
   });
 
+  it('shows « Exporter mes données » to the owner only', async () => {
+    expect(await render('Owner')).toContain('Exporter mes données');
+    expect(await render('Manager')).not.toContain('Exporter mes données');
+    expect(await render('StockKeeper')).not.toContain('Exporter mes données');
+  });
+
   it('keeps the team section away from the stock keeper, who still sees the products (SC-E3)', async () => {
     const text = await render('StockKeeper');
     expect(text).toContain('Produits et stock');

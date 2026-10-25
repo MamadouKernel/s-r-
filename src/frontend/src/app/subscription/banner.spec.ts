@@ -56,6 +56,7 @@ describe('bannerFor', () => {
     expect(banner.text).toContain('Lecture seule');
     expect(banner.text).toContain('vos données sont conservées');
     expect(banner.action?.label).toBe('Payer pour reprendre');
+    expect(banner.secondaryAction).toEqual({ label: 'Récupérer mes données', link: '/gestion/export' });
   });
 
   it('shows the manager the same message but only the owner can pay', () => {
@@ -64,6 +65,7 @@ describe('bannerFor', () => {
 
     expect(grace.action).toEqual({ label: 'Voir l’abonnement', link: '/gestion/abonnement' });
     expect(readOnly.text).toContain('Prévenez le propriétaire');
+    expect(readOnly.secondaryAction ?? null).toBeNull(); // l'export est réservé au propriétaire
   });
 
   it.each(['Cashier', 'StockKeeper', 'Accountant'])('shows %s a short message without price or button, and only once it matters', (role) => {
