@@ -9,6 +9,8 @@ export interface Banner {
   tone: 'info' | 'warn' | 'error';
   text: string;
   action: BannerAction | null;
+  /** Un second geste, à côté du premier : récupérer ses données quand on est en lecture seule. */
+  secondaryAction?: BannerAction | null;
 }
 
 const PAGE = '/gestion/abonnement';
@@ -49,6 +51,7 @@ export function bannerFor(view: SubscriptionView | null, role: string | undefine
           tone: 'error',
           text: 'Lecture seule : vos données sont conservées, vous pouvez les consulter. Payez pour reprendre la vente et la gestion.',
           action: { label: 'Payer pour reprendre', link: PAGE },
+          secondaryAction: { label: 'Récupérer mes données', link: '/gestion/export' },
         }
       : { tone: 'error', text: 'Lecture seule : les données sont conservées. Prévenez le propriétaire pour reprendre la vente et la gestion.', action: { label: 'Voir l’abonnement', link: PAGE } };
   }

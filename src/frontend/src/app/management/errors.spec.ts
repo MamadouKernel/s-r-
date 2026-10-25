@@ -27,4 +27,11 @@ describe('describeError', () => {
     expect(describeError(error)).toBe('Votre abonnement est terminé : la boutique est en lecture seule.');
     expect(describeError(new ApiError(403, 'forbidden', 'x'))).toContain('n’a pas le droit');
   });
+
+  it('keeps the server wording, with the waiting time, when too many exports were asked', () => {
+    const error = new ApiError(429, 'too_many_requests', 'Vous avez demandé plusieurs exports : réessayez dans 12 minutes.');
+
+    expect(describeError(error)).toBe('Vous avez demandé plusieurs exports : réessayez dans 12 minutes.');
+    expect(describeError(new ApiError(429, 'http_429', ''))).toContain('Trop de demandes');
+  });
 });

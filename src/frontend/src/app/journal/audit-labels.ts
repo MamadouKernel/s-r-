@@ -20,6 +20,7 @@ const ACTIONS: Record<string, string> = {
   'family.created': 'Produit créé avec ses formats',
   'products.grouped': 'Produits regroupés en une famille',
   'products.imported': 'Produits importés depuis Excel',
+  'data.exported': 'Export des données',
   'subscription.payment.declared': 'Paiement d’abonnement déclaré',
   'subscription.payment.validated': 'Paiement d’abonnement validé',
   'subscription.payment.refused': 'Paiement d’abonnement refusé',
@@ -41,4 +42,5 @@ export const CATEGORIES: readonly { value: string | null; label: string }[] = [
   { value: 'devices', label: 'Appareils' },
   { value: 'credit', label: 'Crédit et dettes' },
   { value: 'subscription', label: 'Abonnement' },
+  { value: 'data', label: 'Export de données' },
 ];

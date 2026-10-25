@@ -4,6 +4,7 @@ using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Sales;
 using Soro.Application.Reporting;
+using Soro.Application.Export;
 using Soro.Application.Signup;
 using Soro.Application.Subscription;
 using Soro.Application.Stock;
@@ -92,6 +93,10 @@ internal sealed class TestWorld
     public InMemoryProductFamilyRepository Families { get; } = new();
 
     public InMemoryPhotoStore Photos { get; } = new();
+
+    public FakeDataExportQueries ExportQueries { get; } = new();
+
+    public FakeDataExportWriter ExportWriter { get; } = new();
 
     public FakeSheetReader SheetReader { get; } = new();
 
@@ -198,6 +203,8 @@ internal sealed class TestWorld
     public ListPendingSubscriptionPaymentsHandler ListPendingPayments => new(Subscriptions);
 
     public SendSubscriptionRemindersHandler SendReminders => new(Subscriptions, Mail, SubscriptionSettings, Clock, UnitOfWork);
+
+    public ExportDataHandler ExportData => new(Current, Commerces, ExportQueries, ExportWriter, AuditLog, Audit, Clock, UnitOfWork);
 
     public GetImportTemplateHandler ImportTemplate => new(Current, TemplateWriter);
 

@@ -34,7 +34,7 @@ describe('actionLabel', () => {
 describe('CATEGORIES', () => {
   it('starts with “all” and uses the values the server understands', () => {
     expect(CATEGORIES[0]).toEqual({ value: null, label: 'Toutes' });
-    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription']);
+    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription', 'data']);
   });
 
   it('names the subscription, family and import actions in plain French', () => {
@@ -42,6 +42,7 @@ describe('CATEGORIES', () => {
     expect(actionLabel('subscription.payment.validated')).toBe('Paiement d’abonnement validé');
     expect(actionLabel('subscription.payment.refused')).toBe('Paiement d’abonnement refusé');
     expect(actionLabel('subscription.expired.sale')).toBe('Données reçues après la fin de l’abonnement');
+    expect(actionLabel('data.exported')).toBe('Export des données');
     expect(actionLabel('products.imported')).toBe('Produits importés depuis Excel');
     expect(actionLabel('products.grouped')).toBe('Produits regroupés en une famille');
     expect(actionLabel('family.created')).toBe('Produit créé avec ses formats');

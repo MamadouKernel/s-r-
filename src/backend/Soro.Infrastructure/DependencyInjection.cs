@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Soro.Application.Cash;
 using Soro.Application.Common;
 using Soro.Application.Customers;
+using Soro.Application.Export;
 using Soro.Application.Devices;
 using Soro.Application.Identity;
 using Soro.Application.Reporting;
@@ -41,6 +42,8 @@ public static class DependencyInjection
         services.AddScoped<IPhotoStore, PhotoStore>();
         services.AddScoped<ISubscriptionPaymentRepository, SubscriptionPaymentRepository>();
         services.AddScoped<IPlatformSubscriptions, PlatformSubscriptions>();
+        services.AddScoped<IDataExportQueries, DataExportQueries>();
+        services.AddSingleton<IDataExportWriter, Soro.Infrastructure.Export.ClosedXmlDataExportWriter>();
         services.AddSingleton<IProductSheetReader, Soro.Infrastructure.Import.ClosedXmlProductSheetReader>();
         services.AddSingleton<IProductTemplateWriter, Soro.Infrastructure.Import.ClosedXmlProductTemplateWriter>();
         services.AddScoped<IStockMovementRepository, StockMovementRepository>();
