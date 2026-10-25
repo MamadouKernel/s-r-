@@ -78,7 +78,29 @@ public sealed class DeviceInvitationRepository(SoroDbContext db) : IDeviceInvita
                 new UserId(row.CreatedBy),
                 row.SuggestedName,
                 row.CreatedAt,
-                row.ConsumedAt);
+                row.ConsumedAt,
+                row.RevokedAt);
+    }
+
+    public async Task<IReadOnlyList<DeviceInvitation>> ListPendingAsync(TenantId tenant, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var instant = now.ToUniversalTime();
+        var rows = await db.DeviceInvitations
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenant.Value && item.ConsumedAt == null && item.RevokedAt == null && item.ExpiresAt > instant)
+            .OrderByDescending(item => item.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return rows
+            .Select(row => DeviceInvitation.Restore(
+                new DeviceInvitationId(row.Id),
+                new TenantId(row.TenantId),
+                row.SecretHash,
+                new UserId(row.CreatedBy),
+                row.SuggestedName,
+                row.CreatedAt,
+                row.ConsumedAt,
+                row.RevokedAt))
+            .ToArray();
     }
 
     public Task AddAsync(DeviceInvitation invitation, CancellationToken cancellationToken)
@@ -101,5 +123,6 @@ public sealed class DeviceInvitationRepository(SoroDbContext db) : IDeviceInvita
         var row = await db.DeviceInvitations.FindAsync([invitation.Id.Value], cancellationToken)
             ?? throw new InvalidOperationException($"L'invitation {invitation.Id.Value} n'existe pas.");
         row.ConsumedAt = invitation.ConsumedAt?.ToUniversalTime();
+        row.RevokedAt = invitation.RevokedAt?.ToUniversalTime();
     }
 }

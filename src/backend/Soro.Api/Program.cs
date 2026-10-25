@@ -27,6 +27,7 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseTenantScope();
 app.UseDeviceAccess();
+app.UseSessionAccess();
 app.UseSubscriptionAccess();
 app.UseRateLimiter();
 app.UseAuthorization();

@@ -122,7 +122,7 @@ public class LogInTests
     {
         var world = new TestWorld();
         var user = world.GivenUser();
-        user.Disable();
+        user.Disable(world.Clock.UtcNow);
 
         var result = await world.LogIn.HandleAsync(Login(world));
 

@@ -97,7 +97,7 @@ public class ListUsersTests
     {
         var world = new TestWorld();
         var awa = world.GivenUser("awa", role: Role.Cashier);
-        awa.Disable();
+        awa.Disable(world.Clock.UtcNow);
         world.ActAs(world.Manager, Role.Manager);
 
         var view = (await world.ListUsers.HandleAsync()).Value!.Users.Single();
@@ -127,7 +127,7 @@ public class ListUsersTests
         var zoe = world.GivenUser("zoe", role: Role.Cashier);
         var abou = world.GivenUser("abou", role: Role.Cashier);
         var ancien = world.GivenUser("ancien", role: Role.Cashier);
-        ancien.Disable();
+        ancien.Disable(world.Clock.UtcNow);
         world.ActAs(world.Manager, Role.Manager);
 
         var team = (await world.ListUsers.HandleAsync()).Value!;
@@ -159,7 +159,7 @@ public class ListUsersTests
         var world = new TestWorld();
         var awa = world.GivenUser("awa", role: Role.Cashier);
         var ancien = world.GivenUser("ancien", role: Role.Cashier);
-        ancien.Disable();
+        ancien.Disable(world.Clock.UtcNow);
         world.GivenUser("etranger", role: Role.Cashier, tenant: TenantId.New());
 
         world.ActAs(world.Cashier, Role.StockKeeper);

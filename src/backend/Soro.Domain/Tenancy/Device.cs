@@ -46,6 +46,11 @@ public sealed class DeviceInvitation
 
     public bool IsConsumed => ConsumedAt is not null;
 
+    /// <summary>Date à laquelle le propriétaire ou le gérant a annulé le lien ; <c>null</c> tant qu'il n'est pas annulé.</summary>
+    public DateTimeOffset? RevokedAt { get; private set; }
+
+    public bool IsRevoked => RevokedAt is not null;
+
     public static DeviceInvitation Issue(
         DeviceInvitationId id,
         TenantId tenant,
@@ -60,7 +65,17 @@ public sealed class DeviceInvitation
 
     public bool IsExpired(DateTimeOffset now) => now >= ExpiresAt;
 
-    public bool IsUsable(DateTimeOffset now) => !IsConsumed && !IsExpired(now);
+    public bool IsUsable(DateTimeOffset now) => !IsConsumed && !IsRevoked && !IsExpired(now);
+
+    /// <summary>Lien encore en attente d'un appareil : ni utilisé, ni annulé, ni périmé.</summary>
+    public bool IsPending(DateTimeOffset now) => IsUsable(now);
+
+    /// <summary>Annule un lien qui n'a pas servi. Rejouable : la première date est conservée. Un lien déjà utilisé ne s'annule pas (on retire l'appareil).</summary>
+    public void Revoke(DateTimeOffset now)
+    {
+        Ensure.That(!IsConsumed, "Ce lien a déjà été utilisé : retirez l'appareil depuis la liste des appareils.");
+        RevokedAt ??= now;
+    }
 
     public void Consume(DateTimeOffset now)
     {
@@ -76,8 +91,9 @@ public sealed class DeviceInvitation
         UserId createdBy,
         string? suggestedName,
         DateTimeOffset createdAt,
-        DateTimeOffset? consumedAt) =>
-        new(id, tenant, secretHash, createdBy, suggestedName, createdAt) { ConsumedAt = consumedAt };
+        DateTimeOffset? consumedAt,
+        DateTimeOffset? revokedAt) =>
+        new(id, tenant, secretHash, createdBy, suggestedName, createdAt) { ConsumedAt = consumedAt, RevokedAt = revokedAt };
 }
 
 /// <summary>

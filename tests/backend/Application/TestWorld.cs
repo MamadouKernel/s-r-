@@ -170,6 +170,18 @@ internal sealed class TestWorld
 
     public DisableUserHandler DisableUser => new(Current, Users, Audit, Clock, UnitOfWork);
 
+    public ResetUserPinHandler ResetUserPin => new(Current, Users, Hasher, Audit, Clock, UnitOfWork);
+
+    public EnableUserHandler EnableUser => new(Current, Users, Hasher, Audit, Clock, UnitOfWork);
+
+    public ChangeUserRoleHandler ChangeUserRole => new(Current, Users, Audit, Clock, UnitOfWork);
+
+    public CheckSessionHandler CheckSession => new(Users);
+
+    public ListDeviceInvitationsHandler ListDeviceInvitations => new(Current, DeviceInvitations, Users, Clock);
+
+    public RevokeDeviceInvitationHandler RevokeDeviceInvitation => new(Current, DeviceInvitations, Audit, Clock, UnitOfWork);
+
     public CreateProductHandler CreateProduct => new(Current, Products, Families, Audit, Clock, UnitOfWork);
 
     public UpdateProductHandler UpdateProduct => new(Current, Products, Families, Audit, Clock, UnitOfWork);

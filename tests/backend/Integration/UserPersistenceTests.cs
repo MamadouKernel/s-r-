@@ -58,7 +58,7 @@ public class UserPersistenceTests(PostgresFixture fixture)
             var loaded = (await repository.GetAsync(user.Id, tenant, Ct))!;
             loaded.RecordFailedAttempt(Samples.Morning);
             loaded.RecordFailedAttempt(Samples.Morning);
-            loaded.Disable();
+            loaded.Disable(Samples.Morning);
             await repository.UpdateAsync(loaded, Ct);
             await new EfUnitOfWork(db).CommitAsync(Ct);
         }
@@ -67,6 +67,31 @@ public class UserPersistenceTests(PostgresFixture fixture)
         var reloaded = (await new UserRepository(verify).GetAsync(user.Id, tenant, Ct))!;
         Assert.Equal(2, reloaded.FailedAttempts);
         Assert.Equal(UserStatus.Disabled, reloaded.Status);
+        Assert.Equal(Samples.Morning, reloaded.SessionsValidFrom);
+    }
+
+    [Fact]
+    public async Task A_new_pin_a_new_role_and_the_session_cut_off_survive_a_round_trip()
+    {
+        var tenant = TenantId.New();
+        var user = NewUser(tenant);
+        await SaveAsync(tenant, user);
+
+        await using (var db = Db.App(fixture, tenant))
+        {
+            var repository = new UserRepository(db);
+            var loaded = (await repository.GetAsync(user.Id, tenant, Ct))!;
+            loaded.ResetPin("hash-nouveau", Samples.Morning);
+            loaded.ChangeRole(Role.StockKeeper, Samples.Morning.AddMinutes(1));
+            await repository.UpdateAsync(loaded, Ct);
+            await new EfUnitOfWork(db).CommitAsync(Ct);
+        }
+
+        await using var verify = Db.App(fixture, tenant);
+        var reloaded = (await new UserRepository(verify).GetAsync(user.Id, tenant, Ct))!;
+        Assert.Equal("hash-nouveau", reloaded.PinHash);
+        Assert.Equal(Role.StockKeeper, reloaded.Role);
+        Assert.Equal(Samples.Morning.AddMinutes(1), reloaded.SessionsValidFrom);
     }
 
     [Fact]
@@ -129,7 +154,7 @@ public class UserPersistenceTests(PostgresFixture fixture)
         var tenant = TenantId.New();
         var manager = NewUser(tenant, "manager.one", Role.Manager);
         var leaver = NewUser(tenant, "leaver.one", Role.Cashier);
-        leaver.Disable();
+        leaver.Disable(Samples.Morning);
         await SaveAsync(tenant, manager);
         await SaveAsync(tenant, leaver);
 

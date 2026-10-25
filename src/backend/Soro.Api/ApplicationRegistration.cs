@@ -62,6 +62,8 @@ public static class ApplicationRegistration
         services.AddScoped<EnrollDeviceHandler>();
         services.AddScoped<ListDevicesHandler>();
         services.AddScoped<RevokeDeviceHandler>();
+        services.AddScoped<ListDeviceInvitationsHandler>();
+        services.AddScoped<RevokeDeviceInvitationHandler>();
         services.AddScoped<CheckDeviceAccessHandler>();
         services.AddScoped<StartSignupHandler>();
         services.AddScoped<ResendSignupCodeHandler>();
@@ -71,6 +73,10 @@ public static class ApplicationRegistration
         services.AddScoped<ConfirmPasswordResetHandler>();
         services.AddScoped<RegisterUserHandler>();
         services.AddScoped<DisableUserHandler>();
+        services.AddScoped<ResetUserPinHandler>();
+        services.AddScoped<EnableUserHandler>();
+        services.AddScoped<ChangeUserRoleHandler>();
+        services.AddScoped<CheckSessionHandler>();
         services.AddScoped<ListUsersHandler>();
         services.AddScoped<GetDirectoryHandler>();
         services.AddScoped<CreateProductHandler>();

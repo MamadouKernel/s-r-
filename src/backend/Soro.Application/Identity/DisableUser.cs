@@ -8,8 +8,7 @@ public sealed record DisableUserCommand(UserId UserId);
 
 /// <summary>
 /// Désactive un utilisateur (départ d'un caissier). Même règle de droits que la création : on ne désactive que
-/// les profils qu'on peut créer. Un compte désactivé ne peut plus se connecter ; un jeton déjà émis reste valide
-/// jusqu'à son expiration, d'où sa durée de vie limitée.
+/// les profils qu'on peut créer. Un compte désactivé ne peut plus se connecter ; ses sessions ouvertes prennent fin.
 /// </summary>
 public sealed class DisableUserHandler(
     ICurrentUser actor,
@@ -38,7 +37,7 @@ public sealed class DisableUserHandler(
             return Result<UserId>.Success(target.Id);
         }
 
-        target.Disable();
+        target.Disable(clock.UtcNow);
         await users.UpdateAsync(target, cancellationToken);
         await audit.RecordAsync(
             new AuditEntry(actor.Tenant, actor.User, AuditActions.UserDisabled, target.Id.Value, target.Identifier, clock.UtcNow),

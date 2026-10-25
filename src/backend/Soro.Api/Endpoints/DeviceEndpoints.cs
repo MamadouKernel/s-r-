@@ -20,6 +20,8 @@ internal static class DeviceEndpoints
         var devices = api.MapGroup("/devices");
         devices.MapGet("", ListAsync);
         devices.MapPost("/invitations", InviteAsync);
+        devices.MapGet("/invitations", ListInvitationsAsync);
+        devices.MapPost("/invitations/{invitationId:guid}/revoke", RevokeInvitationAsync);
         devices.MapPost("/{deviceId:guid}/revoke", RevokeAsync);
         return api;
     }
@@ -45,4 +47,14 @@ internal static class DeviceEndpoints
 
     private static async Task<IResult> RevokeAsync(Guid deviceId, RevokeDeviceHandler handler, CancellationToken cancellationToken) =>
         (await handler.HandleAsync(new RevokeDeviceCommand(new DeviceId(deviceId)), cancellationToken)).ToHttp(_ => Results.NoContent());
+
+    private static async Task<IResult> ListInvitationsAsync(ListDeviceInvitationsHandler handler, CancellationToken cancellationToken) =>
+        (await handler.HandleAsync(cancellationToken)).ToHttp(pending => Results.Ok(pending));
+
+    private static async Task<IResult> RevokeInvitationAsync(
+        Guid invitationId,
+        RevokeDeviceInvitationHandler handler,
+        CancellationToken cancellationToken) =>
+        (await handler.HandleAsync(new RevokeDeviceInvitationCommand(new DeviceInvitationId(invitationId)), cancellationToken))
+        .ToHttp(_ => Results.NoContent());
 }

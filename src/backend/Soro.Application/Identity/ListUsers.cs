@@ -18,7 +18,10 @@ public sealed record UserView(
     DateTimeOffset? LastLoginAt,
     DateTimeOffset? LockedUntil,
     bool CanDisable,
-    bool IsSelf);
+    bool IsSelf,
+    bool CanRenewCode,
+    bool CanEnable,
+    bool CanChangeRole);
 
 public sealed record TeamView(IReadOnlyList<UserView> Users, IReadOnlyList<Role> AssignableRoles);
 
@@ -48,9 +51,15 @@ public sealed class ListUsersHandler(ICurrentUser actor, IUserRepository users, 
                 user.LastLoginAt,
                 user.IsLocked(now) ? user.LockedUntil : null,
                 CanDisable: user.Status == UserStatus.Active && user.Id != actor.User && RolePolicy.CanManageRole(actor.Role, user.Role),
-                IsSelf: user.Id == actor.User))
+                IsSelf: user.Id == actor.User,
+                CanRenewCode: CanAct(user, UserStatus.Active),
+                CanEnable: CanAct(user, UserStatus.Disabled),
+                CanChangeRole: CanAct(user, UserStatus.Active)))
             .ToArray();
         return Result<TeamView>.Success(new TeamView(views, RolePolicy.AssignableRoles(actor.Role)));
+
+        bool CanAct(User user, UserStatus status) =>
+            user.Status == status && user.Id != actor.User && RolePolicy.CanManageRole(actor.Role, user.Role);
     }
 }
 

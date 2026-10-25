@@ -34,6 +34,9 @@ public static class AuditActions
     public const string SaleCancelled = "sale.cancelled";
     public const string CancelRefused = "sale.cancel.refused";
     public const string UserDisabled = "user.disabled";
+    public const string UserPinReset = "user.pin.reset";
+    public const string UserEnabled = "user.enabled";
+    public const string UserRoleChanged = "user.role.changed";
     public const string ProductCreated = "product.created";
     public const string ProductUpdated = "product.updated";
     public const string ProductDeactivated = "product.deactivated";
@@ -55,4 +58,5 @@ public static class AuditActions
     public const string DeviceInvited = "device.invited";
     public const string DeviceEnrolled = "device.enrolled";
     public const string DeviceRevoked = "device.revoked";
+    public const string DeviceInvitationRevoked = "device.invitation.revoked";
 }
