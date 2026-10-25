@@ -68,6 +68,11 @@ public readonly record struct PhotoId(Guid Value)
     public static PhotoId New() => new(Guid.CreateVersion7());
 }
 
+public readonly record struct SubscriptionPaymentId(Guid Value)
+{
+    public static SubscriptionPaymentId New() => new(Guid.CreateVersion7());
+}
+
 public readonly record struct CustomerId(Guid Value)
 {
     public static CustomerId New() => new(Guid.CreateVersion7());
