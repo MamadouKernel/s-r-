@@ -1,6 +1,7 @@
 import { HELD, inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
 import { CartLine, CatalogueProduct, CustomerSnapshot, PaymentDraft } from '../domain/types';
 import { cartTotal } from '../domain/cart';
+import { matchesSearch } from '../domain/families';
 import { referenceKey, validatePayments } from '../domain/payment';
 
 export type OperationStatus = 'pending' | 'synced' | 'rejected';
@@ -223,8 +224,7 @@ export class Journal {
 
   async listProducts(term?: string): Promise<CatalogueProduct[]> {
     const all = (await this.readAll<CatalogueProduct>(PRODUCTS)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    const needle = term ? fold(term.trim()) : '';
-    return needle === '' ? all : all.filter((product) => fold(product.name).includes(needle) || product.barcode === term?.trim());
+    return term ? all.filter((product) => matchesSearch(product, term)) : all;
   }
 
   async findByBarcode(barcode: string): Promise<CatalogueProduct | null> {

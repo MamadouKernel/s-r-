@@ -53,7 +53,24 @@ describe('ApiService', () => {
       { id: 'b', name: 'Ancien', barcode: null, category: null, purchasePriceFcfa: null, salePriceFcfa: 100, alertThreshold: 0, tracksStock: false, isActive: false, quantityOnHand: 0, isLowStock: false },
     ]);
     expect(await result).toEqual([
-      { id: 'a', name: 'Jus', barcode: '1', category: 'B', salePriceFcfa: 600, tracksStock: true, quantityOnHand: 9 },
+      { id: 'a', name: 'Jus', barcode: '1', category: 'B', salePriceFcfa: 600, tracksStock: true, quantityOnHand: 9, formatLabel: null, photoId: null },
+    ]);
+  });
+
+  it('carries the family, the format and the photo of each product to the till', async () => {
+    const result = api.products();
+    http.expectOne('/api/v1/products').flush([
+      {
+        id: 'a', name: 'Eau minérale · 1 L', barcode: null, category: null, purchasePriceFcfa: null, salePriceFcfa: 300, alertThreshold: 0,
+        tracksStock: true, isActive: true, quantityOnHand: 3, isLowStock: false,
+        familyId: 'eau', familyName: 'Eau minérale', formatLabel: '1 L', photoId: 'p1',
+      },
+    ]);
+    expect(await result).toEqual([
+      {
+        id: 'a', name: 'Eau minérale · 1 L', barcode: null, category: null, salePriceFcfa: 300, tracksStock: true, quantityOnHand: 3,
+        familyId: 'eau', familyName: 'Eau minérale', formatLabel: '1 L', photoId: 'p1',
+      },
     ]);
   });
 

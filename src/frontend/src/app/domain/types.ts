@@ -20,6 +20,12 @@ export interface CatalogueProduct {
   salePriceFcfa: number;
   tracksStock: boolean;
   quantityOnHand: number;
+  /** Famille et format (docs/specs/formats-produits) ; absents d'une copie locale d'avant les formats : le produit est alors sa propre famille. */
+  familyId?: string;
+  familyName?: string;
+  formatLabel?: string | null;
+  /** Photo à afficher (celle du format, sinon celle de la famille) ; jamais obligatoire. */
+  photoId?: string | null;
 }
 
 /** Ligne de panier : nom et prix figés à l'ajout (RG-21). */
