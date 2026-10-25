@@ -281,5 +281,22 @@ describe('SalePage: families and formats', () => {
     await ui.type('#recherche', '222');
     root.querySelector('form[role="search"]')!.dispatchEvent(new Event('submit', { cancelable: true }));
     await vi.waitFor(() => expect(cash.cart().map((line) => line.name)).toEqual(['Eau minérale · 1 L']));
+
+  });
+});
+
+describe('SalePage: catalogue', () => {
+  it('shows a product created on the server after the till was signed in, without signing in again', async () => {
+    const baguette: CatalogueProduct = {
+      id: 'p-baguette', name: 'Baguette', barcode: null, category: null, salePriceFcfa: 150, tracksStock: false, quantityOnHand: 0,
+    };
+    await setup({ products: vi.fn().mockResolvedValue([jus, baguette]) });
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Baguette');
+    });
   });
 });
