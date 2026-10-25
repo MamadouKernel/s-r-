@@ -14,9 +14,15 @@ public sealed record ProductView(
     bool TracksStock,
     bool IsActive,
     int QuantityOnHand,
-    bool IsLowStock)
+    bool IsLowStock,
+    Guid FamilyId,
+    string FamilyName,
+    string? FormatLabel,
+    Guid? PhotoId,
+    Guid? FamilyPhotoId)
 {
-    public static ProductView From(Product product, bool showPurchasePrice) =>
+    /// <param name="family">Sa famille ; absente (produit ancien), le produit est sa propre famille.</param>
+    public static ProductView From(Product product, bool showPurchasePrice, ProductFamily? family = null) =>
         new(
             product.Id.Value,
             product.Name,
@@ -28,5 +34,10 @@ public sealed record ProductView(
             product.TracksStock,
             product.IsActive,
             product.QuantityOnHand,
-            product.IsLowStock);
+            product.IsLowStock,
+            product.FamilyId.Value,
+            family?.Name ?? product.Name,
+            product.FormatLabel,
+            (product.PhotoId ?? family?.PhotoId)?.Value,
+            family?.PhotoId?.Value);
 }

@@ -23,6 +23,10 @@ interface ProductDto {
   tracksStock: boolean;
   isActive: boolean;
   quantityOnHand: number;
+  familyId?: string;
+  familyName?: string;
+  formatLabel?: string | null;
+  photoId?: string | null;
 }
 
 /**
@@ -71,6 +75,10 @@ export class ApiService implements SyncApi {
         salePriceFcfa: dto.salePriceFcfa,
         tracksStock: dto.tracksStock,
         quantityOnHand: dto.quantityOnHand,
+        familyId: dto.familyId,
+        familyName: dto.familyName,
+        formatLabel: dto.formatLabel ?? null,
+        photoId: dto.photoId ?? null,
       }));
   }
 

@@ -23,6 +23,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<ProductRow> Products => Set<ProductRow>();
 
+    internal DbSet<ProductFamilyRow> ProductFamilies => Set<ProductFamilyRow>();
+
+    internal DbSet<PhotoRow> Photos => Set<PhotoRow>();
+
     internal DbSet<StockMovementRow> StockMovements => Set<StockMovementRow>();
 
     internal DbSet<CommerceRow> Commerces => Set<CommerceRow>();
@@ -47,6 +51,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigurePayments(modelBuilder.Entity<PaymentRow>());
         ConfigureAudit(modelBuilder.Entity<AuditRow>());
         ConfigureUsers(modelBuilder.Entity<UserRow>());
+        ConfigureProductFamilies(modelBuilder.Entity<ProductFamilyRow>());
+        ConfigurePhotos(modelBuilder.Entity<PhotoRow>());
         ConfigureProducts(modelBuilder.Entity<ProductRow>());
         ConfigureStockMovements(modelBuilder.Entity<StockMovementRow>());
         ConfigureCommerces(modelBuilder.Entity<CommerceRow>());
@@ -223,6 +229,24 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         invitation.Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
     }
 
+    private static void ConfigureProductFamilies(EntityTypeBuilder<ProductFamilyRow> family)
+    {
+        family.ToTable("product_families");
+        family.HasKey(row => row.Id);
+        family.Property(row => row.Name).HasMaxLength(200);
+        family.Property(row => row.Category).HasMaxLength(100);
+        family.HasOne<PhotoRow>().WithMany().HasForeignKey(row => row.PhotoId).OnDelete(DeleteBehavior.SetNull);
+        family.HasIndex(row => new { row.TenantId, row.Name });
+    }
+
+    private static void ConfigurePhotos(EntityTypeBuilder<PhotoRow> photo)
+    {
+        photo.ToTable("photos", table => table.HasCheckConstraint("ck_photos_size", "removed_at IS NOT NULL OR octet_length(data) BETWEEN 1 AND 204800"));
+        photo.HasKey(row => row.Id);
+        photo.Property(row => row.ContentType).HasMaxLength(32);
+        photo.HasIndex(row => row.TenantId);
+    }
+
     private static void ConfigureProducts(EntityTypeBuilder<ProductRow> product)
     {
         product.ToTable("products", table =>
@@ -233,6 +257,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         product.Property(row => row.Name).HasMaxLength(200);
         product.Property(row => row.Barcode).HasMaxLength(64);
         product.Property(row => row.Category).HasMaxLength(100);
+        product.Property(row => row.FormatLabel).HasMaxLength(40);
+        product.HasOne<ProductFamilyRow>().WithMany().HasForeignKey(row => row.FamilyId).OnDelete(DeleteBehavior.Restrict);
+        product.HasOne<PhotoRow>().WithMany().HasForeignKey(row => row.PhotoId).OnDelete(DeleteBehavior.SetNull);
+        product.HasIndex(row => row.FamilyId);
 
         // xmin, colonne système de PostgreSQL, sert de jeton de concurrence : deux ventes simultanées
         // ne s'écrasent pas, la seconde échoue et sera rejouée.

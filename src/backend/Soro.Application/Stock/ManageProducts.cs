@@ -21,6 +21,7 @@ public sealed record CreateProductResult(ProductId ProductId, bool AlreadyProces
 public sealed class CreateProductHandler(
     ICurrentUser user,
     IProductRepository products,
+    IProductFamilyRepository families,
     IAuditTrail audit,
     IClock clock,
     IUnitOfWork unitOfWork)
@@ -59,6 +60,9 @@ public sealed class CreateProductHandler(
                 return Result<CreateProductResult>.Failure(BarcodeTakenError);
             }
 
+            // Un produit créé seul est sa propre famille, à un format sans libellé (même identifiant).
+            await families.AddAsync(
+                ProductFamily.Create(product.FamilyId, user.Tenant, product.Name, product.Category, clock.UtcNow), cancellationToken);
             await products.AddAsync(product, cancellationToken);
             await audit.RecordAsync(
                 new AuditEntry(user.Tenant, user.User, AuditActions.ProductCreated, product.Id.Value, product.Name, clock.UtcNow),
@@ -86,12 +90,17 @@ public sealed record UpdateProductCommand(
     string? Category,
     long PurchasePriceFcfa,
     long SalePriceFcfa,
-    int AlertThreshold);
+    int AlertThreshold,
+    string? FormatLabel = null);
 
-/// <summary>Modification d'une fiche produit (CAT-02). Les changements de prix sont tracés.</summary>
+/// <summary>
+/// Modification d'une fiche produit (CAT-02). Les changements de prix sont tracés. Le nom et la catégorie sont ceux de la <b>famille</b> (tous
+/// ses formats suivent) ; le libellé est celui du format.
+/// </summary>
 public sealed class UpdateProductHandler(
     ICurrentUser user,
     IProductRepository products,
+    IProductFamilyRepository families,
     IAuditTrail audit,
     IClock clock,
     IUnitOfWork unitOfWork)
@@ -114,6 +123,21 @@ public sealed class UpdateProductHandler(
         try
         {
             var before = product.SalePrice;
+            var family = await families.GetAsync(product.FamilyId, user.Tenant, cancellationToken);
+            var isNewFamily = family is null;
+            family ??= ProductFamily.Create(product.FamilyId, user.Tenant, product.Name, product.Category, clock.UtcNow);
+            var siblings = (await products.ListByFamilyAsync(product.FamilyId, user.Tenant, cancellationToken))
+                .Where(other => other.Id != product.Id)
+                .ToArray();
+            var label = FormatLabel.Normalize(command.FormatLabel);
+            var labelProblem = FamilyRules.LabelProblem(label, siblings.Select(other => other.FormatLabel), siblings.Length + 1);
+            if (labelProblem is not null)
+            {
+                return Result<ProductId>.Failure(ApplicationError.RuleViolation(labelProblem));
+            }
+
+            var familyChanged = family.Name != command.Name.Trim() || family.Category != Clean(command.Category);
+            family.Rename(command.Name, command.Category);
             product.Edit(
                 command.Name,
                 command.Barcode,
@@ -121,11 +145,27 @@ public sealed class UpdateProductHandler(
                 Money.Fcfa(command.PurchasePriceFcfa),
                 Money.Fcfa(command.SalePriceFcfa),
                 command.AlertThreshold);
+            product.Describe(family, label);
 
             if (product.Barcode is not null
                 && await products.IsBarcodeUsedAsync(user.Tenant, product.Barcode, product.Id, cancellationToken))
             {
                 return Result<ProductId>.Failure(CreateProductHandler.BarcodeTakenError);
+            }
+
+            if (isNewFamily)
+            {
+                await families.AddAsync(family, cancellationToken);
+            }
+            else if (familyChanged)
+            {
+                await families.UpdateAsync(family, cancellationToken);
+            }
+
+            foreach (var sibling in siblings.Where(_ => familyChanged))
+            {
+                sibling.Describe(family, sibling.FormatLabel);
+                await products.UpdateAsync(sibling, cancellationToken);
             }
 
             await products.UpdateAsync(product, cancellationToken);
@@ -146,6 +186,8 @@ public sealed class UpdateProductHandler(
             return Result<ProductId>.Failure(ApplicationError.RuleViolation(exception.Message));
         }
     }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public sealed record DeactivateProductCommand(ProductId Id);

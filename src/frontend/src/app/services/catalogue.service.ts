@@ -17,7 +17,11 @@ export class CatalogueService {
   readonly refreshing = this.refreshingSignal.asReadonly();
   readonly refreshFailed = this.refreshFailedSignal.asReadonly();
 
+  /** Dernière recherche affichée : une recopie du serveur qui se termine pendant la saisie ne doit pas l'effacer. */
+  private lastTerm: string | undefined;
+
   async loadLocal(term?: string): Promise<void> {
+    this.lastTerm = term;
     this.productsSignal.set(await (await this.journalService.get()).listProducts(term));
   }
 
@@ -32,7 +36,7 @@ export class CatalogueService {
       this.refreshFailedSignal.set(true);
     } finally {
       this.refreshingSignal.set(false);
-      await this.loadLocal();
+      await this.loadLocal(this.lastTerm);
     }
   }
 

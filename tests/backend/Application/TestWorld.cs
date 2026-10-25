@@ -82,6 +82,10 @@ internal sealed class TestWorld
 
     public InMemoryProductRepository Products { get; } = new();
 
+    public InMemoryProductFamilyRepository Families { get; } = new();
+
+    public InMemoryPhotoStore Photos { get; } = new();
+
     public InMemoryStockMovementRepository Movements { get; } = new();
 
     public InMemoryUserRepository Users { get; } = new();
@@ -150,9 +154,23 @@ internal sealed class TestWorld
 
     public DisableUserHandler DisableUser => new(Current, Users, Audit, Clock, UnitOfWork);
 
-    public CreateProductHandler CreateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
+    public CreateProductHandler CreateProduct => new(Current, Products, Families, Audit, Clock, UnitOfWork);
 
-    public UpdateProductHandler UpdateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
+    public UpdateProductHandler UpdateProduct => new(Current, Products, Families, Audit, Clock, UnitOfWork);
+
+    public CreateFamilyHandler CreateFamily => new(Current, Families, Products, Audit, Clock, UnitOfWork);
+
+    public AddFormatHandler AddFormat => new(Current, Families, Products, Audit, Clock, UnitOfWork);
+
+    public UpdateFamilyHandler UpdateFamily => new(Current, Families, Products, Audit, Clock, UnitOfWork);
+
+    public GroupIntoFamilyHandler GroupIntoFamily => new(Current, Families, Products, Audit, Clock, UnitOfWork);
+
+    public SetPhotoHandler SetPhoto => new(Current, Families, Products, Photos, UnitOfWork);
+
+    public RemovePhotoHandler RemovePhoto => new(Current, Families, Products, Photos, UnitOfWork);
+
+    public GetPhotoHandler GetPhoto => new(Current, Photos);
 
     public DeactivateProductHandler DeactivateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
 
@@ -160,9 +178,9 @@ internal sealed class TestWorld
 
     public RecordStockLossHandler RecordStockLoss => new(Current, Products, Movements, Audit, Clock, UnitOfWork);
 
-    public ListProductsHandler ListProducts => new(Current, Products);
+    public ListProductsHandler ListProducts => new(Current, Products, Families);
 
-    public ListLowStockHandler ListLowStock => new(Current, Products);
+    public ListLowStockHandler ListLowStock => new(Current, Products, Families);
 
     public ListStockMovementsHandler ListStockMovements => new(Current, Products, Movements);
 
@@ -231,6 +249,7 @@ internal sealed class TestWorld
         }
 
         Products.Put(product);
+        Families.Put(ProductFamily.Create(product.FamilyId, product.Tenant, product.Name, product.Category, Morning));
         return product;
     }
 

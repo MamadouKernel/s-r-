@@ -90,4 +90,63 @@ describe('ProductsApi', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 409, code: 'barcode_taken' });
   });
+
+  const format = { productId: 'f-1', label: '1 L', barcode: null, purchasePriceFcfa: 180, salePriceFcfa: 300, alertThreshold: 3, tracksStock: true };
+
+  it('creates a family with its formats, adds a format, renames a family and groups products on the right routes', async () => {
+    const created = api.createFamily({ familyId: 'fam', name: 'Eau minérale', category: null, formats: [format] });
+    const post = http.expectOne('/api/v1/product-families');
+    expect(post.request.method).toBe('POST');
+    expect(post.request.body).toEqual({ familyId: 'fam', name: 'Eau minérale', category: null, formats: [format] });
+    post.flush({ familyId: 'fam', alreadyProcessed: false });
+    await created;
+
+    const added = api.addFormat('fam', format, '50 cl');
+    const addRequest = http.expectOne('/api/v1/product-families/fam/formats');
+    expect(addRequest.request.body).toEqual({ format, labelForExistingFormat: '50 cl' });
+    addRequest.flush({ productId: 'f-1', alreadyProcessed: false });
+    await added;
+
+    const renamed = api.updateFamily('fam', { name: 'Eau de source', category: 'Eaux' });
+    const put = http.expectOne('/api/v1/product-families/fam');
+    expect(put.request.method).toBe('PUT');
+    put.flush(null, { status: 204, statusText: 'No Content' });
+    await renamed;
+
+    const grouped = api.group({ familyId: 'g', name: 'Eau', category: null, members: [{ productId: 'a', label: '1 L' }] });
+    const groupRequest = http.expectOne('/api/v1/product-families/group');
+    expect(groupRequest.request.body.members).toEqual([{ productId: 'a', label: '1 L' }]);
+    groupRequest.flush({ familyId: 'g', alreadyProcessed: false });
+    await grouped;
+  });
+
+  it('sends a family photo or a format photo as raw bytes and returns the new photo id, and removes it', async () => {
+    const image = new Blob(['x'], { type: 'image/jpeg' });
+
+    const family = api.setPhoto('family', 'fam', image);
+    const familyRequest = http.expectOne('/api/v1/product-families/fam/photo');
+    expect(familyRequest.request.method).toBe('PUT');
+    expect(familyRequest.request.body).toBe(image);
+    expect(familyRequest.request.headers.get('Content-Type')).toBe('image/jpeg');
+    familyRequest.flush({ photoId: 'ph-1' });
+    expect(await family).toBe('ph-1');
+
+    const own = api.setPhoto('format', 'f-1', image);
+    http.expectOne('/api/v1/products/f-1/photo').flush({ photoId: 'ph-2' });
+    expect(await own).toBe('ph-2');
+
+    const removed = api.removePhoto('format', 'f-1');
+    const del = http.expectOne('/api/v1/products/f-1/photo');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null, { status: 204, statusText: 'No Content' });
+    await removed;
+  });
+
+  it('sends the format label with a product update', async () => {
+    const update = api.update('p-1', { name: 'Eau', barcode: null, category: null, purchasePriceFcfa: 1, salePriceFcfa: 2, alertThreshold: 0, formatLabel: '1 L' });
+    const put = http.expectOne('/api/v1/products/p-1');
+    expect(put.request.body.formatLabel).toBe('1 L');
+    put.flush(null, { status: 204, statusText: 'No Content' });
+    await update;
+  });
 });

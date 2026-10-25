@@ -21,7 +21,11 @@ public sealed record CreateProductRequest
 
 public sealed record UpdateProductRequest
 {
+    /// <summary>Le nom de la famille : tous ses formats suivent.</summary>
     public required string Name { get; init; }
+
+    /// <summary>Le format de ce produit dans sa famille (« 1,5 L »).</summary>
+    public string? FormatLabel { get; init; }
 
     public string? Barcode { get; init; }
 
@@ -58,3 +62,63 @@ public sealed record ProductCreatedResponse(Guid ProductId, bool AlreadyProcesse
 
 /// <param name="PurchasePriceFcfa">Le prix d'achat moyen après une réception (RG-11) ; absent après une perte.</param>
 public sealed record StockChangedResponse(Guid MovementId, int QuantityOnHand, bool AlreadyProcessed, long? PurchasePriceFcfa = null);
+
+public sealed record FormatRequest
+{
+    public required Guid ProductId { get; init; }
+
+    public string? Label { get; init; }
+
+    public string? Barcode { get; init; }
+
+    public required long PurchasePriceFcfa { get; init; }
+
+    public required long SalePriceFcfa { get; init; }
+
+    public int AlertThreshold { get; init; }
+
+    public bool TracksStock { get; init; } = true;
+}
+
+public sealed record CreateFamilyRequest
+{
+    public required Guid FamilyId { get; init; }
+
+    public required string Name { get; init; }
+
+    public string? Category { get; init; }
+
+    public required IReadOnlyList<FormatRequest> Formats { get; init; }
+}
+
+public sealed record AddFormatRequest
+{
+    public required FormatRequest Format { get; init; }
+
+    /// <summary>Libellé à donner au format actuel quand la famille n'en a qu'un, sans libellé.</summary>
+    public string? LabelForExistingFormat { get; init; }
+}
+
+public sealed record UpdateFamilyRequest
+{
+    public required string Name { get; init; }
+
+    public string? Category { get; init; }
+}
+
+public sealed record GroupMemberRequest(Guid ProductId, string Label);
+
+public sealed record GroupIntoFamilyRequest
+{
+    public required Guid FamilyId { get; init; }
+
+    public required string Name { get; init; }
+
+    public string? Category { get; init; }
+
+    public required IReadOnlyList<GroupMemberRequest> Members { get; init; }
+}
+
+public sealed record FamilyCreatedResponse(Guid FamilyId, bool AlreadyProcessed);
+
+public sealed record PhotoChangedResponse(Guid PhotoId);

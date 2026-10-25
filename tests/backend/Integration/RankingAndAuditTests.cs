@@ -31,7 +31,7 @@ public sealed class RankingAndAuditTests(PostgresFixture fixture) : IDisposable
     {
         var product = Product.Create(ProductId.New(), tenant, name, null, null, Money.Fcfa(purchase), Money.Fcfa(price), 0, true, DayStart);
         await using var db = Db.App(fixture, tenant);
-        await new ProductRepository(db).AddAsync(product, Ct);
+        await ProductSeed.AddAsync(db, product, Ct);
         await new EfUnitOfWork(db).CommitAsync(Ct);
         return (product.Id, name);
     }

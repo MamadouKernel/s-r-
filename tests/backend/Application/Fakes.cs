@@ -182,6 +182,11 @@ internal sealed class InMemoryProductRepository : IProductRepository
             .OrderBy(product => product.QuantityOnHand)
             .ToArray());
 
+    public Task<IReadOnlyList<Product>> ListByFamilyAsync(FamilyId family, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Product>>(_products
+            .Where(product => product.Tenant == tenant && product.FamilyId == family)
+            .ToArray());
+
     public Task AddAsync(Product product, CancellationToken cancellationToken)
     {
         _products.Add(product);
@@ -189,6 +194,55 @@ internal sealed class InMemoryProductRepository : IProductRepository
     }
 
     public Task UpdateAsync(Product product, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class InMemoryProductFamilyRepository : IProductFamilyRepository
+{
+    private readonly List<ProductFamily> _families = [];
+
+    public void Put(ProductFamily family) => _families.Add(family);
+
+    public void Remove(FamilyId id) => _families.RemoveAll(family => family.Id == id);
+
+    public Task<ProductFamily?> GetAsync(FamilyId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_families.FirstOrDefault(family => family.Id == id && family.Tenant == tenant));
+
+    public Task<IReadOnlyList<ProductFamily>> ListAsync(TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ProductFamily>>(_families.Where(family => family.Tenant == tenant).ToArray());
+
+    public Task AddAsync(ProductFamily family, CancellationToken cancellationToken)
+    {
+        _families.Add(family);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(ProductFamily family, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class InMemoryPhotoStore : IPhotoStore
+{
+    private readonly List<Photo> _photos = [];
+
+    public int Count => _photos.Count;
+
+    public IReadOnlyList<Photo> All => _photos;
+
+    public void Put(Photo photo) => _photos.Add(photo);
+
+    public Task<Photo?> GetAsync(PhotoId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_photos.FirstOrDefault(photo => photo.Id == id && photo.Tenant == tenant));
+
+    public Task AddAsync(Photo photo, CancellationToken cancellationToken)
+    {
+        _photos.Add(photo);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(PhotoId id, TenantId tenant, CancellationToken cancellationToken)
+    {
+        _photos.RemoveAll(photo => photo.Id == id && photo.Tenant == tenant);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryStockMovementRepository : IStockMovementRepository

@@ -16,6 +16,13 @@ export interface ManagedProduct {
   isActive: boolean;
   quantityOnHand: number;
   isLowStock: boolean;
+  /** Famille et format (docs/specs/formats-produits) ; absents d'une réponse d'avant les formats. */
+  familyId?: string;
+  familyName?: string;
+  formatLabel?: string | null;
+  photoId?: string | null;
+  /** Photo de la famille seule : la différence avec `photoId` dit si le format a la sienne. */
+  familyPhotoId?: string | null;
 }
 
 export type MovementKind = 'Reception' | 'Sale' | 'Loss' | 'SaleCancellation';
@@ -39,7 +46,29 @@ export interface ProductInput {
   purchasePriceFcfa: number;
   salePriceFcfa: number;
   alertThreshold: number;
+  /** Format du produit dans sa famille ; `name` est alors le nom de la famille. */
+  formatLabel?: string | null;
 }
+
+/** Un format à créer : son identifiant est fixé à l'ouverture du formulaire pour qu'un nouvel essai ne le crée pas deux fois. */
+export interface FormatInput {
+  productId: string;
+  label: string | null;
+  barcode: string | null;
+  purchasePriceFcfa: number;
+  salePriceFcfa: number;
+  alertThreshold: number;
+  tracksStock: boolean;
+}
+
+export interface CreateFamilyInput {
+  familyId: string;
+  name: string;
+  category: string | null;
+  formats: FormatInput[];
+}
+
+export type PhotoOwner = 'family' | 'format';
 
 export interface StockChange {
   movementId: string;
@@ -75,6 +104,37 @@ export class ProductsApi {
 
   async update(id: string, input: ProductInput): Promise<void> {
     await this.call(this.http.put(`${API_ROOT}/products/${id}`, input));
+  }
+
+  async createFamily(input: CreateFamilyInput): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/product-families`, input));
+  }
+
+  /** `labelForExistingFormat` : le libellé à donner au format actuel quand la famille n'en a qu'un, sans libellé. */
+  async addFormat(familyId: string, format: FormatInput, labelForExistingFormat: string | null = null): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/product-families/${familyId}/formats`, { format, labelForExistingFormat }));
+  }
+
+  async updateFamily(familyId: string, input: { name: string; category: string | null }): Promise<void> {
+    await this.call(this.http.put(`${API_ROOT}/product-families/${familyId}`, input));
+  }
+
+  async group(input: { familyId: string; name: string; category: string | null; members: { productId: string; label: string }[] }): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/product-families/group`, input));
+  }
+
+  /** Envoie l'image (déjà réduite) et renvoie l'identifiant de la nouvelle photo. */
+  async setPhoto(owner: PhotoOwner, ownerId: string, image: Blob): Promise<string> {
+    const route = owner === 'family' ? 'product-families' : 'products';
+    const response = await this.call(
+      this.http.put<{ photoId: string }>(`${API_ROOT}/${route}/${ownerId}/photo`, image, { headers: { 'Content-Type': image.type || 'image/jpeg' } }),
+    );
+    return response.photoId;
+  }
+
+  async removePhoto(owner: PhotoOwner, ownerId: string): Promise<void> {
+    const route = owner === 'family' ? 'product-families' : 'products';
+    await this.call(this.http.delete(`${API_ROOT}/${route}/${ownerId}/photo`));
   }
 
   async deactivate(id: string): Promise<void> {

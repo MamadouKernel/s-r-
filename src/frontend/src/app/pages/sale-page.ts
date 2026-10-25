@@ -1,17 +1,21 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { formatFcfa } from '../core/money';
 import { cartTotal } from '../domain/cart';
+import { FamilyGroup, groupByFamily } from '../domain/families';
 import { CartLine, CatalogueProduct } from '../domain/types';
 import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
+import { ProductAvatar } from '../shared/product-avatar';
 import { PaymentPanel } from './payment-panel';
 
 const MAX_VISIBLE = 60;
+/** En dessous de ce stock, le choix du format écrit « Plus que N » pour prévenir le caissier. */
+const LOW_STOCK_HINT = 5;
 
 /** S4 : catalogue (recherche, scan) et panier. Le total reste visible (DESIGN.md §4, §5). */
 @Component({
   selector: 'app-sale-page',
-  imports: [PaymentPanel],
+  imports: [PaymentPanel, ProductAvatar],
   template: `
     <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
 
@@ -84,17 +88,50 @@ const MAX_VISIBLE = 60;
             </p>
           } @else {
             <ul class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              @for (product of visible(); track product.id) {
-                <li class="flex">
-                  <button type="button" class="btn h-full w-full flex-col items-start justify-start gap-1 !py-3 text-left" (click)="add(product)">
-                    <span class="text-base font-semibold">{{ product.name }}</span>
-                    <span class="amount text-lg font-bold text-feuille">{{ format(product.salePriceFcfa) }}</span>
-                    @if (product.tracksStock) {
-                      <span class="amount text-sm font-normal" [class.text-erreur]="product.quantityOnHand <= 0">
-                        {{ product.quantityOnHand <= 0 ? 'Rupture de stock' : 'Stock : ' + product.quantityOnHand }}
-                      </span>
-                    }
+              @for (family of visible(); track family.familyId) {
+                <li class="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    class="btn h-full w-full justify-start gap-3 !py-3 text-left"
+                    [attr.aria-expanded]="family.formats.length > 1 ? openFamily() === family.familyId : null"
+                    (click)="choose(family)"
+                  >
+                    <app-product-avatar [name]="family.title" [photoId]="family.photoId" />
+                    <span class="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span class="text-base font-semibold">{{ family.title }}</span>
+                      @if (family.formats.length === 1) {
+                        <span class="amount text-lg font-bold text-feuille">{{ format(family.formats[0].salePriceFcfa) }}</span>
+                        @if (family.formats[0].tracksStock) {
+                          <span class="amount text-sm font-normal" [class.text-erreur]="family.formats[0].quantityOnHand <= 0">
+                            {{ family.formats[0].quantityOnHand <= 0 ? 'Rupture de stock' : 'Stock : ' + family.formats[0].quantityOnHand }}
+                          </span>
+                        }
+                      } @else {
+                        <span class="amount text-sm font-normal text-ardoise">
+                          {{ family.formats.length }} formats · de {{ format(family.formats[0].salePriceFcfa) }} à {{ format(family.formats[family.formats.length - 1].salePriceFcfa) }}
+                        </span>
+                      }
+                    </span>
                   </button>
+                  @if (family.formats.length > 1 && openFamily() === family.familyId) {
+                    <div class="panel flex flex-col gap-2 border-feuille" role="group" [attr.aria-label]="family.name + ' : choisissez le format'">
+                      <p class="font-semibold">{{ family.name }} : quel format ?</p>
+                      @for (item of family.formats; track item.id) {
+                        <button
+                          type="button"
+                          class="btn w-full flex-wrap justify-between gap-x-3 !py-3 text-left"
+                          [attr.aria-label]="item.name + ', ' + format(item.salePriceFcfa) + stockPhrase(item)"
+                          (click)="addFormat(item)"
+                        >
+                          <span class="text-xl font-bold">{{ item.formatLabel }}</span>
+                          <span class="amount text-lg font-bold text-feuille">{{ format(item.salePriceFcfa) }}</span>
+                          @if (item.tracksStock) {
+                            <span class="amount w-full text-sm font-normal" [class.text-erreur]="item.quantityOnHand <= 0">{{ stockText(item) }}</span>
+                          }
+                        </button>
+                      }
+                    </div>
+                  }
                 </li>
               }
             </ul>
@@ -192,9 +229,11 @@ export class SalePage implements OnInit {
   protected readonly holdLabel = signal('');
   protected readonly confirmDelete = signal<string | null>(null);
   protected readonly message = signal('');
-  protected readonly visible = computed(() => this.catalogue.products().slice(0, MAX_VISIBLE));
+  protected readonly openFamily = signal<string | null>(null);
+  protected readonly families = computed(() => groupByFamily(this.catalogue.products()));
+  protected readonly visible = computed(() => this.families().slice(0, MAX_VISIBLE));
   protected readonly itemCount = computed(() => this.cash.cart().reduce((sum, line) => sum + line.quantity, 0));
-  protected readonly hiddenCount = computed(() => Math.max(this.catalogue.products().length - MAX_VISIBLE, 0));
+  protected readonly hiddenCount = computed(() => Math.max(this.families().length - MAX_VISIBLE, 0));
   protected format = formatFcfa;
 
   async ngOnInit(): Promise<void> {
@@ -206,6 +245,7 @@ export class SalePage implements OnInit {
 
   protected async search(term: string): Promise<void> {
     this.term.set(term);
+    this.openFamily.set(null);
     this.unknownCode.set('');
     await this.catalogue.loadLocal(term);
   }
@@ -272,6 +312,32 @@ export class SalePage implements OnInit {
 
   protected showCart(): void {
     document.getElementById('panier')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Une famille à un seul format s'ajoute d'un toucher ; sinon la carte ouvre (ou ferme) le choix du format. */
+  protected choose(family: FamilyGroup): void {
+    if (family.formats.length === 1) {
+      this.add(family.formats[0]);
+    } else {
+      this.openFamily.set(this.openFamily() === family.familyId ? null : family.familyId);
+    }
+  }
+
+  protected addFormat(product: CatalogueProduct): void {
+    this.add(product);
+    this.openFamily.set(null);
+  }
+
+  /** Disponibilité écrite en toutes lettres, jamais par la couleur seule. */
+  protected stockText(product: CatalogueProduct): string {
+    if (product.quantityOnHand <= 0) {
+      return 'Rupture de stock';
+    }
+    return product.quantityOnHand <= LOW_STOCK_HINT ? `Plus que ${product.quantityOnHand}` : `Stock : ${product.quantityOnHand}`;
+  }
+
+  protected stockPhrase(product: CatalogueProduct): string {
+    return product.tracksStock ? ', ' + this.stockText(product) : '';
   }
 
   protected add(product: CatalogueProduct): void {

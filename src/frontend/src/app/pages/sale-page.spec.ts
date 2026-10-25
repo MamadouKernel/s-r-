@@ -15,9 +15,9 @@ const jus: CatalogueProduct = {
   id: 'p-jus', name: 'Jus', barcode: '111', category: null, salePriceFcfa: 600, tracksStock: true, quantityOnHand: 24,
 };
 
-async function setup(api: Partial<ApiService> = {}) {
+async function setup(api: Partial<ApiService> = {}, catalogue: CatalogueProduct[] = [jus]) {
   const journal = await Journal.open(`soro-ui-${Math.random()}`);
-  await journal.replaceCatalogue([jus]);
+  await journal.replaceCatalogue(catalogue);
   TestBed.configureTestingModule({
     providers: [
       { provide: JournalService, useValue: { get: () => Promise.resolve(journal) } },
@@ -157,6 +157,131 @@ describe('ClosePage: held sales warning', () => {
     const fixture = TestBed.createComponent(ClosePage);
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).querySelector('[role="note"]')).toBeNull();
+  });
+});
+
+const water = (id: string, label: string, price: number, quantityOnHand: number): CatalogueProduct => ({
+  id, name: `Eau minérale · ${label}`, barcode: null, category: null, salePriceFcfa: price, tracksStock: true, quantityOnHand,
+  familyId: 'eau', familyName: 'Eau minérale', formatLabel: label, photoId: null,
+});
+const rice = (id: string, label: string, price: number): CatalogueProduct => ({
+  id, name: `Riz parfumé · ${label}`, barcode: null, category: null, salePriceFcfa: price, tracksStock: true, quantityOnHand: 20,
+  familyId: 'riz', familyName: 'Riz parfumé', formatLabel: label, photoId: null,
+});
+const catalogue = [
+  water('w15', '1,5 L', 400, 12), water('w1', '1 L', 300, 3), water('w30', '30 cl', 150, 0),
+  rice('r5', '5 kg', 3200), rice('r25', '25 kg', 14500), rice('r50', '50 kg', 27000),
+  { id: 'sel', name: 'Sel fin', barcode: '999', category: null, salePriceFcfa: 200, tracksStock: true, quantityOnHand: 40 },
+];
+
+async function openSale() {
+  const { cash } = await setup({ products: vi.fn().mockResolvedValue(catalogue) }, catalogue);
+  const fixture = TestBed.createComponent(SalePage);
+  await fixture.whenStable();
+  const root = fixture.nativeElement as HTMLElement;
+  const ui = helpers(root, () => fixture.whenStable());
+  await vi.waitFor(() => {
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Eau minérale');
+  });
+  return { cash, fixture, root, ui };
+}
+
+describe('SalePage: families and formats', () => {
+  it('shows one card per family, not one per format', async () => {
+    const { root } = await openSale();
+
+    const cards = [...root.querySelectorAll('ul.grid > li')].map((card) => card.textContent ?? '');
+    expect(cards).toHaveLength(3);
+    expect(cards.filter((card) => card.includes('Eau minérale'))).toHaveLength(1);
+    expect(root.textContent).toContain('3 formats');
+    expect(root.textContent).not.toContain('Eau minérale · 1 L');
+  });
+
+  it('adds a single-format product with one touch, as before', async () => {
+    const { cash, ui } = await openSale();
+
+    await ui.click('Sel fin');
+
+    expect(cash.cart().map((line) => line.name)).toEqual(['Sel fin']);
+  });
+
+  it('opens the choice of format with the price and the stock of each, and adds the chosen one', async () => {
+    const { cash, root, ui } = await openSale();
+
+    await ui.click('Eau minérale');
+    const choice = root.querySelector('[role="group"]')!;
+    expect(choice.textContent).toContain('1,5 L');
+    expect(choice.textContent).toContain('1 L');
+    expect(choice.textContent).toContain('30 cl');
+    expect(choice.textContent).toContain('Plus que 3');
+    expect(choice.textContent).toContain('Rupture de stock');
+    expect(cash.cart()).toEqual([]);
+
+    await ui.click('Eau minérale · 1 L');
+
+    expect(cash.cart().map((line) => [line.name, line.unitPriceFcfa])).toEqual([['Eau minérale · 1 L', 300]]);
+    expect(root.querySelector('[role="group"]')).toBeNull();
+  });
+
+  it('lists formats from the cheapest to the dearest', async () => {
+    const { root, ui } = await openSale();
+
+    await ui.click('Riz parfumé');
+
+    const labels = [...root.querySelectorAll('[role="group"] button')].map((button) => button.textContent ?? '');
+    expect(labels[0]).toContain('5 kg');
+    expect(labels[1]).toContain('25 kg');
+    expect(labels[2]).toContain('50 kg');
+  });
+
+  it('finds a format by its label and adds it with one touch when only that one is left', async () => {
+    const { cash, ui } = await openSale();
+
+    await ui.type('#recherche', 'riz 25');
+    await vi.waitFor(async () => {
+      await ui.click('Riz parfumé · 25 kg');
+      expect(cash.cart().map((line) => line.name)).toEqual(['Riz parfumé · 25 kg']);
+    });
+  });
+
+  it('keeps two formats of the same family on two lines of the cart', async () => {
+    const { cash, ui } = await openSale();
+
+    await ui.click('Eau minérale');
+    await ui.click('Eau minérale · 1,5 L');
+    await ui.click('Eau minérale');
+    await ui.click('Eau minérale · 1 L');
+
+    expect(cash.cart().map((line) => line.name).sort()).toEqual(['Eau minérale · 1 L', 'Eau minérale · 1,5 L']);
+  });
+
+  it('closes the choice when the family card is touched again', async () => {
+    const { root, ui } = await openSale();
+
+    await ui.click('Eau minérale');
+    expect(root.querySelector('[role="group"]')).not.toBeNull();
+    await ui.click('Eau minérale');
+
+    expect(root.querySelector('[role="group"]')).toBeNull();
+  });
+
+  it('adds the exact format of a scanned barcode', async () => {
+    const withCodes = catalogue.map((product) => (product.id === 'w1' ? { ...product, barcode: '222' } : product));
+    const { cash } = await setup({ products: vi.fn().mockResolvedValue(withCodes) }, withCodes);
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const ui = helpers(root, () => fixture.whenStable());
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.textContent).toContain('Eau minérale');
+    });
+
+    await ui.type('#recherche', '222');
+    root.querySelector('form[role="search"]')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect(cash.cart().map((line) => line.name)).toEqual(['Eau minérale · 1 L']));
+
   });
 });
 

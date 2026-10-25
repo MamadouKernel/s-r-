@@ -63,6 +63,14 @@ public sealed class ProductRepository(SoroDbContext db) : IProductRepository
         return rows.Select(ProductMapper.ToDomain).ToArray();
     }
 
+    public async Task<IReadOnlyList<Product>> ListByFamilyAsync(FamilyId family, TenantId tenant, CancellationToken cancellationToken)
+    {
+        var rows = await db.Products
+            .Where(product => product.TenantId == tenant.Value && product.FamilyId == family.Value)
+            .ToListAsync(cancellationToken);
+        return rows.Select(ProductMapper.ToDomain).ToArray();
+    }
+
     public Task AddAsync(Product product, CancellationToken cancellationToken)
     {
         db.Products.Add(ProductMapper.ToRow(product));

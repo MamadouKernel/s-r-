@@ -119,3 +119,15 @@ internal sealed class CapturingMail : Soro.Application.Signup.IEmailSender
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Insère un produit comme le fait la création : une famille d'abord (le produit seul est sa propre famille), puis le produit.</summary>
+internal static class ProductSeed
+{
+    public static async Task AddAsync(SoroDbContext db, Soro.Domain.Stock.Product product, CancellationToken cancellationToken)
+    {
+        await new ProductFamilyRepository(db).AddAsync(
+            Soro.Domain.Stock.ProductFamily.Create(product.FamilyId, product.Tenant, product.Name, product.Category, DateTimeOffset.UtcNow),
+            cancellationToken);
+        await new ProductRepository(db).AddAsync(product, cancellationToken);
+    }
+}

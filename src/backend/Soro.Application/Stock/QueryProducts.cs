@@ -8,7 +8,7 @@ namespace Soro.Application.Stock;
 public sealed record ListProductsQuery(string? Search, bool IncludeInactive);
 
 /// <summary>Catalogue du commerce courant (CAT-03), lisible par tous les profils authentifiés.</summary>
-public sealed class ListProductsHandler(ICurrentUser user, IProductRepository products)
+public sealed class ListProductsHandler(ICurrentUser user, IProductRepository products, IProductFamilyRepository families)
 {
     public async Task<IReadOnlyList<ProductView>> HandleAsync(
         ListProductsQuery query,
@@ -18,12 +18,13 @@ public sealed class ListProductsHandler(ICurrentUser user, IProductRepository pr
         var includeInactive = query.IncludeInactive && RolePolicy.CanManageCatalogue(user.Role);
         var found = await products.ListAsync(user.Tenant, query.Search, includeInactive, cancellationToken);
         var showPurchase = RolePolicy.CanSeePurchasePrice(user.Role);
-        return found.Select(product => ProductView.From(product, showPurchase)).ToArray();
+        var byId = (await families.ListAsync(user.Tenant, cancellationToken)).ToDictionary(family => family.Id);
+        return found.Select(product => ProductView.From(product, showPurchase, byId.GetValueOrDefault(product.FamilyId))).ToArray();
     }
 }
 
 /// <summary>Alertes de rupture (STK-05).</summary>
-public sealed class ListLowStockHandler(ICurrentUser user, IProductRepository products)
+public sealed class ListLowStockHandler(ICurrentUser user, IProductRepository products, IProductFamilyRepository families)
 {
     public async Task<Result<IReadOnlyList<ProductView>>> HandleAsync(CancellationToken cancellationToken = default)
     {
@@ -34,8 +35,9 @@ public sealed class ListLowStockHandler(ICurrentUser user, IProductRepository pr
         }
 
         var found = await products.ListLowStockAsync(user.Tenant, cancellationToken);
+        var byId = (await families.ListAsync(user.Tenant, cancellationToken)).ToDictionary(family => family.Id);
         return Result<IReadOnlyList<ProductView>>.Success(
-            found.Select(product => ProductView.From(product, showPurchasePrice: true)).ToArray());
+            found.Select(product => ProductView.From(product, showPurchasePrice: true, byId.GetValueOrDefault(product.FamilyId))).ToArray());
     }
 }
 
