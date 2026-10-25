@@ -9,7 +9,9 @@ import { CatalogueService } from '../services/catalogue.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ProductAvatar } from '../shared/product-avatar';
 import { RouterLink } from '@angular/router';
+import { ReceiptService } from '../services/receipt.service';
 import { PaymentPanel } from './payment-panel';
+import { TicketActions } from './ticket-actions';
 
 const MAX_VISIBLE = 60;
 /** En dessous de ce stock, le choix du format écrit « Plus que N » pour prévenir le caissier. */
@@ -18,7 +20,7 @@ const LOW_STOCK_HINT = 5;
 /** S4 : catalogue (recherche, scan) et panier. Le total reste visible (DESIGN.md §4, §5). */
 @Component({
   selector: 'app-sale-page',
-  imports: [PaymentPanel, ProductAvatar, RouterLink],
+  imports: [PaymentPanel, ProductAvatar, RouterLink, TicketActions],
   template: `
     <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
 
@@ -56,6 +58,18 @@ const LOW_STOCK_HINT = 5;
                 <p class="field-help">Pour reprendre une vente en attente, mettez d’abord le panier en cours en attente ou videz-le.</p>
               }
             </section>
+          }
+
+          @if (receipts.last(); as lastTicket) {
+            @if (reprinting()) {
+              <section class="panel mb-4" aria-labelledby="dernier-ticket-titre">
+                <h3 id="dernier-ticket-titre" class="mb-2 text-lg font-bold">Dernier ticket</h3>
+                <app-ticket-actions [receipt]="lastTicket" />
+                <button type="button" class="btn mt-3" (click)="reprinting.set(false)">Fermer</button>
+              </section>
+            } @else {
+              <button type="button" class="btn mb-3" (click)="reprinting.set(true)">Réimprimer le dernier ticket</button>
+            }
           }
 
           <form (submit)="scan($event)" role="search">
@@ -234,6 +248,7 @@ export class SalePage implements OnInit {
   protected readonly catalogue = inject(CatalogueService);
   private readonly subscription = inject(SubscriptionService);
   private readonly auth = inject(AuthService);
+  protected readonly receipts = inject(ReceiptService);
 
   /** Abonnement terminé (lecture seule) : on ne démarre plus de nouvel encaissement ; l'écran dit pourquoi et vers qui se tourner. */
   protected readonly suspended = this.subscription.readOnly;
@@ -241,6 +256,7 @@ export class SalePage implements OnInit {
 
   protected readonly term = signal('');
   protected readonly paying = signal(false);
+  protected readonly reprinting = signal(false);
   protected readonly unknownCode = signal('');
   protected readonly announcement = signal('');
   protected readonly holding = signal(false);

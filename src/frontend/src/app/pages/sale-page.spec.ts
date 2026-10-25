@@ -12,6 +12,8 @@ import { JournalService } from '../services/journal.service';
 import { SyncService } from '../services/sync.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ClosePage } from './close-page';
+import { SaleOperation } from '../data/journal';
+import { ReceiptService } from '../services/receipt.service';
 import { SalePage } from './sale-page';
 
 const jus: CatalogueProduct = {
@@ -346,5 +348,44 @@ describe('SalePage: abonnement terminé', () => {
     expect(pay(root).every((button) => button.disabled)).toBe(true);
     expect(root.textContent).toContain('La vente est suspendue : l’abonnement est terminé.');
     expect(root.querySelector('a[href="/gestion/abonnement"]')?.textContent).toContain('Voir mon abonnement');
+  });
+});
+
+describe('SalePage: last ticket (docs/specs/etiquettes-tickets TKT-01)', () => {
+  const lastSale = {
+    kind: 'sale', seq: 5, status: 'pending', saleId: 's', sessionId: 'sess', at: new Date().toISOString(), discountFcfa: 0, netTotalFcfa: 600, changeFcfa: 0,
+    lines: [{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 1 }], payments: [{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }],
+  } as SaleOperation;
+
+  async function open(withReceipt: boolean) {
+    await setup();
+    if (withReceipt) {
+      await TestBed.inject(ReceiptService).remember(lastSale, null);
+    }
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const click = async (label: string) => {
+      [...root.querySelectorAll('button')].find((button) => button.textContent?.includes(label))!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+    return { root, click, has: (text: string) => (root.textContent ?? '').includes(text) };
+  }
+
+  it('offers nothing before a first sale', async () => {
+    expect((await open(false)).has('Réimprimer le dernier ticket')).toBe(false);
+  });
+
+  it('offers to print the last ticket again, with the same ways out as at the payment, then closes', async () => {
+    const page = await open(true);
+    expect(page.has('Imprimer le ticket')).toBe(false);
+
+    await page.click('Réimprimer le dernier ticket');
+    expect(page.has('Imprimer le ticket')).toBe(true);
+    expect(page.has('Copier le ticket')).toBe(true);
+
+    await page.click('Fermer');
+    expect(page.has('Imprimer le ticket')).toBe(false);
   });
 });
