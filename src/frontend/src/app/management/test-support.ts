@@ -26,6 +26,7 @@ export function fakeApi() {
     setPhoto: vi.fn().mockResolvedValue('photo-new'),
     removePhoto: vi.fn().mockResolvedValue(undefined),
     deactivate: vi.fn().mockResolvedValue(undefined),
+    createInternalBarcode: vi.fn().mockResolvedValue('2900000000018'),
     receive: vi.fn().mockResolvedValue({ movementId: 'm', quantityOnHand: 0, alreadyProcessed: false }),
     recordLoss: vi.fn().mockResolvedValue({ movementId: 'm', quantityOnHand: 0, alreadyProcessed: false }),
     movements: vi.fn().mockResolvedValue([]),

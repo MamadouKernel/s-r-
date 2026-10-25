@@ -56,4 +56,8 @@ describe('CATEGORIES', () => {
     const labels = ['user.pin.reset', 'user.enabled', 'user.role.changed', 'device.invitation.revoked'].map(actionLabel);
     expect(labels).toEqual(['PIN d’un membre changé', 'Compte réactivé', 'Rôle d’un membre changé', 'Lien d’ajout d’appareil annulé']);
   });
+
+  it('names the creation of an internal code', () => {
+    expect(actionLabel('product.barcode.created')).toBe('Code interne créé');
+  });
 });

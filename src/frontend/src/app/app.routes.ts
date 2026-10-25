@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, exportGuard, managementGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, exportGuard, managementGuard, labelsGuard, openSessionGuard, reportsGuard, teamGuard, userGuard, welcomeGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', pathMatch: 'full', redirectTo: 'bienvenue' },
@@ -111,6 +111,11 @@ export const routes: Routes = [
         path: 'appareils',
         canActivate: [devicesGuard],
         loadComponent: () => import('./management/devices-page').then((m) => m.DevicesPage),
+      },
+      {
+        path: 'etiquettes',
+        canActivate: [labelsGuard],
+        loadComponent: () => import('./management/labels-page').then((m) => m.LabelsPage),
       },
       {
         path: 'equipe/nouveau',

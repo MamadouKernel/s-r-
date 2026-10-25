@@ -54,6 +54,13 @@ interface FieldErrors {
           <label class="field-label mt-4" for="code-barres">Code-barres (facultatif)</label>
           <input id="code-barres" class="field font-mono" type="text" maxlength="64" autocomplete="off" inputmode="numeric" [value]="barcode()" (input)="barcode.set($any($event.target).value)" [attr.aria-invalid]="errors().barcode ? 'true' : null" aria-describedby="code-aide code-erreur" />
           <p id="code-aide" class="field-help">Un même code-barres ne peut servir qu’à un seul produit.</p>
+          @if (!barcode().trim() && productId()) {
+            <button type="button" class="btn mt-2" [disabled]="creatingCode()" (click)="createCode()">Créer un code interne</button>
+            <p class="field-help">Pour un article sans code-barres (vrac, pain…) : l’application en fabrique un que vous pourrez imprimer en étiquette.</p>
+          }
+          @if (codeNotice()) {
+            <p class="mt-2 font-semibold text-succes" role="status">{{ codeNotice() }}</p>
+          }
           <p id="code-erreur" class="field-error">{{ errors().barcode }}</p>
 
           <label class="field-label mt-4" for="categorie">Catégorie (facultatif)</label>
@@ -123,6 +130,8 @@ export class ProductFormPage implements OnInit {
   private readonly images = inject(ImageService);
 
   protected readonly productId = signal<string>('');
+  protected readonly creatingCode = signal(false);
+  protected readonly codeNotice = signal('');
   protected readonly familyId = signal('');
   protected readonly siblings = signal(1);
   protected readonly displayName = signal('');
@@ -241,6 +250,24 @@ export class ProductFormPage implements OnInit {
       this.photoError.set(describeError(error));
     } finally {
       this.photoBusy.set(false);
+    }
+  }
+
+  /** Le serveur fabrique et enregistre le code interne ; le champ le montre aussitôt (rien d'autre n'est enregistré avec lui). */
+  protected async createCode(): Promise<void> {
+    if (this.creatingCode()) {
+      return;
+    }
+    this.creatingCode.set(true);
+    this.failure.set('');
+    this.codeNotice.set('');
+    try {
+      this.barcode.set(await this.api.createInternalBarcode(this.productId()));
+      this.codeNotice.set('Code interne créé. Vous pouvez l’imprimer dans « Étiquettes ».');
+    } catch (error) {
+      this.failure.set(describeError(error));
+    } finally {
+      this.creatingCode.set(false);
     }
   }
 

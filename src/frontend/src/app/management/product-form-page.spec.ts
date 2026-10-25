@@ -132,3 +132,37 @@ describe('ProductFormPage: formats', () => {
     expect(api.removePhoto).toHaveBeenCalledWith('format', 'w1');
   });
 });
+
+describe('ProductFormPage: internal code (docs/specs/etiquettes-tickets ETQ-01)', () => {
+  it('offers to create an internal code for a product with no barcode, and fills the field with it', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9', barcode: null })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' }, role: 'Manager' });
+
+    await page.click('Créer un code interne');
+
+    expect(api.createInternalBarcode).toHaveBeenCalledWith('p-9');
+    expect(page.root.querySelector<HTMLInputElement>('#code-barres')!.value).toBe('2900000000018');
+    expect(page.root.querySelector('[role="status"]')?.textContent).toContain('Code interne créé');
+    expect(page.root.textContent).not.toContain('Créer un code interne');
+  });
+
+  it('does not offer it when the product already has a code', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9', barcode: '6111000000014' })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' }, role: 'Manager' });
+
+    expect(page.root.textContent).not.toContain('Créer un code interne');
+  });
+
+  it('shows the refusal of the server in French', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9', barcode: null })]);
+    api.createInternalBarcode.mockRejectedValue(new ApiError(403, 'forbidden', 'Seul un gérant peut créer un code-barres.'));
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' }, role: 'Manager' });
+
+    await page.click('Créer un code interne');
+
+    expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('pas le droit');
+  });
+});

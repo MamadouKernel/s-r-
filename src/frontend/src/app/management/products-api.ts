@@ -102,6 +102,12 @@ export class ProductsApi {
     await this.call(this.http.post(`${API_ROOT}/products`, { productId: id, ...input }));
   }
 
+  /** Le serveur fabrique le code interne (EAN-13, préfixe 29) d'un produit sans code-barres et le lui donne. */
+  async createInternalBarcode(id: string): Promise<string> {
+    const answer = await this.call(this.http.post<{ barcode: string }>(`${API_ROOT}/products/${id}/internal-barcode`, {}));
+    return answer.barcode;
+  }
+
   async update(id: string, input: ProductInput): Promise<void> {
     await this.call(this.http.put(`${API_ROOT}/products/${id}`, input));
   }
