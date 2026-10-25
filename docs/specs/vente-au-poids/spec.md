@@ -52,7 +52,7 @@ La saisie, le calcul, le total et le ticket fonctionnent hors ligne avec la copi
 1. **Riz au kilo.** Riz à 800 FCFA/kg, 25 kg en stock : vendre 1,250 kg donne 1 000 FCFA, stock 23,750 kg, ticket « 1,250 kg × 800 FCFA ».
 2. **Pour 1 000 francs.** Saisir 1 000 FCFA de riz à 800 FCFA/kg : 1,250 kg, total 1 000 FCFA.
 3. **Montant qui ne tombe pas juste.** 1 000 FCFA d'un produit à 700 FCFA/kg : 1,429 kg (arrondi au gramme), total réel 1 000 FCFA (1,429 × 700 = 1 000,3 → 1 000) ; l'écran écrit le résultat avant l'ajout.
-4. **Arrondi.** 0,333 kg à 800 FCFA/kg = 266,4 → 266 FCFA ; 0,3335 n'existe pas (trois décimales au plus) ; demi vers le haut : 0,0625… hors trois décimales ; 0,1875 kg refusé (4 décimales).
+4. **Arrondi.** 0,333 kg à 800 FCFA/kg = 266,4 → 266 FCFA ; 0,001 kg à 500 FCFA/kg = 0,5 → 1 FCFA (demi vers le haut) ; 0,0625 kg est refusé (trois décimales au plus : « Écrivez le poids avec trois décimales au plus. »).
 5. **Total exact.** Trois lignes pesées : le total encaissé est la somme des totaux de ligne arrondis, égal à celui du ticket et de l'historique.
 6. **Pièce inchangée.** Une bouteille à 600 FCFA vendue ×2 donne 1 200 FCFA, comme avant ; aucune virgule affichée.
 7. **Stock insuffisant.** Vendre 30 kg quand il en reste 25,500 : refusé avec « Il n'en reste que 25,500 kg. » (produit suivi).
