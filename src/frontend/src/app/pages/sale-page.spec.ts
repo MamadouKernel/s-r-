@@ -15,14 +15,14 @@ const jus: CatalogueProduct = {
   id: 'p-jus', name: 'Jus', barcode: '111', category: null, salePriceFcfa: 600, tracksStock: true, quantityOnHand: 24,
 };
 
-async function setup() {
+async function setup(api: Partial<ApiService> = {}) {
   const journal = await Journal.open(`soro-ui-${Math.random()}`);
   await journal.replaceCatalogue([jus]);
   TestBed.configureTestingModule({
     providers: [
       { provide: JournalService, useValue: { get: () => Promise.resolve(journal) } },
       { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null), counts: () => ({ pending: 0, synced: 0, rejected: 0 }) } },
-      { provide: ApiService, useValue: {} },
+      { provide: ApiService, useValue: api },
       { provide: AuthService, useValue: { device: () => ({ tenantId: 't', registerId: 'r', pointOfSaleId: 'p' }) } },
     ],
   });
@@ -157,5 +157,21 @@ describe('ClosePage: held sales warning', () => {
     const fixture = TestBed.createComponent(ClosePage);
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).querySelector('[role="note"]')).toBeNull();
+  });
+});
+
+describe('SalePage: catalogue', () => {
+  it('shows a product created on the server after the till was signed in, without signing in again', async () => {
+    const baguette: CatalogueProduct = {
+      id: 'p-baguette', name: 'Baguette', barcode: null, category: null, salePriceFcfa: 150, tracksStock: false, quantityOnHand: 0,
+    };
+    await setup({ products: vi.fn().mockResolvedValue([jus, baguette]) });
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Baguette');
+    });
   });
 });

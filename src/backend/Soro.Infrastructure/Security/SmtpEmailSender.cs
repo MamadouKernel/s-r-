@@ -40,7 +40,9 @@ public sealed partial class SmtpEmailSender(SmtpSettings settings, ILogger<SmtpE
 
         try
         {
-            using var client = new SmtpClient { Timeout = (int)Timeout.TotalMilliseconds };
+            // La liste de révocation (CRL) est souvent injoignable derrière un pare-feu ou un réseau filtré : sans cette exception la
+            // connexion échoue alors que le certificat est bon. La chaîne de confiance et le nom du serveur restent vérifiés.
+            using var client = new SmtpClient { Timeout = (int)Timeout.TotalMilliseconds, CheckCertificateRevocation = false };
             // Connexion ouverte à la main : certains réseaux mettent 20 secondes à répondre à une recherche IPv6 alors que l'IPv4 répond en quelques
             // millisecondes. La résolution par défaut attend les deux et dépasse le délai ; ici l'IPv4 passe d'abord, chaque étape a son délai.
             var socket = await OpenSocketAsync(settings.Host, settings.Port, cancellationToken);
