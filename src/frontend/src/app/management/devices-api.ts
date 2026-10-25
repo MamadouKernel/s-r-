@@ -18,6 +18,15 @@ export interface DeviceInvitation {
   expiresAt: string;
 }
 
+/** Un lien d'ajout d'appareil qui n'a pas encore servi. Ni le code ni le secret du lien ne sont rendus. */
+export interface PendingLink {
+  id: string;
+  name: string;
+  createdByName: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 /** Appareils du commerce : lecture, invitation et retrait, en ligne seulement. */
 @Injectable({ providedIn: 'root' })
 export class DevicesApi {
@@ -29,6 +38,14 @@ export class DevicesApi {
 
   invite(suggestedName: string | null): Promise<DeviceInvitation> {
     return this.call(this.http.post<DeviceInvitation>(`${API_ROOT}/devices/invitations`, { suggestedName }));
+  }
+
+  pendingInvitations(): Promise<PendingLink[]> {
+    return this.call(this.http.get<PendingLink[]>(`${API_ROOT}/devices/invitations`));
+  }
+
+  async revokeInvitation(id: string): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/devices/invitations/${id}/revoke`, {}));
   }
 
   async revoke(id: string): Promise<void> {

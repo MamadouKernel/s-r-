@@ -34,7 +34,7 @@ export function fakeApi() {
 
 export const member = (overrides: Partial<TeamMember> = {}): TeamMember => ({
   id: 'u-1', identifier: 'awa', displayName: 'Awa Koné', role: 'Cashier', status: 'Active', createdAt: '2026-10-01T08:00:00.000Z',
-  lastLoginAt: null, lockedUntil: null, canDisable: true, isSelf: false, ...overrides,
+  lastLoginAt: null, lockedUntil: null, canDisable: true, isSelf: false, canRenewCode: true, canEnable: false, canChangeRole: true, ...overrides,
 });
 
 /** Faux service d'équipe : annuaire vide par défaut, ce qui ramène l'auteur à son identifiant court. */
@@ -44,6 +44,9 @@ export function fakeTeamApi() {
     directory: vi.fn().mockResolvedValue([]),
     create: vi.fn().mockResolvedValue(undefined),
     disable: vi.fn().mockResolvedValue(undefined),
+    resetPin: vi.fn().mockResolvedValue(undefined),
+    enable: vi.fn().mockResolvedValue(undefined),
+    changeRole: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -92,6 +95,12 @@ export async function render<T>(
       input!.value = value;
       input!.dispatchEvent(new Event('input'));
       await fixture.whenStable();
+    },
+    select: async (selector: string, value: string) => {
+      const field = root.querySelector<HTMLSelectElement>(selector)!;
+      field.value = value;
+      field.dispatchEvent(new Event('change'));
+      await settle();
     },
     check: async (selector: string, checked: boolean) => {
       const input = root.querySelector<HTMLInputElement>(selector)!;

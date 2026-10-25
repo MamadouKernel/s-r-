@@ -14,6 +14,9 @@ export interface TeamMember {
   lockedUntil: string | null;
   canDisable: boolean;
   isSelf: boolean;
+  canRenewCode: boolean;
+  canEnable: boolean;
+  canChangeRole: boolean;
 }
 
 export interface Team {
@@ -52,6 +55,20 @@ export class TeamApi {
 
   async disable(id: string): Promise<void> {
     await this.call(this.http.post(`${API_ROOT}/users/${id}/disable`, {}));
+  }
+
+  /** Nouveau PIN d'un membre qui a oublié le sien ou dont le compte est bloqué. Le PIN n'est jamais rendu ni gardé. */
+  async resetPin(id: string, pin: string): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/users/${id}/pin`, { pin }));
+  }
+
+  /** Retour d'un membre désactivé, avec un nouveau PIN. */
+  async enable(id: string, pin: string): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/users/${id}/enable`, { pin }));
+  }
+
+  async changeRole(id: string, role: string): Promise<void> {
+    await this.call(this.http.put(`${API_ROOT}/users/${id}/role`, { role }));
   }
 
   private async call<T>(request: Observable<T>): Promise<T> {

@@ -49,4 +49,16 @@ describe('DevicesApi', () => {
     http.expectOne('/api/v1/devices').flush({ code: 'forbidden', detail: 'Seuls le propriétaire et le gérant peuvent voir les appareils.' }, { status: 403, statusText: 'Forbidden' });
     await expect(list).rejects.toMatchObject({ status: 403, code: 'forbidden' });
   });
+
+  it('lists the pending links and cancels one on the right route', async () => {
+    const pending = api.pendingInvitations();
+    http.expectOne('/api/v1/devices/invitations').flush([{ id: 'i-1', name: 'Caisse 2', createdByName: 'Issa', createdAt: 'x', expiresAt: 'y' }]);
+    expect((await pending)[0].createdByName).toBe('Issa');
+
+    const cancelled = api.revokeInvitation('i-1');
+    const request = http.expectOne('/api/v1/devices/invitations/i-1/revoke');
+    expect(request.request.method).toBe('POST');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await cancelled;
+  });
 });

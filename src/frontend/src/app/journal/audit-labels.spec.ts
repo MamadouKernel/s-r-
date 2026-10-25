@@ -51,4 +51,9 @@ describe('CATEGORIES', () => {
   it('offers a subscription filter in the journal', () => {
     expect(CATEGORIES).toContainEqual({ value: 'subscription', label: 'Abonnement' });
   });
+
+  it('names the team management actions in plain French', () => {
+    const labels = ['user.pin.reset', 'user.enabled', 'user.role.changed', 'device.invitation.revoked'].map(actionLabel);
+    expect(labels).toEqual(['PIN d’un membre changé', 'Compte réactivé', 'Rôle d’un membre changé', 'Lien d’ajout d’appareil annulé']);
+  });
 });

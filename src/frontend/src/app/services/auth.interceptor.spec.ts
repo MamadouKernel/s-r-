@@ -2,11 +2,12 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { FlashService } from '../management/flash.service';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from './auth.service';
 
 function setup(token: { value: string } | null = { value: 'jwt' }) {
-  const auth = { token: () => token, markDeviceRefused: vi.fn().mockResolvedValue(undefined) };
+  const auth = { token: () => token, markDeviceRefused: vi.fn().mockResolvedValue(undefined), logout: vi.fn().mockResolvedValue(undefined) };
   TestBed.configureTestingModule({
     providers: [provideRouter([]), provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting(), { provide: AuthService, useValue: auth }],
   });
@@ -50,5 +51,18 @@ describe('authInterceptor', () => {
     expect(status).toBe(403);
     expect(auth.markDeviceRefused).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('signs out and goes to the login with a plain message when the access has changed, keeping the device', async () => {
+    const { auth, navigate, client, http } = setup();
+
+    client.get('/api/v1/products').subscribe({ error: () => undefined });
+    http.expectOne('/api/v1/products').flush({ code: 'session_outdated' }, { status: 401, statusText: 'Unauthorized' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(auth.logout).toHaveBeenCalledOnce();
+    expect(auth.markDeviceRefused).not.toHaveBeenCalled();
+    expect(TestBed.inject(FlashService).current()).toBe('Votre accès a changé : reconnectez-vous.');
+    expect(navigate).toHaveBeenCalledWith('/connexion');
   });
 });
