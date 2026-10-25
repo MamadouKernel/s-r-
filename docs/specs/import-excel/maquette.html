@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — importer depuis Excel</title>
+<style>
+  :root { --ivoire:#f7f7f2; --surface:#fff; --charbon:#20231f; --ardoise:#626a63; --sauge:#dde2da; --feuille:#287a52; --avert:#a86412; --erreur:#b43a32; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ivoire); color:var(--charbon); font:16px/1.4 "Source Sans 3", system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1,h2,h3,p { margin:0; }
+  .note { background:#fff7e6; border-bottom:1px solid #ecd9a8; padding:10px 16px; font-size:14px; color:#6b4a0b; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--sauge); position:sticky; top:0; z-index:5; }
+  .tab { min-height:44px; padding:8px 14px; border:1px solid var(--sauge); border-radius:4px; background:var(--surface); font:inherit; font-weight:600; cursor:pointer; }
+  .tab[aria-selected="true"] { border-color:var(--feuille); color:var(--feuille); box-shadow:inset 0 -3px 0 var(--feuille); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  .screen { display:none; } .screen.on { display:block; }
+  .why { margin:0 0 16px; color:var(--ardoise); font-size:15px; }
+  .panel { background:var(--surface); border:1px solid var(--sauge); border-radius:4px; padding:16px; }
+  .panel + .panel { margin-top:12px; }
+  .btn,.btn-primary { min-height:48px; display:inline-flex; align-items:center; justify-content:center; padding:8px 16px; border-radius:4px; font:inherit; font-weight:600; cursor:pointer; border:1px solid var(--sauge); background:var(--surface); color:var(--charbon); text-decoration:none; }
+  .btn-primary { background:var(--feuille); border-color:var(--feuille); color:#fff; }
+  .btn-primary[disabled] { opacity:.5; cursor:not-allowed; }
+  .step { display:flex; gap:12px; align-items:flex-start; }
+  .num { width:32px; height:32px; border-radius:50%; background:var(--feuille); color:#fff; display:grid; place-items:center; font-weight:700; flex:none; }
+  .muted { color:var(--ardoise); font-size:14px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .stack > * + * { margin-top:12px; }
+  .drop { border:2px dashed var(--ardoise); border-radius:6px; padding:20px; text-align:center; background:#fbfbf8; }
+  .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .stat { border:1px solid var(--sauge); border-radius:4px; padding:12px; background:#fbfbf8; }
+  .stat b { display:block; font-size:28px; font-variant-numeric:tabular-nums; }
+  .tag { display:inline-block; font-size:13px; font-weight:700; padding:1px 8px; border-radius:3px; border:1px solid; }
+  .ok { color:var(--feuille); border-color:var(--feuille); } .bad { color:var(--erreur); border-color:var(--erreur); } .info { color:var(--avert); border-color:var(--avert); }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th,td { text-align:left; padding:8px 10px; border-top:1px solid var(--sauge); vertical-align:top; }
+  th { font-size:13px; color:var(--ardoise); border-top:0; }
+  td.n { font-variant-numeric:tabular-nums; white-space:nowrap; font-weight:700; }
+  .alert { border-left:4px solid var(--erreur); background:#fdf1f0; padding:12px 14px; border-radius:2px; }
+  .good { border-left:4px solid var(--feuille); background:#eef7f1; padding:12px 14px; border-radius:2px; }
+  .legend { margin-top:20px; padding:12px 16px; border-left:4px solid #426a82; background:#eef4f8; font-size:15px; }
+  details { margin-top:12px; } summary { cursor:pointer; font-weight:600; min-height:44px; display:flex; align-items:center; }
+</style>
+</head>
+<body>
+<div class="note"><strong>Maquette à valider</strong> — pas encore le vrai programme. Quatre étapes du même écran : choisir le fichier, voir les lignes à corriger, voir que tout est juste, lire le résultat. Cliquez sur les onglets.</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-t="s1">1. Début</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s2">2. Lignes à corriger</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s3">3. Tout est juste</button>
+  <button class="tab" role="tab" aria-selected="false" data-t="s4">4. Résultat</button>
+</div>
+
+<main>
+
+<section class="screen on" id="s1">
+  <p class="why">On y arrive depuis <b>Gestion → Produits → « Importer depuis Excel »</b> (visible pour le propriétaire et le gérant). En trois gestes : télécharger le modèle, le remplir, le choisir.</p>
+  <a class="btn" href="#" onclick="return false">← Retour aux produits</a>
+  <h1 style="margin:16px 0">Importer des produits depuis Excel</h1>
+  <div class="panel stack">
+    <div class="step"><span class="num">1</span><div class="stack">
+      <p><b>Téléchargez le modèle</b> et remplissez-le dans Excel : une ligne par produit, ou par format (5 kg, 25 kg…).</p>
+      <button class="btn">Télécharger le modèle Excel</button>
+      <details><summary>Comment remplir le fichier ?</summary>
+        <div class="stack muted">
+          <p>• Plusieurs lignes avec le même nom forment <b>un seul produit en plusieurs formats</b>.</p>
+          <p>• Prix et stock : des nombres entiers, sans virgule. Le prix de vente est obligatoire.</p>
+          <p>• Le « Stock de départ » est ce que vous avez aujourd'hui en rayon.</p>
+          <p>• Un produit déjà dans votre catalogue n'est jamais modifié.</p>
+        </div>
+      </details>
+    </div></div>
+  </div>
+  <div class="panel">
+    <div class="step"><span class="num">2</span><div class="stack" style="flex:1">
+      <p><b>Choisissez votre fichier rempli</b> (.xlsx, 2 Mo et 2 000 lignes au plus).</p>
+      <div class="drop"><button class="btn-primary" onclick="show('s2')">Choisir un fichier</button><p class="muted" style="margin-top:8px">Rien n'est enregistré à cette étape : nous vérifions d'abord votre fichier.</p></div>
+    </div></div>
+  </div>
+  <div class="legend">Messages prévus si le fichier n'est pas le bon : « Ce fichier n'est pas un classeur Excel (.xlsx). Utilisez le modèle à télécharger. » · « Ce fichier est trop lourd (2 Mo au plus). » · « Il manque la colonne « Prix de vente ». »</div>
+</section>
+
+<section class="screen" id="s2">
+  <p class="why">Le fichier est vérifié tout de suite. <b>S'il y a une seule ligne à corriger, rien n'est importé</b> : on corrige dans Excel, on rechoisit le fichier, et tout passe d'un coup. Toutes les erreurs sont listées ensemble, avec le numéro de ligne tel qu'Excel l'affiche.</p>
+  <h1 style="margin-bottom:12px">Importer des produits depuis Excel</h1>
+  <div class="panel stack">
+    <p><b>produits-octobre.xlsx</b> <span class="muted">· 42 lignes lues</span></p>
+    <div class="alert"><b>3 lignes sont à corriger.</b> Rien n'a été importé. Corrigez le fichier dans Excel, puis choisissez-le de nouveau.</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Ligne</th><th>Colonne</th><th>À corriger</th></tr></thead>
+      <tbody>
+        <tr><td class="n">5</td><td>Prix de vente</td><td>Le prix de vente doit être un nombre entier en FCFA, sans centimes.</td></tr>
+        <tr><td class="n">12</td><td>Format</td><td>Donnez un format à chaque ligne de ce produit (1 L, 50 kg…).</td></tr>
+        <tr><td class="n">31</td><td>Code-barres</td><td>Excel a transformé ce code-barres en nombre. Dans Excel, mettez la colonne en format Texte, puis retapez le code.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">Au plus 50 lignes sont affichées ; s'il y en a davantage, un message dit combien il en reste.</p>
+    <div class="row"><button class="btn-primary" onclick="show('s1')">Choisir un autre fichier</button><button class="btn">Télécharger le modèle</button></div>
+  </div>
+  <div class="panel">
+    <h3>Déjà dans votre catalogue <span class="tag info">2 lignes ignorées</span></h3>
+    <p class="muted" style="margin-top:6px">Ce ne sont pas des erreurs : ces produits existent déjà et ne seront pas modifiés. Ligne 7 : Savon Omo · Ligne 8 : Sel fin.</p>
+  </div>
+</section>
+
+<section class="screen" id="s3">
+  <p class="why">Quand tout est juste, on montre ce qui va être créé. Le bouton d'importation n'apparaît <b>que maintenant</b>, avec le nombre exact.</p>
+  <h1 style="margin-bottom:12px">Importer des produits depuis Excel</h1>
+  <div class="panel stack">
+    <p><b>produits-octobre.xlsx</b> <span class="muted">· 42 lignes lues</span></p>
+    <div class="good"><b>Votre fichier est prêt.</b> Voici ce qui sera créé.</div>
+    <div class="summary">
+      <div class="stat"><b>18</b>produits</div>
+      <div class="stat"><b>40</b>formats au total</div>
+      <div class="stat"><b>31</b>stocks de départ</div>
+      <div class="stat"><b>2</b>déjà dans votre catalogue (ignorés)</div>
+    </div>
+    <details><summary>Voir les produits ignorés</summary><p class="muted">Ligne 7 : Savon Omo — ce produit est déjà dans votre catalogue. · Ligne 8 : Sel fin — ce code-barres est déjà dans votre catalogue.</p></details>
+    <div class="row"><button class="btn-primary" onclick="show('s4')">Importer ces 18 produits</button><button class="btn" onclick="show('s1')">Annuler</button></div>
+    <p class="muted">Les stocks de départ seront enregistrés comme une première réception « Import Excel », visible dans l'historique de chaque produit.</p>
+  </div>
+</section>
+
+<section class="screen" id="s4">
+  <p class="why">Après l'importation : un message clair, et un lien pour retrouver les produits. Si la connexion coupe pendant l'envoi, on peut réessayer sans risque : rien ne sera créé en double.</p>
+  <h1 style="margin-bottom:12px">Importer des produits depuis Excel</h1>
+  <div class="panel stack">
+    <div class="good"><b>L'importation est terminée.</b> 18 produits (40 formats) ont été ajoutés à votre catalogue, avec 31 stocks de départ.</div>
+    <div class="row"><button class="btn-primary">Voir les produits</button><button class="btn" onclick="show('s1')">Importer un autre fichier</button></div>
+    <p class="muted">Astuce : ajoutez ensuite les photos depuis la fiche de chaque produit (facultatif).</p>
+  </div>
+  <div class="legend">Si le serveur répond « déjà traité » (réessai après une coupure), le message est : « Cette importation avait déjà été faite : rien n'a été ajouté en double. »</div>
+</section>
+
+</main>
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  function show(id) {
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.t === id)));
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.t)));
+</script>
+</body>
+</html>
