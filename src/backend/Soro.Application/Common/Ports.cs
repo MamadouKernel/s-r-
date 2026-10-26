@@ -33,6 +33,7 @@ public static class AuditActions
     public const string DiscountRefused = "sale.discount.refused";
     public const string SaleCancelled = "sale.cancelled";
     public const string CancelRefused = "sale.cancel.refused";
+    public const string SalePriceLowered = "sale.price.lowered";
     public const string UserDisabled = "user.disabled";
     public const string UserPinReset = "user.pin.reset";
     public const string UserEnabled = "user.enabled";

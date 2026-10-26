@@ -10,8 +10,8 @@ public class SaleStockTests
     private static RecordSaleCommand SaleOf(TestWorld world, params (ProductId Product, int Quantity)[] lines) =>
         world.CashSale(world.GivenOpenSession()) with
         {
-            Lines = lines.Select(line => new SaleLineInput(line.Product, "Produit", line.Quantity, 500)).ToArray(),
-            Payments = [new PaymentInput(PaymentId.New(), PaymentMethod.Cash, lines.Sum(line => 500L * line.Quantity), null, null)],
+            Lines = lines.Select(line => new SaleLineInput(line.Product, "Produit", line.Quantity, 600)).ToArray(),
+            Payments = [new PaymentInput(PaymentId.New(), PaymentMethod.Cash, lines.Sum(line => 600L * line.Quantity), null, null)],
         };
 
     [Fact]

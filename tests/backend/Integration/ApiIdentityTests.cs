@@ -215,9 +215,46 @@ public sealed class ApiIdentityTests(PostgresFixture fixture) : IDisposable
                 new { paymentId = Guid.NewGuid(), method = "Cash", amountFcfa = 800, tenderedFcfa = (long?)800, reference = (string?)null },
             },
             discountApproverId = manager.Id.Value,
+            discountApproverPin = "1234",
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_manager_identifier_without_the_pin_does_not_approve_a_discount()
+    {
+        var manager = await SeedAsync("gerant", Role.Manager);
+        await SeedAsync("caissiere", Role.Cashier);
+        using var cashier = await LoggedInAsync("caissiere");
+        var sessionId = Guid.NewGuid();
+        await cashier.PostAsJsonAsync("/api/v1/register-sessions", new
+        {
+            sessionId,
+            pointOfSaleId = Guid.NewGuid(),
+            registerId = Guid.NewGuid(),
+            openingFloatFcfa = 10_000,
+            openedAt = DateTimeOffset.UtcNow.AddHours(-2),
+        });
+
+        object Sale(string? pin) => new
+        {
+            saleId = Guid.NewGuid(),
+            sessionId,
+            localSequence = 1,
+            at = DateTimeOffset.UtcNow.AddHours(-1),
+            lines = new[] { new { productId = Guid.NewGuid(), name = "Produit", quantity = 1, unitPriceFcfa = 1_000 } },
+            discountFcfa = 200,
+            payments = new[] { new { paymentId = Guid.NewGuid(), method = "Cash", amountFcfa = 800, tenderedFcfa = (long?)800, reference = (string?)null } },
+            discountApproverId = manager.Id.Value,
+            discountApproverPin = pin,
+        };
+
+        var withoutPin = await cashier.PostAsJsonAsync("/api/v1/sales", Sale(null));
+        var wrongPin = await cashier.PostAsJsonAsync("/api/v1/sales", Sale("0000"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, withoutPin.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, wrongPin.StatusCode);
     }
 
     [Fact]

@@ -132,9 +132,10 @@ public class RecordSaleTests
     {
         var world = new TestWorld();
         var session = world.GivenOpenSession();
+        var manager = world.GivenUser("gerant", pin: "4321", role: Role.Manager);
 
         var result = await world.RecordSale.HandleAsync(
-            world.CashSale(session, price: 1_000, discount: 200, approver: world.Manager));
+            world.CashSale(session, price: 1_000, discount: 200, approval: new Approval(manager.Id, "4321")));
 
         Assert.True(result.IsSuccess);
         Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.DiscountApproved);
@@ -145,11 +146,10 @@ public class RecordSaleTests
     {
         var world = new TestWorld();
         var session = world.GivenOpenSession();
-        var colleague = UserId.New();
-        world.Directory.Set(world.Tenant, colleague, Role.Cashier);
+        var colleague = world.GivenUser("caissier2", pin: "1111", role: Role.Cashier);
 
         var result = await world.RecordSale.HandleAsync(
-            world.CashSale(session, price: 1_000, discount: 200, approver: colleague));
+            world.CashSale(session, price: 1_000, discount: 200, approval: new Approval(colleague.Id, "1111")));
 
         Assert.Equal(ErrorCodes.Forbidden, result.Error!.Code);
     }

@@ -6,10 +6,15 @@ using Soro.Application.Settings;
 using Soro.Application.Stock;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
-using Soro.Domain.Sales;
+using Soro.Domain.Customers;
 using Soro.Domain.Identity;
+using Soro.Domain.Sales;
+using Soro.Domain.Stock;
 
 namespace Soro.Application.Sales;
+
+/// <summary>Approbation d'un gérant : son identifiant ET son PIN, que le serveur vérifie (docs/decisions/0018).</summary>
+public sealed record Approval(UserId Approver, string Pin);
 
 public sealed record SaleLineInput(ProductId Product, string Name, int Quantity, long UnitPriceFcfa);
 
@@ -29,9 +34,10 @@ public sealed record RecordSaleCommand(
     long DiscountFcfa,
     IReadOnlyList<PaymentInput> Payments,
     CustomerId? Customer,
-    UserId? DiscountApprover,
-    UserId? CreditApprover = null,
-    bool EnforceCreditCeiling = true);
+    Approval? DiscountApproval,
+    Approval? CreditApproval = null,
+    bool EnforceCreditCeiling = true,
+    bool FromOfflineQueue = false);
 
 public sealed record RecordSaleResult(SaleId SaleId, long NetTotalFcfa, long ChangeFcfa, bool AlreadyProcessed);
 
@@ -47,7 +53,9 @@ public sealed class RecordSaleHandler(
     IStockMovementRepository stockMovements,
     ICustomerRepository customers,
     IShopSettings settings,
-    IUserDirectory directory,
+    IUserRepository users,
+    IPinHasher hasher,
+    IDebtRepaymentRepository repayments,
     IAuditTrail audit,
     IClock clock,
     IUnitOfWork unitOfWork)
@@ -94,9 +102,20 @@ public sealed class RecordSaleHandler(
         CashRegisterSession session,
         CancellationToken cancellationToken)
     {
-        var draft = await WithCostsAsync(ToDraft(command), cancellationToken);
+        var catalogue = await LoadProductsAsync(command, cancellationToken);
+        var draft = WithCosts(ToDraft(command), catalogue);
 
-        var discountError = await CheckDiscountAsync(command, draft, cancellationToken);
+        // Les inscriptions au journal d'une vente ne sont écrites qu'une fois la vente acceptée par la session : une vente refusée ne laisse
+        // ni approbation, ni dépassement, ni dette derrière elle (docs/decisions/0018). Les refus, eux, s'écrivent aussitôt.
+        var journal = new List<AuditEntry>();
+
+        var priceError = CheckPrices(command, draft, catalogue, journal);
+        if (priceError is not null)
+        {
+            return Result<RecordSaleResult>.Failure(priceError);
+        }
+
+        var discountError = await CheckDiscountAsync(command, draft, journal, cancellationToken);
         if (discountError is not null)
         {
             return Result<RecordSaleResult>.Failure(discountError);
@@ -108,13 +127,24 @@ public sealed class RecordSaleHandler(
             return Result<RecordSaleResult>.Failure(referenceError);
         }
 
-        var creditError = await ApplyCreditAsync(command, draft, cancellationToken);
-        if (creditError is not null)
+        var credit = await CheckCreditAsync(command, draft, journal, cancellationToken);
+        if (credit.Error is not null)
         {
-            return Result<RecordSaleResult>.Failure(creditError);
+            return Result<RecordSaleResult>.Failure(credit.Error);
         }
 
         var sale = session.RecordSale(draft);
+        if (credit.Charge is { } charge)
+        {
+            charge.Customer.Charge(charge.Amount);
+            await customers.UpdateAsync(charge.Customer, cancellationToken);
+        }
+
+        foreach (var entry in journal)
+        {
+            await audit.RecordAsync(entry, cancellationToken);
+        }
+
         await sales.AddAsync(sale, cancellationToken);
         await sessions.UpdateAsync(session, cancellationToken);
         await DecrementStockAsync(sale, cancellationToken);
@@ -140,76 +170,114 @@ public sealed class RecordSaleHandler(
         }
     }
 
+    /// <summary>Les produits des lignes, une seule lecture chacun : pour fixer les coûts et comparer les prix.</summary>
+    private async Task<Dictionary<ProductId, Product?>> LoadProductsAsync(RecordSaleCommand command, CancellationToken cancellationToken)
+    {
+        var loaded = new Dictionary<ProductId, Product?>();
+        foreach (var productId in command.Lines.Select(line => line.Product).Distinct())
+        {
+            loaded[productId] = await products.GetAsync(productId, user.Tenant, cancellationToken);
+        }
+
+        return loaded;
+    }
+
     /// <summary>
     /// Fige sur chaque ligne le prix d'achat moyen du produit à cet instant (RG-11, docs/decisions/0007) : la marge d'une vente ne bougera plus
     /// quand les prix des fournisseurs changeront. Un produit inconnu du commerce n'a pas de coût.
     /// </summary>
-    private async Task<SaleDraft> WithCostsAsync(SaleDraft draft, CancellationToken cancellationToken)
-    {
-        var costs = new Dictionary<ProductId, Money?>();
-        foreach (var productId in draft.Lines.Select(line => line.ProductId).Distinct())
-        {
-            var product = await products.GetAsync(productId, user.Tenant, cancellationToken);
-            costs[productId] = product?.PurchasePrice;
-        }
-
-        return draft with
+    private static SaleDraft WithCosts(SaleDraft draft, Dictionary<ProductId, Product?> catalogue) =>
+        draft with
         {
             Lines = draft.Lines
-                .Select(line => SaleLine.Create(line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, costs[line.ProductId]))
+                .Select(line => SaleLine.Create(line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, catalogue[line.ProductId]?.PurchasePrice))
                 .ToArray(),
         };
-    }
 
     /// <summary>
-    /// Vente à crédit (CRD-04, RG-06) : le montant à crédit s'ajoute à la dette du client dans la même transaction que la vente. Au-delà du plafond,
-    /// un gérant doit valider ; une vente venue de la synchronisation a déjà eu lieu, on l'enregistre toujours et on signale le dépassement.
+    /// Un prix de ligne <b>inférieur</b> à celui du catalogue est une perte possible (docs/decisions/0018). Envoyée en ligne par un profil qui n'est
+    /// ni propriétaire ni gérant, la vente est refusée ; venue de la file hors ligne, elle a eu lieu et s'enregistre, avec une inscription au journal
+    /// pour que le propriétaire la voie. Un prix supérieur, ou un produit inconnu, ne dit rien.
     /// </summary>
-    private async Task<ApplicationError?> ApplyCreditAsync(RecordSaleCommand command, SaleDraft draft, CancellationToken cancellationToken)
+    private ApplicationError? CheckPrices(
+        RecordSaleCommand command,
+        SaleDraft draft,
+        Dictionary<ProductId, Product?> catalogue,
+        List<AuditEntry> journal)
+    {
+        var lowered = draft.Lines
+            .Where(line => catalogue[line.ProductId] is { } product && line.UnitPrice.Amount < product.SalePrice.Amount)
+            .Select(line => $"{line.ProductName} à {line.UnitPrice} au lieu de {catalogue[line.ProductId]!.SalePrice}")
+            .ToArray();
+        if (lowered.Length == 0)
+        {
+            return null;
+        }
+
+        if (!command.FromOfflineQueue && !RolePolicy.IsManager(user.Role))
+        {
+            return ApplicationError.Forbidden("Seul un gérant peut vendre à un prix inférieur à celui du catalogue.");
+        }
+
+        var shown = string.Join(" ; ", lowered.Take(3));
+        var more = lowered.Length > 3 ? $" (+{lowered.Length - 3} autres)" : string.Empty;
+        journal.Add(new AuditEntry(user.Tenant, user.User, AuditActions.SalePriceLowered, command.Id.Value, $"Vente à prix réduit : {shown}{more}", clock.UtcNow));
+        return null;
+    }
+
+    private sealed record CreditCharge(Customer Customer, Money Amount);
+
+    private sealed record CreditCheck(ApplicationError? Error, CreditCharge? Charge);
+
+    /// <summary>
+    /// Vente à crédit (CRD-04, RG-06) : vérifie le client et le plafond, sans rien modifier. Le crédit s'ajoute à la dette du client, dans la même
+    /// transaction que la vente, <b>après</b> que la session a accepté la vente (docs/decisions/0018). Au-delà du plafond, un gérant doit valider
+    /// (son PIN) ; une vente venue de la synchronisation a déjà eu lieu, on l'enregistre toujours et on signale le dépassement.
+    /// </summary>
+    private async Task<CreditCheck> CheckCreditAsync(RecordSaleCommand command, SaleDraft draft, List<AuditEntry> journal, CancellationToken cancellationToken)
     {
         var credit = Money.Sum(draft.Payments.Where(payment => payment.Method == PaymentMethod.Credit).Select(payment => payment.Amount));
         if (credit == Money.Zero || draft.Customer is not { } customerId)
         {
-            return null; // sans client, le domaine refuse la vente à crédit avec son propre message
+            return new(null, null); // sans client, le domaine refuse la vente à crédit avec son propre message
         }
 
         var customer = await customers.GetAsync(customerId, user.Tenant, cancellationToken);
         if (customer is null)
         {
-            return ApplicationError.NotFound("Client introuvable : la vente à crédit ne peut pas être enregistrée.");
+            return new(ApplicationError.NotFound("Client introuvable : la vente à crédit ne peut pas être enregistrée."), null);
         }
 
         if (!customer.IsActive)
         {
-            return ApplicationError.RuleViolation($"Le client {customer.Name} est désactivé : il ne peut plus acheter à crédit.");
+            return new(ApplicationError.RuleViolation($"Le client {customer.Name} est désactivé : il ne peut plus acheter à crédit."), null);
         }
 
         if (customer.WouldExceedCeiling(credit))
         {
             var detail = $"{customer.Name} : dette {customer.Debt}, plafond {customer.CreditCeiling}, crédit demandé {credit}";
-            var approver = RolePolicy.IsManager(user.Role) ? user.User : command.CreditApprover;
-            if (approver is { } who && await IsManagerAsync(who, cancellationToken))
+            if (await IsApprovedAsync(command.CreditApproval, cancellationToken))
             {
-                await audit.RecordAsync(CreditEntry(AuditActions.CreditApproved, command, detail), cancellationToken);
+                journal.Add(CreditEntry(AuditActions.CreditApproved, command, detail));
             }
             else if (command.EnforceCreditCeiling)
             {
                 await audit.RecordAsync(CreditEntry(AuditActions.CreditRefused, command, detail), cancellationToken);
                 await unitOfWork.CommitAsync(cancellationToken);
-                return new ApplicationError(
-                    ErrorCodes.CreditLimitExceeded,
-                    $"{customer.Name} a atteint son plafond de crédit ({customer.CreditCeiling}) : dette {customer.Debt}, il reste {customer.AvailableCredit}. "
-                    + "La validation d'un gérant est nécessaire.");
+                return new(
+                    new ApplicationError(
+                        ErrorCodes.CreditLimitExceeded,
+                        $"{customer.Name} a atteint son plafond de crédit ({customer.CreditCeiling}) : dette {customer.Debt}, il reste {customer.AvailableCredit}. "
+                        + "La validation d'un gérant est nécessaire."),
+                    null);
             }
             else
             {
-                await audit.RecordAsync(CreditEntry(AuditActions.CreditExceeded, command, detail), cancellationToken);
+                journal.Add(CreditEntry(AuditActions.CreditExceeded, command, detail));
             }
         }
 
-        customer.Charge(credit);
-        await customers.UpdateAsync(customer, cancellationToken);
-        return null;
+        return new(null, new CreditCharge(customer, credit));
     }
 
     private AuditEntry CreditEntry(string action, RecordSaleCommand command, string detail) =>
@@ -218,6 +286,7 @@ public sealed class RecordSaleHandler(
     private async Task<ApplicationError?> CheckDiscountAsync(
         RecordSaleCommand command,
         SaleDraft draft,
+        List<AuditEntry> journal,
         CancellationToken cancellationToken)
     {
         var gross = Money.Sum(draft.Lines.Select(line => line.Total));
@@ -227,8 +296,7 @@ public sealed class RecordSaleHandler(
             return null;
         }
 
-        var approver = RolePolicy.IsManager(user.Role) ? user.User : command.DiscountApprover;
-        if (approver is null || !await IsManagerAsync(approver.Value, cancellationToken))
+        if (!await IsApprovedAsync(command.DiscountApproval, cancellationToken))
         {
             await audit.RecordAsync(Entry(AuditActions.DiscountRefused, command, draft.Discount), cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);
@@ -236,26 +304,51 @@ public sealed class RecordSaleHandler(
                 $"Une remise supérieure à {shop.DiscountApprovalThresholdPercent} % exige la validation d'un gérant.");
         }
 
-        await audit.RecordAsync(Entry(AuditActions.DiscountApproved, command, draft.Discount), cancellationToken);
+        journal.Add(Entry(AuditActions.DiscountApproved, command, draft.Discount));
         return null;
     }
 
-    private async Task<bool> IsManagerAsync(UserId candidate, CancellationToken cancellationToken)
+    /// <summary>
+    /// Un gérant qui vend lui-même n'a rien à prouver. Sinon l'approbation exige l'identifiant d'un gérant actif ET son PIN, vérifié comme à la
+    /// connexion (échecs comptés, compte verrouillé après cinq) : un identifiant seul ne prouve rien. Le propriétaire n'a pas de PIN : il approuve
+    /// en vendant lui-même sur la caisse.
+    /// </summary>
+    private async Task<bool> IsApprovedAsync(Approval? approval, CancellationToken cancellationToken)
     {
-        if (candidate == user.User)
+        if (RolePolicy.IsManager(user.Role))
         {
-            return RolePolicy.IsManager(user.Role);
+            return true;
         }
 
-        var role = await directory.GetRoleAsync(candidate, user.Tenant, cancellationToken);
-        return role is { } found && RolePolicy.IsManager(found);
+        if (approval is null)
+        {
+            return false;
+        }
+
+        var approver = await users.GetAsync(approval.Approver, user.Tenant, cancellationToken);
+        var now = clock.UtcNow;
+        if (approver is null || approver.Role != Role.Manager || approver.Status != UserStatus.Active || approver.IsLocked(now))
+        {
+            hasher.Verify(approval.Pin ?? string.Empty, null);
+            return false;
+        }
+
+        if (!hasher.Verify(approval.Pin ?? string.Empty, approver.PinHash))
+        {
+            approver.RecordFailedAttempt(now);
+            await users.UpdateAsync(approver, cancellationToken);
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<ApplicationError?> CheckMobileMoneyReferencesAsync(SaleDraft draft, CancellationToken cancellationToken)
     {
         foreach (var payment in draft.Payments.Where(payment => payment.Method.IsMobileMoney()))
         {
-            if (await sales.IsMobileMoneyReferenceUsedAsync(user.Tenant, payment.Method, payment.Reference!, cancellationToken))
+            if (await sales.IsMobileMoneyReferenceUsedAsync(user.Tenant, payment.Method, payment.Reference!, cancellationToken)
+                || await repayments.IsReferenceUsedAsync(user.Tenant, payment.Method, payment.Reference!, cancellationToken))
             {
                 return new ApplicationError(
                     ErrorCodes.MobileMoneyReferenceUsed,
