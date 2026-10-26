@@ -63,6 +63,9 @@ export class SyncService {
     this.clearTimer();
     this.auth.tick();
     await this.refreshCounts();
+    if (this.network.online() && this.auth.signedIn()) {
+      await this.sendOfflineLogins();
+    }
     if (this.countsSignal().pending === 0) {
       this.stateSignal.set('idle');
       return null;
@@ -82,6 +85,22 @@ export class SyncService {
     await this.refreshCounts();
     this.apply(outcome);
     return outcome;
+  }
+
+  /** Les entrées sans réseau terminées partent au journal du serveur ; un échec les garde pour le prochain envoi (le serveur ignore un rejeu). */
+  private async sendOfflineLogins(): Promise<void> {
+    const journal = await this.journalService.get();
+    const ended = (await journal.getOfflineLogins()).filter((event) => event.endedAt !== null);
+    if (ended.length === 0) {
+      return;
+    }
+    try {
+      await this.api.sendOfflineLogins(ended);
+      const sent = new Set(ended.map((event) => event.eventId));
+      await journal.saveOfflineLogins((await journal.getOfflineLogins()).filter((event) => !sent.has(event.eventId)));
+    } catch {
+      // Réseau ou serveur indisponible : rien n'est perdu, on réessaiera au prochain envoi.
+    }
   }
 
   private apply(outcome: FlushOutcome): void {

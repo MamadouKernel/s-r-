@@ -137,6 +137,11 @@ export class ApiService implements SyncApi {
     );
   }
 
+  /** Les connexions sans réseau, pour le journal de sécurité ; rejouable (le serveur ne les inscrit qu'une fois). */
+  async sendOfflineLogins(logins: { eventId: string; userId: string; startedAt: string; endedAt: string | null }[]): Promise<void> {
+    await this.call(this.http.post(`${API_ROOT}/offline-logins`, { logins }));
+  }
+
   private async call<T>(request: import('rxjs').Observable<T>): Promise<T> {
     try {
       return await firstValueFrom(request);

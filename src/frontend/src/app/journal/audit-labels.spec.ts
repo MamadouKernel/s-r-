@@ -34,7 +34,8 @@ describe('actionLabel', () => {
 describe('CATEGORIES', () => {
   it('starts with “all” and uses the values the server understands', () => {
     expect(CATEGORIES[0]).toEqual({ value: null, label: 'Toutes' });
-    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription', 'data']);
+    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription', 'data', 'security']);
+    expect(actionLabel('login.offline')).toBe('Connexion sans réseau');
   });
 
   it('names the subscription, family and import actions in plain French', () => {

@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DomSanitizer } from '@angular/platform-browser';
 import { QrService } from '../onboarding/qr.service';
+import { AuthService } from '../services/auth.service';
 import { NetworkService } from '../services/network.service';
 import { ApiError } from '../sync/sync-api';
 import { DevicesApi, ManagedDevice, PendingLink } from './devices-api';
@@ -19,11 +20,13 @@ async function open(devices: ManagedDevice[] = [device()], options: { online?: b
     invite: vi.fn().mockResolvedValue({ invitationId: 'i-1', token: 'jeton-du-lien', expiresAt: '2026-10-25T08:00:00.000Z' }),
     revoke: vi.fn().mockResolvedValue(undefined),
   };
+  const auth = { forgetAllProofs: vi.fn().mockResolvedValue(undefined) };
   const qr = { image: vi.fn().mockImplementation(async () => TestBed.inject(DomSanitizer).bypassSecurityTrustUrl('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E')) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
       { provide: DevicesApi, useValue: api },
+      { provide: AuthService, useValue: auth },
       { provide: QrService, useValue: qr },
       { provide: NetworkService, useValue: { online: signal(options.online ?? true) } },
     ],
@@ -37,7 +40,7 @@ async function open(devices: ManagedDevice[] = [device()], options: { online?: b
   };
   await settle();
   return {
-    api, qr, root, settle,
+    api, qr, auth, root, settle,
     has: (text: string) => (root.textContent ?? '').includes(text),
     click: async (label: string) => {
       const target = [...root.querySelectorAll('button')].find((b) => (b.textContent ?? '').includes(label) || b.getAttribute('aria-label')?.includes(label));
@@ -222,5 +225,29 @@ describe('DevicesPage', () => {
 
       expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('liste des appareils');
     });
+  });
+});
+
+describe('DevicesPage: oublier les comptes de cet appareil (HLC-09)', () => {
+  it('forgets the offline proofs of this device after a confirmation that says what it means', async () => {
+    const { auth, click, has } = await open();
+
+    await click('Oublier les comptes de cet appareil');
+    expect(has('ne pourront plus ouvrir la caisse sans réseau')).toBe(true);
+    expect(auth.forgetAllProofs).not.toHaveBeenCalled();
+
+    await click('Oui, oublier');
+
+    expect(auth.forgetAllProofs).toHaveBeenCalledTimes(1);
+    expect(has('Les comptes de cet appareil ont été oubliés.')).toBe(true);
+  });
+
+  it('does nothing when the manager changes their mind', async () => {
+    const { auth, click } = await open();
+    await click('Oublier les comptes de cet appareil');
+
+    await click('Non, les garder');
+
+    expect(auth.forgetAllProofs).not.toHaveBeenCalled();
   });
 });
