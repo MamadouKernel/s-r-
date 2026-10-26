@@ -74,11 +74,22 @@ export interface StoredToken {
 /** Le compte entré sans réseau : aucun jeton, seulement qui est au comptoir (docs/specs/connexion-hors-ligne HLC-07). */
 export interface OfflineSession {
   userId: string;
+  identifier: string;
+  /** L'événement du journal que cette session ouvre (envoyé au serveur avec la file). */
+  eventId: string;
   displayName: string;
   role: string;
   startedAt: string;
   /** Fin de validité de la preuve qui a ouvert la session. */
   validUntil: string;
+}
+
+/** Une entrée sans réseau, notée pour le journal du serveur (docs/specs/connexion-hors-ligne HLC-10). */
+export interface OfflineLoginEvent {
+  eventId: string;
+  userId: string;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 export interface LocalSession {
@@ -163,6 +174,14 @@ export class Journal {
 
   saveProofs(proofs: OfflineProof[]): Promise<void> {
     return this.putMeta('offline-proofs', proofs);
+  }
+
+  async getOfflineLogins(): Promise<OfflineLoginEvent[]> {
+    return (await this.getMeta<OfflineLoginEvent[]>('offline-logins')) ?? [];
+  }
+
+  saveOfflineLogins(events: OfflineLoginEvent[]): Promise<void> {
+    return this.putMeta('offline-logins', events);
   }
 
   getOfflineSession(): Promise<OfflineSession | null> {

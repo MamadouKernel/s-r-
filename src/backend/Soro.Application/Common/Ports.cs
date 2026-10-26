@@ -16,6 +16,9 @@ public interface IUnitOfWork
 public interface IAuditTrail
 {
     Task RecordAsync(AuditEntry entry, CancellationToken cancellationToken);
+
+    /// <summary>Une inscription de cette action sur cette ressource existe déjà (pour qu'un envoi rejoué ne l'écrive pas deux fois).</summary>
+    Task<bool> ExistsAsync(string action, Guid resourceId, CancellationToken cancellationToken);
 }
 
 /// <summary>Action sensible tracée : qui, quoi, sur quelle ressource, quand (journal des actions sensibles).</summary>
@@ -61,4 +64,5 @@ public static class AuditActions
     public const string DeviceEnrolled = "device.enrolled";
     public const string DeviceRevoked = "device.revoked";
     public const string DeviceInvitationRevoked = "device.invitation.revoked";
+    public const string LoginOffline = "login.offline";
 }

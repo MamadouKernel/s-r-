@@ -45,6 +45,7 @@ public static class ApplicationRegistration
         services.AddScoped<DeclareSubscriptionPaymentHandler>();
         services.AddScoped<GetSubscriptionStateHandler>();
         services.AddScoped<RecordExpiredSyncHandler>();
+        services.AddScoped<RecordOfflineLoginsHandler>();
 
         services.AddScoped<OpenRegisterSessionHandler>();
         services.AddScoped<CloseRegisterSessionHandler>();

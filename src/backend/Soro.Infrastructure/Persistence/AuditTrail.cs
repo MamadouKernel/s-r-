@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Soro.Application.Common;
 
 namespace Soro.Infrastructure.Persistence;
@@ -18,4 +19,7 @@ public sealed class AuditTrail(SoroDbContext db) : IAuditTrail
         });
         return Task.CompletedTask;
     }
+
+    public Task<bool> ExistsAsync(string action, Guid resourceId, CancellationToken cancellationToken) =>
+        db.AuditEntries.AnyAsync(row => row.Action == action && row.ResourceId == resourceId, cancellationToken);
 }

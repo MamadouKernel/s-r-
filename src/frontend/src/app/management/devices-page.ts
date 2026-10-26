@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { SafeUrl } from '@angular/platform-browser';
 import { QrService } from '../onboarding/qr.service';
+import { AuthService } from '../services/auth.service';
 import { NetworkService } from '../services/network.service';
 import { DeviceInvitation, DevicesApi, ManagedDevice, PendingLink } from './devices-api';
 import { describeError } from './errors';
@@ -98,6 +99,24 @@ import { describeError } from './errors';
         </section>
       }
 
+      <section class="panel mb-4" aria-labelledby="comptes-titre">
+        <h3 id="comptes-titre" class="text-lg font-bold">Comptes de ce téléphone</h3>
+        <p class="mt-1 text-base text-ardoise">
+          Un caissier déjà connecté ici peut ouvrir la caisse sans réseau pendant trois jours. Si ce téléphone change de mains, oubliez ces comptes.
+        </p>
+        @if (confirmingForget()) {
+          <p class="mt-3 font-semibold text-erreur" role="alert">
+            Oublier les comptes de ce téléphone ? Ils ne pourront plus ouvrir la caisse sans réseau avant de se reconnecter une fois avec le réseau. Les ventes déjà enregistrées ne sont pas touchées.
+          </p>
+          <div class="mt-2 grid grid-cols-2 gap-3">
+            <button type="button" class="btn" (click)="confirmingForget.set(false)">Non, les garder</button>
+            <button type="button" class="btn-primary !border-erreur !bg-erreur" (click)="forgetAccounts()" [disabled]="busy()">Oui, oublier</button>
+          </div>
+        } @else {
+          <button type="button" class="btn mt-3" (click)="confirmingForget.set(true)">Oublier les comptes de cet appareil</button>
+        }
+      </section>
+
       @if (loading()) {
         <p class="panel text-ardoise" role="status">Chargement des appareils…</p>
       } @else if (error()) {
@@ -141,6 +160,7 @@ import { describeError } from './errors';
 export class DevicesPage implements OnInit {
   private readonly api = inject(DevicesApi);
   private readonly qrService = inject(QrService);
+  private readonly auth = inject(AuthService);
   protected readonly network = inject(NetworkService);
 
   protected readonly devices = signal<ManagedDevice[]>([]);
@@ -148,6 +168,7 @@ export class DevicesPage implements OnInit {
   protected readonly error = signal('');
   protected readonly notice = signal('');
   protected readonly busy = signal(false);
+  protected readonly confirmingForget = signal(false);
   protected readonly confirming = signal<string | null>(null);
   protected readonly links = signal<PendingLink[]>([]);
   protected readonly cancelling = signal<string | null>(null);
@@ -230,6 +251,17 @@ export class DevicesPage implements OnInit {
       await navigator.share({ title: 'Sôrô', text: 'Voici le lien pour configurer la caisse :', url: this.link() });
     } catch {
       // Partage annulé par l'utilisateur : rien à dire.
+    }
+  }
+
+  protected async forgetAccounts(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.auth.forgetAllProofs();
+      this.confirmingForget.set(false);
+      this.notice.set('Les comptes de cet appareil ont été oubliés.');
+    } finally {
+      this.busy.set(false);
     }
   }
 

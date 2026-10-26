@@ -374,4 +374,37 @@ describe('AuthService: connexion sans réseau (HLC)', () => {
 
     expect(login).not.toHaveBeenCalled();
   });
+
+  it('notes each offline login with its start, and its end at logout, for the journal (HLC-10)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-26T08:02:00Z'));
+    const { auth, journal } = await enrolledCashier();
+    await auth.loginOffline('awa', '4821');
+
+    vi.setSystemTime(new Date('2026-10-26T14:40:00Z'));
+    await auth.logout();
+
+    const events = await journal.getOfflineLogins();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ userId: 'u-1', startedAt: '2026-10-26T08:02:00.000Z', endedAt: '2026-10-26T14:40:00.000Z' });
+    expect(events[0].eventId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('ends the offline session when the person logs in with the network again (HLC-08)', async () => {
+    const login = vi.fn().mockResolvedValue(cashierLogin());
+    const { auth, journal } = await enrolledCashier(login);
+    await auth.loginOffline('awa', '4821');
+
+    await auth.login('awa', '4821');
+
+    expect(auth.offlineSession()).toBeNull();
+    expect(auth.signedIn()).toBe(true);
+    expect((await journal.getOfflineLogins())[0].endedAt).not.toBeNull();
+  });
+
+  it('remembers the identifier of the offline session to prefill the reconnection prompt (HLC-08)', async () => {
+    const { auth } = await enrolledCashier();
+    await auth.loginOffline(' AWA ', '4821');
+    expect(auth.offlineSession()?.identifier).toBe('awa');
+  });
 });

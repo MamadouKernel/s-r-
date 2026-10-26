@@ -58,6 +58,7 @@ public static class SubscriptionAccessMiddleware
     private static bool IsOfflineQueueEndpoint(string method, string path) =>
         HttpMethods.IsPost(method)
         && (string.Equals(path, Prefix + "sales/sync", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, Prefix + "offline-logins", StringComparison.OrdinalIgnoreCase)
             || string.Equals(path, Prefix + "register-sessions", StringComparison.OrdinalIgnoreCase)
             || (path.StartsWith(Prefix + "register-sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/close", StringComparison.OrdinalIgnoreCase)));
 

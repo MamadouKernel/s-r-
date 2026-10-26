@@ -39,6 +39,7 @@ app.MapDeviceEnrollment();
 var api = app.MapGroup("/api/v1").RequireAuthorization();
 api.MapRegisterSessionEndpoints();
 api.MapSaleEndpoints();
+api.MapOfflineLoginEndpoints();
 api.MapUserEndpoints();
 api.MapProductEndpoints();
 api.MapProductImportEndpoints();

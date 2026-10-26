@@ -78,6 +78,9 @@ internal sealed class RecordingAuditTrail : IAuditTrail
         _entries.Add(entry);
         return Task.CompletedTask;
     }
+
+    public Task<bool> ExistsAsync(string action, Guid resourceId, CancellationToken cancellationToken) =>
+        Task.FromResult(_entries.Any(entry => entry.Action == action && entry.ResourceId == resourceId));
 }
 
 internal sealed class InMemorySessionRepository : ISessionRepository

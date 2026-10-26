@@ -147,6 +147,7 @@ export class AuthService {
       }
       throw error;
     }
+    await this.endOfflineSession();
     await this.keepToken({ value: response.accessToken, expiresAt: response.expiresAt, user: response.user });
     await this.rememberProof(identifier, pin, response.user);
   }
@@ -184,21 +185,38 @@ export class AuthService {
 
     const session: OfflineSession = {
       userId: found.userId,
+      identifier: found.identifier,
+      eventId: crypto.randomUUID(),
       displayName: found.displayName,
       role: found.role,
       startedAt: new Date(now).toISOString(),
       validUntil: new Date(Date.parse(found.createdAt) + OFFLINE_DAYS * 24 * 3_600_000).toISOString(),
     };
+    await journal.saveOfflineLogins([
+      ...(await journal.getOfflineLogins()),
+      { eventId: session.eventId, userId: session.userId, startedAt: session.startedAt, endedAt: null },
+    ]);
     await journal.saveOfflineSession(session);
     this.offlineState.set(session);
   }
 
-  /** Efface la preuve locale de tous les comptes de cet appareil (appareil retiré, ou « Oublier les comptes »). */
-  async forgetAllProofs(): Promise<void> {
+  /** Clôt l'événement de la session sans réseau en cours (déconnexion, retour en ligne, appareil retiré) pour le journal du serveur. */
+  private async endOfflineSession(): Promise<void> {
+    const session = this.offlineState();
     const journal = await this.journalService.get();
-    await journal.saveProofs([]);
+    if (session) {
+      const now = new Date().toISOString();
+      const events = await journal.getOfflineLogins();
+      await journal.saveOfflineLogins(events.map((event) => (event.eventId === session.eventId && !event.endedAt ? { ...event, endedAt: now } : event)));
+    }
     await journal.saveOfflineSession(null);
     this.offlineState.set(null);
+  }
+
+  /** Efface la preuve locale de tous les comptes de cet appareil (appareil retiré, ou « Oublier les comptes »). */
+  async forgetAllProofs(): Promise<void> {
+    await this.endOfflineSession();
+    await (await this.journalService.get()).saveProofs([]);
   }
 
   private async rememberProof(identifier: string, pin: string, user: { id: string; displayName: string; role: string }): Promise<void> {
@@ -231,11 +249,9 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
-    const journal = await this.journalService.get();
-    await journal.clearToken();
-    await journal.saveOfflineSession(null);
+    await this.endOfflineSession();
+    await (await this.journalService.get()).clearToken();
     this.tokenState.set(null);
-    this.offlineState.set(null);
   }
 
   /** Rafraîchit l'horloge qui décide de l'expiration (appelée par la synchronisation). */

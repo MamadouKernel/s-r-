@@ -37,7 +37,7 @@ Quand le réseau revient et qu'il n'y a pas de jeton valable, la caisse n'efface
 La preuve d'un compte est effacée : (a) quand le serveur refuse l'appareil (révoqué, `device_not_authorized`) : **toutes** les preuves ; (b) quand une connexion en ligne de ce compte est refusée parce que le compte est désactivé ou que son PIN a changé (401 `invalid_credentials` après avoir eu une preuve) ou que sa session est périmée (`session_outdated`) ; (c) sur « Oublier les comptes de cet appareil » (gérant, écran Appareils, avec confirmation). « Se déconnecter » ne l'efface pas.
 
 ### HLC-10 Journal
-Chaque connexion sans réseau et chaque fin de session hors ligne sont notées dans le journal local et envoyées avec la file au retour du réseau ; le serveur les inscrit au journal d'audit (`login.offline`, compte, appareil, heures de début et de fin). Visible du propriétaire et du gérant, rubrique « Sécurité ». Une heure d'appareil manifestement fausse (futur de plus de 24 h) est signalée dans le détail.
+Chaque connexion sans réseau et chaque fin de session hors ligne sont notées dans le journal local et envoyées avec la file au retour du réseau ; le serveur les inscrit au journal d'audit (`login.offline`, compte, appareil, heures de début et de fin). Visible de ceux qui lisent le journal (propriétaire, comptable), rubrique « Sécurité ». Une heure d'appareil manifestement fausse (futur de plus de 24 h) est signalée dans le détail.
 
 ### HLC-11 Écrans et vocabulaire
 Aucun mot technique à l'écran : « sans réseau », « code », jamais « hors ligne », « hash », « jeton ». Chaque refus dit ce qu'il faut faire ensuite. Cibles tactiles de 48 px minimum, contraste AA. États : connexion en cours, pas de réseau, réseau revenu, verrouillé (avec minutes), bloqué.
