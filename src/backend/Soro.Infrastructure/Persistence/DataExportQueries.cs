@@ -45,7 +45,7 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
         var products = (await db.Products.AsNoTracking().Where(product => product.TenantId == id).ToListAsync(cancellationToken))
             .Select(product => new ProductExportRow(
                 families.GetValueOrDefault(product.FamilyId, product.Name), product.FormatLabel, product.Category, product.Barcode, product.PurchasePrice,
-                product.SalePrice, product.QuantityOnHand, product.AlertThreshold, product.TracksStock, product.IsActive))
+                product.SalePrice, product.QuantityOnHand, product.AlertThreshold, product.TracksStock, product.IsActive, product.Unit))
             .OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(product => product.SalePriceFcfa)
             .ToArray();
@@ -86,8 +86,9 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
                 item.line.ProductName,
                 item.line.Quantity,
                 item.line.UnitPrice,
-                item.line.UnitPrice * item.line.Quantity,
-                item.line.UnitCost))
+                Money.Fcfa(item.line.UnitPrice).ForQuantity(item.line.Quantity, item.line.Unit).Amount,
+                item.line.UnitCost,
+                item.line.Unit))
             .ToArray();
 
         var repayments = (await db.DebtRepayments.AsNoTracking()
@@ -100,11 +101,11 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
 
         var movements = (await db.StockMovements.AsNoTracking()
                 .Where(movement => movement.TenantId == id && movement.At >= from && movement.At < to)
-                .Join(db.Products, movement => movement.ProductId, product => product.Id, (movement, product) => new { movement, product.Name })
+                .Join(db.Products, movement => movement.ProductId, product => product.Id, (movement, product) => new { movement, product.Name, product.Unit })
                 .OrderBy(item => item.movement.At)
                 .ToListAsync(cancellationToken))
             .Select(item => new MovementExportRow(
-                item.movement.At, item.Name, item.movement.Kind, item.movement.QuantityDelta, item.movement.Reason, item.movement.UnitCost, User(item.movement.UserId)))
+                item.movement.At, item.Name, item.movement.Kind, item.movement.QuantityDelta, item.movement.Reason, item.movement.UnitCost, User(item.movement.UserId), item.Unit))
             .ToArray();
 
         var customerExport = customers

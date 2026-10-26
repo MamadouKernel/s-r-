@@ -10,17 +10,72 @@ namespace Soro.Application.Tests;
 internal static class Row
 {
     public static ImportRow At(int line, string? name, string? format = null, string? category = null, string? barcode = null,
-        string? buy = "0", string? sell = "100", string? alert = null, string? stock = null, string? track = null) =>
+        string? buy = "0", string? sell = "100", string? alert = null, string? stock = null, string? track = null, string? unit = null) =>
         new(line, new Dictionary<ImportColumn, string?>
         {
             [ImportColumn.Name] = name, [ImportColumn.Format] = format, [ImportColumn.Category] = category, [ImportColumn.Barcode] = barcode,
             [ImportColumn.PurchasePrice] = buy, [ImportColumn.SalePrice] = sell, [ImportColumn.AlertThreshold] = alert,
-            [ImportColumn.InitialStock] = stock, [ImportColumn.TracksStock] = track,
+            [ImportColumn.InitialStock] = stock, [ImportColumn.TracksStock] = track, [ImportColumn.Unit] = unit,
         });
 }
 
 public class ImportPlannerTests
 {
+    [Theory]
+    [InlineData(null, MeasureUnit.Piece)]
+    [InlineData("pièce", MeasureUnit.Piece)]
+    [InlineData("kg", MeasureUnit.Kilogram)]
+    [InlineData("Kilo", MeasureUnit.Kilogram)]
+    [InlineData("litre", MeasureUnit.Litre)]
+    [InlineData("L", MeasureUnit.Litre)]
+    public void The_unit_column_is_optional_and_understood_in_plain_words(string? text, MeasureUnit expected)
+    {
+        var plan = Plan([Row.At(2, "Riz vrac", sell: "800", unit: text)]);
+
+        Assert.Empty(plan.Problems);
+        Assert.Equal(expected, plan.NewFamilies.Single().Formats.Single().Unit);
+    }
+
+    [Fact]
+    public void An_unknown_unit_is_refused_with_the_line_and_the_choices()
+    {
+        var plan = Plan([Row.At(5, "Riz vrac", sell: "800", unit: "mètre")]);
+
+        var problem = Assert.Single(plan.Problems);
+        Assert.Equal(5, problem.Line);
+        Assert.Contains("Unité", problem.Column);
+        Assert.Contains("pièce", problem.Message);
+        Assert.Contains("kg", problem.Message);
+    }
+
+    [Fact]
+    public void A_weighed_product_takes_decimal_stock_and_alert_converted_to_grams()
+    {
+        var plan = Plan([Row.At(2, "Riz vrac", sell: "800", unit: "kg", stock: "12,5", alert: "2.250")]);
+
+        Assert.Empty(plan.Problems);
+        var format = plan.NewFamilies.Single().Formats.Single();
+        Assert.Equal(12_500, format.InitialStock);
+        Assert.Equal(2_250, format.AlertThreshold);
+    }
+
+    [Fact]
+    public void A_weighed_product_refuses_more_than_three_decimals()
+    {
+        var plan = Plan([Row.At(2, "Riz vrac", sell: "800", unit: "kg", stock: "1,2345")]);
+
+        var problem = Assert.Single(plan.Problems);
+        Assert.Contains("Stock de départ", problem.Column);
+    }
+
+    [Fact]
+    public void A_piece_product_still_refuses_decimal_stock()
+    {
+        var plan = Plan([Row.At(2, "Sel fin", sell: "200", stock: "1,5")]);
+
+        Assert.Single(plan.Problems);
+    }
+
     private static readonly CatalogueSnapshot Empty = new([], new HashSet<string>());
 
     private static ImportPlan Plan(IEnumerable<ImportRow> rows, CatalogueSnapshot? catalogue = null) =>

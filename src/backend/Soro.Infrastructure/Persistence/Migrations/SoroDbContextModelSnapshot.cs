@@ -630,6 +630,14 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("tracks_stock");
 
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Piece")
+                        .HasColumnName("unit");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -681,6 +689,14 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Piece")
+                        .HasColumnName("unit");
 
                     b.Property<long?>("UnitCost")
                         .HasColumnType("bigint")

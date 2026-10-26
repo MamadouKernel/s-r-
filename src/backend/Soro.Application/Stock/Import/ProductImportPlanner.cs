@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Soro.Domain.Common;
 using Soro.Domain.Stock;
@@ -13,7 +14,8 @@ public sealed record ImportProblem(int Line, string Column, string Message)
 public sealed record ImportSkip(int Line, string Name, string Reason);
 
 public sealed record PlannedFormat(
-    int Line, string? Label, string? Barcode, long PurchasePriceFcfa, long SalePriceFcfa, int AlertThreshold, bool TracksStock, int InitialStock);
+    int Line, string? Label, string? Barcode, long PurchasePriceFcfa, long SalePriceFcfa, int AlertThreshold, bool TracksStock, int InitialStock,
+    MeasureUnit Unit = MeasureUnit.Piece);
 
 public sealed record PlannedFamily(string Name, string? Category, IReadOnlyList<PlannedFormat> Formats);
 
@@ -52,7 +54,7 @@ public static partial class ProductImportPlanner
     private const int MaxBarcode = 64;
 
     private sealed record Parsed(
-        ImportRow Row, string Name, string? Label, string? Category, string? Barcode, long Purchase, long Sale, int Alert, int Stock, bool Tracks);
+        ImportRow Row, string Name, string? Label, string? Category, string? Barcode, long Purchase, long Sale, int Alert, int Stock, bool Tracks, MeasureUnit Unit);
 
     public static ImportPlan Plan(IReadOnlyList<ImportRow> rows, CatalogueSnapshot catalogue)
     {
@@ -208,7 +210,7 @@ public static partial class ProductImportPlanner
     }
 
     private static PlannedFormat ToFormat(Parsed item) =>
-        new(item.Row.Line, item.Label, item.Barcode, item.Purchase, item.Sale, item.Alert, item.Tracks, item.Stock);
+        new(item.Row.Line, item.Label, item.Barcode, item.Purchase, item.Sale, item.Alert, item.Tracks, item.Stock, item.Unit);
 
     private static string LabelKey(string? label) => label is null ? string.Empty : TextKey.Key(label);
 
@@ -277,16 +279,27 @@ public static partial class ProductImportPlanner
             Fail(ImportColumn.SalePrice, "le prix de vente doit être un nombre entier en FCFA, sans centimes.");
         }
 
-        var alertText = Clean(row.Get(ImportColumn.AlertThreshold));
-        if (alertText is not null && (!TryAmount(alertText, out alert) || alert > int.MaxValue))
+        var unit = MeasureUnit.Piece;
+        var unitText = Clean(row.Get(ImportColumn.Unit));
+        if (unitText is not null && !TryUnit(unitText, out unit))
         {
-            Fail(ImportColumn.AlertThreshold, "l'alerte stock doit être un nombre entier, 0 ou plus.");
+            Fail(ImportColumn.Unit, "l'unité doit être « pièce », « kg » ou « litre » (laissez vide pour une pièce).");
+        }
+
+        var alertText = Clean(row.Get(ImportColumn.AlertThreshold));
+        if (alertText is not null && (!TryQuantity(alertText, unit, out alert) || alert > int.MaxValue))
+        {
+            Fail(ImportColumn.AlertThreshold, unit == MeasureUnit.Piece
+                ? "l'alerte stock doit être un nombre entier, 0 ou plus."
+                : "l'alerte stock doit être un nombre de 0 ou plus, avec au plus 3 chiffres après la virgule.");
         }
 
         var stockText = Clean(row.Get(ImportColumn.InitialStock));
-        if (stockText is not null && (!TryAmount(stockText, out stock) || stock > int.MaxValue))
+        if (stockText is not null && (!TryQuantity(stockText, unit, out stock) || stock > int.MaxValue))
         {
-            Fail(ImportColumn.InitialStock, "le stock de départ doit être un nombre entier, 0 ou plus.");
+            Fail(ImportColumn.InitialStock, unit == MeasureUnit.Piece
+                ? "le stock de départ doit être un nombre entier, 0 ou plus."
+                : "le stock de départ doit être un nombre de 0 ou plus, avec au plus 3 chiffres après la virgule.");
         }
 
         var tracks = true;
@@ -300,7 +313,7 @@ public static partial class ProductImportPlanner
             Fail(ImportColumn.InitialStock, "ce produit n'a pas de suivi du stock : retirez le stock de départ ou mettez « Oui » au suivi du stock.");
         }
 
-        return ok ? new Parsed(row, name!, label, category, barcode, purchase, sale, (int)alert, (int)stock, tracks) : null;
+        return ok ? new Parsed(row, name!, label, category, barcode, purchase, sale, (int)alert, (int)stock, tracks, unit) : null;
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -312,6 +325,45 @@ public static partial class ProductImportPlanner
         cleaned = Spaces().Replace(cleaned, string.Empty);
         var match = WholeNumber().Match(cleaned);
         return match.Success && long.TryParse(match.Groups[1].Value, out amount);
+    }
+
+    /// <summary>Une pièce se compte en entier ; un produit au poids ou à la mesure accepte jusqu'à 3 décimales (1,250 kg), gardées en grammes ou millilitres.</summary>
+    private static bool TryQuantity(string text, MeasureUnit unit, out long quantity)
+    {
+        if (unit == MeasureUnit.Piece)
+        {
+            return TryAmount(text, out quantity);
+        }
+
+        quantity = 0;
+        var cleaned = Spaces().Replace(text.Trim(), string.Empty);
+        var match = Decimal().Match(cleaned);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        var fraction = match.Groups[2].Value.PadRight(3, '0');
+        quantity = (long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) * 1000) + long.Parse(fraction, CultureInfo.InvariantCulture);
+        return true;
+    }
+
+    private static bool TryUnit(string text, out MeasureUnit unit)
+    {
+        unit = MeasureUnit.Piece;
+        switch (TextKey.Compact(text))
+        {
+            case "piece" or "pieces" or "pc" or "unite" or "unites" or "u":
+                return true;
+            case "kg" or "kilo" or "kilos" or "kilogramme" or "kilogrammes":
+                unit = MeasureUnit.Kilogram;
+                return true;
+            case "l" or "litre" or "litres":
+                unit = MeasureUnit.Litre;
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static bool TryYesNo(string text, out bool value)
@@ -329,6 +381,9 @@ public static partial class ProductImportPlanner
                 return false;
         }
     }
+
+    [GeneratedRegex(@"^(\d{1,9})(?:[.,](\d{1,3}))?$")]
+    private static partial Regex Decimal();
 
     [GeneratedRegex(@"(?i)\s*(f\s*cfa|xof|f)\s*$")]
     private static partial Regex Currency();

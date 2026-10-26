@@ -35,7 +35,11 @@ public sealed record FormatInput(
     long PurchasePriceFcfa,
     long SalePriceFcfa,
     int AlertThreshold,
-    bool TracksStock);
+    bool TracksStock)
+{
+    /// <summary>Unité de vente de ce format (docs/decisions/0017) ; une pièce par défaut. Le seuil d'alerte est dans l'unité stockée (grammes, millilitres).</summary>
+    public MeasureUnit Unit { get; init; } = MeasureUnit.Piece;
+}
 
 public sealed record CreateFamilyCommand(FamilyId Id, string Name, string? Category, IReadOnlyList<FormatInput> Formats);
 
@@ -100,7 +104,8 @@ public sealed class CreateFamilyHandler(
                     format.TracksStock,
                     clock.UtcNow,
                     family.Id,
-                    label);
+                    label,
+                    format.Unit);
                 if (product.Barcode is not null
                     && (created.Any(other => other.Barcode == product.Barcode)
                         || await products.IsBarcodeUsedAsync(user.Tenant, product.Barcode, null, cancellationToken)))
@@ -202,7 +207,8 @@ public sealed class AddFormatHandler(
                 format.TracksStock,
                 clock.UtcNow,
                 family.Id,
-                label);
+                label,
+                format.Unit);
             if (product.Barcode is not null
                 && await products.IsBarcodeUsedAsync(user.Tenant, product.Barcode, null, cancellationToken))
             {

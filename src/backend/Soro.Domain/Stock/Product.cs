@@ -26,8 +26,10 @@ public sealed class Product
         DateTimeOffset createdAt,
         FamilyId? family = null,
         string? formatLabel = null,
-        PhotoId? photo = null)
+        PhotoId? photo = null,
+        MeasureUnit unit = MeasureUnit.Piece)
     {
+        Unit = unit;
         Id = id;
         FamilyId = family ?? new FamilyId(id.Value);
         FormatLabel = formatLabel;
@@ -64,6 +66,9 @@ public sealed class Product
 
     public string? Category { get; private set; }
 
+    /// <summary>Unité de vente : pièce, kilogramme ou litre (docs/decisions/0017). Pesé ou mesuré, la quantité et le stock sont comptés en millièmes.</summary>
+    public MeasureUnit Unit { get; private set; }
+
     public Money PurchasePrice { get; private set; }
 
     public Money SalePrice { get; private set; }
@@ -93,10 +98,11 @@ public sealed class Product
         bool tracksStock,
         DateTimeOffset createdAt,
         FamilyId? family = null,
-        string? formatLabel = null)
+        string? formatLabel = null,
+        MeasureUnit unit = MeasureUnit.Piece)
     {
         var product = new Product(
-            id, tenant, string.Empty, null, null, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel);
+            id, tenant, string.Empty, null, null, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel, null, unit);
         product.Edit(name, barcode, category, purchasePrice, salePrice, alertThreshold);
         return product;
     }
@@ -117,8 +123,9 @@ public sealed class Product
         int quantityOnHand,
         FamilyId? family = null,
         string? formatLabel = null,
-        PhotoId? photo = null) =>
-        new(id, tenant, name, barcode, category, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel, photo)
+        PhotoId? photo = null,
+        MeasureUnit unit = MeasureUnit.Piece) =>
+        new(id, tenant, name, barcode, category, purchasePrice, salePrice, alertThreshold, tracksStock, createdAt, family, formatLabel, photo, unit)
         {
             IsActive = isActive,
             QuantityOnHand = quantityOnHand,
@@ -166,6 +173,13 @@ public sealed class Product
     public void SetPhoto(PhotoId? photo) => PhotoId = photo;
 
     /// <summary>Un produit désactivé reste lisible dans l'historique mais n'est plus proposé à la vente.</summary>
+    /// <summary>Change l'unité de vente d'un produit qui n'a pas de stock (les quantités changent d'échelle). L'historique est vérifié par l'appelant.</summary>
+    public void ChangeUnit(MeasureUnit unit)
+    {
+        Ensure.That(QuantityOnHand == 0, "Cette unité ne peut plus changer : ce produit a déjà du stock.");
+        Unit = unit;
+    }
+
     /// <summary>Donne à un produit sans code-barres son code interne (ETQ-01). Un produit n'en reçoit jamais un second.</summary>
     public void AssignBarcode(string barcode)
     {

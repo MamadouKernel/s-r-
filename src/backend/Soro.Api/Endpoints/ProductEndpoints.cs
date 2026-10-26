@@ -44,7 +44,10 @@ internal static class ProductEndpoints
             format.PurchasePriceFcfa,
             format.SalePriceFcfa,
             format.AlertThreshold,
-            format.TracksStock);
+            format.TracksStock)
+        {
+            Unit = format.Unit,
+        };
 
     private static async Task<IResult> CreateFamilyAsync(
         CreateFamilyRequest request,
@@ -162,7 +165,10 @@ internal static class ProductEndpoints
                 request.PurchasePriceFcfa,
                 request.SalePriceFcfa,
                 request.AlertThreshold,
-                request.TracksStock),
+                request.TracksStock)
+            {
+                Unit = request.Unit,
+            },
             cancellationToken);
         return result.ToHttp(created => Results.Ok(new ProductCreatedResponse(created.ProductId.Value, created.AlreadyProcessed)));
     }
@@ -182,7 +188,10 @@ internal static class ProductEndpoints
                 request.PurchasePriceFcfa,
                 request.SalePriceFcfa,
                 request.AlertThreshold,
-                request.FormatLabel),
+                request.FormatLabel)
+            {
+                Unit = request.Unit,
+            },
             cancellationToken);
         return result.ToHttp(_ => Results.NoContent());
     }

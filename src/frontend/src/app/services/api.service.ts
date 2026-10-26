@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { CloseSessionOperation, OpenSessionOperation, SaleOperation } from '../data/journal';
+import { MeasureUnit } from '../core/measure';
 import { CatalogueProduct } from '../domain/types';
 import { ApiError, ClosingResult, SaleSyncStatus, SyncApi } from '../sync/sync-api';
 
@@ -23,6 +24,7 @@ interface ProductDto {
   tracksStock: boolean;
   isActive: boolean;
   quantityOnHand: number;
+  unit?: MeasureUnit;
   familyId?: string;
   familyName?: string;
   formatLabel?: string | null;
@@ -75,6 +77,7 @@ export class ApiService implements SyncApi {
         salePriceFcfa: dto.salePriceFcfa,
         tracksStock: dto.tracksStock,
         quantityOnHand: dto.quantityOnHand,
+        ...(dto.unit && dto.unit !== 'Piece' ? { unit: dto.unit } : {}),
         familyId: dto.familyId,
         familyName: dto.familyName,
         formatLabel: dto.formatLabel ?? null,
@@ -107,6 +110,8 @@ export class ApiService implements SyncApi {
             name: line.name,
             quantity: line.quantity,
             unitPriceFcfa: line.unitPriceFcfa,
+            // Un produit pesé envoie son unité ; une pièce reste comme avant (le serveur lit l'absence d'unité comme des pièces).
+            ...(line.unit && line.unit !== 'Piece' ? { unit: line.unit } : {}),
           })),
           discountFcfa: sale.discountFcfa,
           customerId: sale.customerId ?? null,

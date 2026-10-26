@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, Observable } from 'rxjs';
+import { MeasureUnit } from '../core/measure';
 import { API_ROOT, toApiError } from '../services/api.service';
 import { PaymentLine, RankingCriterionName } from './metrics';
 import { Range } from './period';
@@ -39,6 +40,8 @@ export interface ProductRanking {
   productId: string;
   name: string;
   quantity: number;
+  /** Unité du produit ; absente = pièce. La quantité d'un produit pesé est en grammes ou millilitres. */
+  unit?: MeasureUnit;
   revenueFcfa: number;
   marginFcfa: number | null;
   /** Vrai si une ligne de la période n'a pas de coût retenu : la marge utilise alors le prix d'achat actuel (RG-11). */

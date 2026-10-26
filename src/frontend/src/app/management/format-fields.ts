@@ -1,4 +1,5 @@
-import { Component, DestroyRef, inject, input, output } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, output } from '@angular/core';
+import { perUnit, unitSymbol } from '../core/measure';
 import { ScanService } from '../services/scan.service';
 import { FormatDraft, FormatErrors } from './format-draft';
 
@@ -9,6 +10,24 @@ import { FormatDraft, FormatErrors } from './format-draft';
     <fieldset class="rounded border border-sauge bg-ivoire p-3">
       <legend class="px-1 text-base font-semibold">{{ legend() }}</legend>
       <div class="grid gap-3 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="field-label" [attr.for]="id('unite')">Vendu</label>
+          <select
+            [id]="id('unite')" class="field" [value]="draft().unit" [attr.aria-describedby]="id('unite-aide')"
+            (change)="patch.emit({ unit: $any($event.target).value })"
+          >
+            <option value="Piece" [selected]="draft().unit === 'Piece'">À la pièce</option>
+            <option value="Kilogram" [selected]="draft().unit === 'Kilogram'">Au poids (kg)</option>
+            <option value="Litre" [selected]="draft().unit === 'Litre'">À la mesure (litre)</option>
+          </select>
+          <p [id]="id('unite-aide')" class="field-help">
+            @if (draft().unit === 'Piece') {
+              Chaque article se compte un par un. Ce choix ne pourra plus changer une fois le produit en vente.
+            } @else {
+              Le prix ci-dessous est celui d’un {{ draft().unit === 'Kilogram' ? 'kilo' : 'litre' }} ; la caisse calcule le prix selon la quantité servie. Ce choix ne pourra plus changer une fois le produit en vente.
+            }
+          </p>
+        </div>
         <div>
           <label class="field-label" [attr.for]="id('format')">Format{{ requireLabel() ? '' : ' (facultatif)' }}</label>
           <input
@@ -28,7 +47,7 @@ import { FormatDraft, FormatErrors } from './format-draft';
           <p [id]="id('code-erreur')" class="field-error">{{ errors().barcode }}</p>
         </div>
         <div>
-          <label class="field-label" [attr.for]="id('prix-achat')">Prix d’achat (FCFA)</label>
+          <label class="field-label" [attr.for]="id('prix-achat')">Prix d’achat (FCFA{{ priceUnit() }})</label>
           <input
             [id]="id('prix-achat')" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off"
             [value]="draft().purchasePrice" (input)="patch.emit({ purchasePrice: $any($event.target).value })"
@@ -37,7 +56,7 @@ import { FormatDraft, FormatErrors } from './format-draft';
           <p [id]="id('prix-achat-erreur')" class="field-error">{{ errors().purchasePrice }}</p>
         </div>
         <div>
-          <label class="field-label" [attr.for]="id('prix-vente')">Prix de vente (FCFA)</label>
+          <label class="field-label" [attr.for]="id('prix-vente')">Prix de vente (FCFA{{ priceUnit() }})</label>
           <input
             [id]="id('prix-vente')" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off"
             [value]="draft().salePrice" (input)="patch.emit({ salePrice: $any($event.target).value })"
@@ -46,9 +65,9 @@ import { FormatDraft, FormatErrors } from './format-draft';
           <p [id]="id('prix-vente-erreur')" class="field-error">{{ errors().salePrice }}</p>
         </div>
         <div>
-          <label class="field-label" [attr.for]="id('seuil')">Alerte quand il reste</label>
+          <label class="field-label" [attr.for]="id('seuil')">Alerte quand il reste{{ thresholdUnit() }}</label>
           <input
-            [id]="id('seuil')" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off"
+            [id]="id('seuil')" class="field amount text-right" type="text" [attr.inputmode]="draft().unit === 'Piece' ? 'numeric' : 'decimal'" autocomplete="off"
             [value]="draft().threshold" (input)="patch.emit({ threshold: $any($event.target).value })"
             [attr.aria-invalid]="errors().threshold ? 'true' : null" [attr.aria-describedby]="id('seuil-erreur')"
           />
@@ -76,6 +95,10 @@ export class FormatFields {
   readonly legend = input('Format');
   readonly requireLabel = input(true);
   readonly removable = input(false);
+
+  /** « par kg » à côté du prix : sans lui, 600 FCFA pourrait être le prix du sac. */
+  protected readonly priceUnit = computed(() => perUnit(this.draft().unit));
+  protected readonly thresholdUnit = computed(() => (this.draft().unit === 'Piece' ? '' : ` (en ${unitSymbol(this.draft().unit)})`));
 
   readonly patch = output<Partial<FormatDraft>>();
   readonly remove = output<void>();

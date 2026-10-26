@@ -7,7 +7,7 @@ namespace Soro.Integration.Tests;
 internal static class ImportFiles
 {
     public static readonly string[] Headers =
-        ["Nom du produit", "Format", "Catégorie", "Code-barres", "Prix d'achat", "Prix de vente", "Alerte stock", "Stock de départ", "Suivi du stock"];
+        ["Nom du produit", "Format", "Catégorie", "Code-barres", "Prix d'achat", "Prix de vente", "Alerte stock", "Stock de départ", "Suivi du stock", "Unité"];
 
     /// <summary>Un classeur « Produits » avec le modèle de colonnes et les lignes données (texte, ou nombre pour un <c>double</c>).</summary>
     public static byte[] Workbook(IEnumerable<object?[]> rows, string[]? headers = null, string sheetName = "Produits")

@@ -77,6 +77,21 @@ public sealed class ApiImportTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task A_weighed_product_is_imported_with_its_unit_and_a_decimal_stock_in_grams()
+    {
+        using var manager = As(Role.Manager);
+        var file = ImportFiles.Workbook([["Riz en vrac", null, null, null, 450.0, 600.0, "10", "120,5", "Oui", "kg"]]);
+
+        var imported = await Import(manager, file);
+
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        var rice = Assert.Single((await manager.GetFromJsonAsync<JsonElement>("/api/v1/products")).EnumerateArray());
+        Assert.Equal("Kilogram", rice.GetProperty("unit").GetString());
+        Assert.Equal(120_500, rice.GetProperty("quantityOnHand").GetInt32());
+        Assert.Equal(10_000, rice.GetProperty("alertThreshold").GetInt32());
+    }
+
+    [Fact]
     public async Task One_wrong_line_is_a_422_with_every_problem_listed_and_nothing_is_created()
     {
         using var manager = As(Role.Manager);

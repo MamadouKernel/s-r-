@@ -1,3 +1,4 @@
+using Soro.Domain.Common;
 using Soro.Domain.Stock;
 
 namespace Soro.Application.Stock;
@@ -19,7 +20,8 @@ public sealed record ProductView(
     string FamilyName,
     string? FormatLabel,
     Guid? PhotoId,
-    Guid? FamilyPhotoId)
+    Guid? FamilyPhotoId,
+    MeasureUnit Unit = MeasureUnit.Piece)
 {
     /// <param name="family">Sa famille ; absente (produit ancien), le produit est sa propre famille.</param>
     public static ProductView From(Product product, bool showPurchasePrice, ProductFamily? family = null) =>
@@ -39,5 +41,6 @@ public sealed record ProductView(
             family?.Name ?? product.Name,
             product.FormatLabel,
             (product.PhotoId ?? family?.PhotoId)?.Value,
-            family?.PhotoId?.Value);
+            family?.PhotoId?.Value,
+            product.Unit);
 }

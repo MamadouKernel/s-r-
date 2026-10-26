@@ -315,6 +315,14 @@ describe('DashboardPage', () => {
       expect(rows[2]).toContain('Fantôme');
     });
 
+    it('says a weighed product was sold in kilos, not in grams', async () => {
+      const rice: ProductRanking = { ...item('Riz en vrac', 12_500, 7_500, null), unit: 'Kilogram' };
+      const { page } = await open({ ranking: [rice] });
+
+      const row = page.root.querySelector('#classement-titre ~ ol li')?.textContent?.replace(/\s+/g, ' ');
+      expect(row?.replace(/\u00a0/g, ' ')).toContain('12,500 kg vendus');
+    });
+
     it('reloads only the ranking when the criterion or the period changes (SC-M1)', async () => {
       const { page, dashboard } = await open({ ranking });
       const activityCalls = dashboard.activity.mock.calls.length;

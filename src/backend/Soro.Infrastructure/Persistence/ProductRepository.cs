@@ -27,6 +27,10 @@ public sealed class ProductRepository(SoroDbContext db) : IProductRepository
             .Take(count)
             .ToListAsync(cancellationToken);
 
+    public async Task<bool> HasHistoryAsync(TenantId tenant, ProductId id, CancellationToken cancellationToken) =>
+        await db.StockMovements.AnyAsync(movement => movement.TenantId == tenant.Value && movement.ProductId == id.Value, cancellationToken)
+        || await db.SaleLines.AnyAsync(line => line.TenantId == tenant.Value && line.ProductId == id.Value, cancellationToken);
+
     public Task<bool> IsBarcodeUsedAsync(
         TenantId tenant,
         string barcode,

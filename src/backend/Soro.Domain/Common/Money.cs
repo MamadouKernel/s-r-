@@ -30,6 +30,17 @@ public readonly record struct Money : IComparable<Money>
         return new Money { Amount = checked(money.Amount * quantity) };
     }
 
+    /// <summary>
+    /// Total d'une ligne : le prix d'<b>une</b> unité de vente fois la quantité (comptée en millièmes pour un produit pesé ou mesuré), arrondi au franc
+    /// le plus proche, demi vers le haut (docs/decisions/0017).
+    /// </summary>
+    public Money ForQuantity(long quantity, MeasureUnit unit)
+    {
+        Ensure.That(quantity >= 0, "Une quantité ne peut pas être négative.");
+        var scale = unit.Scale();
+        return new Money { Amount = checked(((Amount * quantity) + (scale / 2)) / scale) };
+    }
+
     public static bool operator <(Money left, Money right) => left.Amount < right.Amount;
 
     public static bool operator >(Money left, Money right) => left.Amount > right.Amount;

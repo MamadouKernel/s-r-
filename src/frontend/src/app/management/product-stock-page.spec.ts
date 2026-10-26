@@ -15,6 +15,60 @@ async function open(role = 'StockKeeper', stock = 24, history: ReturnType<typeof
   return { api, page };
 }
 
+describe('ProductStockPage: produit au poids', () => {
+  const rice = (stock = 12_500) => product({ id: 'p-1', unit: 'Kilogram', quantityOnHand: stock, alertThreshold: 2_000, isLowStock: false });
+
+  async function openRice(stock = 12_500) {
+    const api = fakeApi();
+    api.list.mockResolvedValue([rice(stock)]);
+    api.movements.mockResolvedValue([movement({ quantityDelta: 12_500 }), movement({ id: 'm-2', kind: 'Loss', quantityDelta: -250, reason: 'Sac percé' })]);
+    const page = await render(ProductStockPage, { api, role: 'StockKeeper', params: { id: 'p-1' } });
+    return { api, page };
+  }
+
+  it('shows the stock and the history in kilos, never in grams', async () => {
+    const { page } = await openRice();
+
+    expect(page.has('Stock : 12,500 kg')).toBe(true);
+    expect(page.has('+12,500 kg')).toBe(true);
+    expect(page.has('-0,250 kg')).toBe(true);
+  });
+
+  it('receives 12,5 kg as 12 500 grams', async () => {
+    const { api, page } = await openRice();
+    api.receive.mockResolvedValue({ movementId: 'm', quantityOnHand: 25_000, alreadyProcessed: false });
+    await page.type('#reception-quantite', '12,5');
+
+    await page.submit(0);
+
+    expect(api.receive).toHaveBeenCalledWith('p-1', expect.objectContaining({ quantity: 12_500 }));
+    expect(page.has('Stock : 25,000 kg')).toBe(true);
+  });
+
+  it('refuses a loss of more than the stock and records a decimal loss in grams', async () => {
+    const { api, page } = await openRice();
+    await page.type('#perte-quantite', '13');
+    await page.type('#perte-motif', 'Sac percé');
+    await page.submit(1);
+    expect(api.recordLoss).not.toHaveBeenCalled();
+    expect(page.has('dépasse le stock disponible (12,500 kg)')).toBe(true);
+
+    await page.type('#perte-quantite', '0,25');
+    await page.submit(1);
+    expect(api.recordLoss).toHaveBeenCalledWith('p-1', expect.objectContaining({ quantity: 250 }));
+  });
+
+  it('refuses four decimals in a reception', async () => {
+    const { api, page } = await openRice();
+    await page.type('#reception-quantite', '1,2345');
+
+    await page.submit(0);
+
+    expect(api.receive).not.toHaveBeenCalled();
+    expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('trois décimales');
+  });
+});
+
 describe('ProductStockPage', () => {
   it('shows the stock, the history with signed quantities and the author', async () => {
     const { page } = await open();

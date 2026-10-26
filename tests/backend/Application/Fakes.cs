@@ -158,6 +158,14 @@ internal sealed class InMemoryProductRepository : IProductRepository
     public Task<Product?> GetAsync(ProductId id, TenantId tenant, CancellationToken cancellationToken) =>
         Task.FromResult(_products.FirstOrDefault(product => product.Id == id && product.Tenant == tenant));
 
+    private readonly HashSet<ProductId> _withHistory = [];
+
+    /// <summary>Simule un produit qui a déjà un mouvement de stock ou une vente.</summary>
+    public void MarkHasHistory(ProductId id) => _withHistory.Add(id);
+
+    public Task<bool> HasHistoryAsync(TenantId tenant, ProductId id, CancellationToken cancellationToken) =>
+        Task.FromResult(_withHistory.Contains(id));
+
     public Task<bool> IsBarcodeUsedAsync(
         TenantId tenant,
         string barcode,

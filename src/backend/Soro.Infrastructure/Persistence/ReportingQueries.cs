@@ -94,7 +94,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             row.CustomerId,
             row.Lines.OrderBy(line => line.Position)
                 .Select(line => new SaleLineView(
-                    line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, line.UnitPrice * line.Quantity))
+                    line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, Money.Fcfa(line.UnitPrice).ForQuantity(line.Quantity, line.Unit).Amount, line.Unit))
                 .ToArray(),
             row.Payments.OrderBy(payment => payment.Position)
                 .Select(payment => new PaymentView(payment.Method, payment.Amount, payment.Change, payment.Reference))
@@ -171,9 +171,12 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 ProductId = group.Key,
                 FrozenName = group.Max(line => line.ProductName)!,
                 Quantity = group.Sum(line => line.Quantity),
-                Revenue = group.Sum(line => line.UnitPrice * line.Quantity),
+                // Un produit pesé compte ses quantités en millièmes : le total de chaque ligne est arrondi au franc, demi vers le haut (docs/decisions/0017).
+                Revenue = group.Sum(line => (line.UnitPrice * line.Quantity + (line.Unit == MeasureUnit.Piece ? 0L : 500L)) / (line.Unit == MeasureUnit.Piece ? 1L : 1000L)),
                 // RG-11 : coût retenu à la vente ; les lignes sans coût (ventes antérieures) sont comptées à part pour l'estimation.
-                KnownCost = group.Sum(line => line.UnitCost != null ? line.UnitCost.Value * line.Quantity : 0L),
+                KnownCost = group.Sum(line => line.UnitCost != null
+                    ? (line.UnitCost.Value * line.Quantity + (line.Unit == MeasureUnit.Piece ? 0L : 500L)) / (line.Unit == MeasureUnit.Piece ? 1L : 1000L)
+                    : 0L),
                 UncostedQuantity = group.Sum(line => line.UnitCost == null ? line.Quantity : 0),
             })
             .ToListAsync(cancellationToken);
@@ -184,7 +187,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             ? []
             : await db.Products.AsNoTracking()
                 .Where(product => product.TenantId == tenant.Value && ids.Contains(product.Id))
-                .Select(product => new { product.Id, product.Name, product.PurchasePrice })
+                .Select(product => new { product.Id, product.Name, product.PurchasePrice, product.Unit })
                 .ToDictionaryAsync(product => product.Id, cancellationToken);
 
         var ranking = sold.Select(item =>
@@ -192,10 +195,10 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             products.TryGetValue(item.ProductId, out var product);
             // Sans fiche, des lignes sans coût n'ont rien pour s'estimer : marge inconnue. Sinon : coûts retenus + estimation du reste.
             long? margin = includeMargin && (item.UncostedQuantity == 0 || product is not null)
-                ? item.Revenue - item.KnownCost - (long)item.UncostedQuantity * (product?.PurchasePrice ?? 0)
+                ? item.Revenue - item.KnownCost - Money.Fcfa(product?.PurchasePrice ?? 0).ForQuantity(item.UncostedQuantity, product?.Unit ?? MeasureUnit.Piece).Amount
                 : null;
             return new ProductRanking(
-                item.ProductId, product?.Name ?? item.FrozenName, item.Quantity, item.Revenue, margin, includeMargin && item.UncostedQuantity > 0);
+                item.ProductId, product?.Name ?? item.FrozenName, item.Quantity, item.Revenue, margin, includeMargin && item.UncostedQuantity > 0, product?.Unit ?? MeasureUnit.Piece);
         });
 
         // Critère décroissant, puis le nom pour un ordre stable ; sans marge connue, un produit passe après ceux qui en ont une.
@@ -203,7 +206,8 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         {
             RankingCriterion.Revenue => ranking.OrderByDescending(item => item.RevenueFcfa),
             RankingCriterion.Margin => ranking.OrderByDescending(item => item.MarginFcfa.HasValue).ThenByDescending(item => item.MarginFcfa),
-            _ => ranking.OrderByDescending(item => item.Quantity),
+            // Des grammes et des pièces ne se comparent pas : on classe sur la quantité vendue dans l'unité du produit (kg, L ou pièces).
+            _ => ranking.OrderByDescending(item => (decimal)item.Quantity / item.Unit.Scale()),
         };
         return ordered.ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).Take(limit).ToArray();
     }

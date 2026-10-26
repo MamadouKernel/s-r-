@@ -1,3 +1,4 @@
+import { MeasureUnit, parseThreshold } from '../core/measure';
 import { parseFcfa } from '../core/money';
 import { fold } from '../domain/families';
 import { FormatInput } from './products-api';
@@ -14,6 +15,8 @@ export interface FormatDraft {
   salePrice: string;
   threshold: string;
   tracksStock: boolean;
+  /** Pièce, kg ou litre : se choisit à la création et ne change plus ensuite. */
+  unit: MeasureUnit;
 }
 
 export interface FormatErrors {
@@ -26,7 +29,7 @@ export interface FormatErrors {
 
 export function newDraft(): FormatDraft {
   const id = crypto.randomUUID();
-  return { key: id, productId: id, label: '', barcode: '', purchasePrice: '0', salePrice: '', threshold: '0', tracksStock: true };
+  return { key: id, productId: id, label: '', barcode: '', purchasePrice: '0', salePrice: '', threshold: '0', tracksStock: true, unit: 'Piece' };
 }
 
 function cleanLabel(label: string): string {
@@ -50,7 +53,7 @@ export function validateFormats(drafts: readonly FormatDraft[], labelRequired = 
     const barcode = draft.barcode.trim();
     const sale = parseFcfa(draft.salePrice);
     const purchase = parseFcfa(draft.purchasePrice);
-    const threshold = parseFcfa(draft.threshold);
+    const threshold = parseThreshold(draft.threshold, draft.unit);
 
     if (labelRequired && label === '') {
       error.label = 'Donnez un format à chaque produit (1 L, 50 kg…).';
@@ -70,11 +73,11 @@ export function validateFormats(drafts: readonly FormatDraft[], labelRequired = 
     if (purchase === null) {
       error.purchasePrice = 'Saisissez le prix d’achat en chiffres, sans virgule (0 s’il est inconnu).';
     }
-    if (threshold === null) {
-      error.threshold = 'Saisissez le seuil en chiffres entiers (0 pour aucune alerte).';
+    if (!threshold.ok) {
+      error.threshold = threshold.message;
     }
 
-    if (Object.keys(error).length > 0 || sale === null || purchase === null || threshold === null) {
+    if (Object.keys(error).length > 0 || sale === null || purchase === null || !threshold.ok) {
       valid = false;
       return;
     }
@@ -84,8 +87,9 @@ export function validateFormats(drafts: readonly FormatDraft[], labelRequired = 
       barcode: barcode === '' ? null : barcode,
       purchasePriceFcfa: purchase,
       salePriceFcfa: sale,
-      alertThreshold: threshold,
+      alertThreshold: threshold.quantity,
       tracksStock: draft.tracksStock,
+      unit: draft.unit,
     });
   });
 

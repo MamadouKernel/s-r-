@@ -1,10 +1,11 @@
+import { lineTotal } from '../core/measure';
 import { CartLine, CatalogueProduct } from './types';
 
 // Fonctions pures : le panier est une valeur, jamais modifiée sur place.
 
 function assertQuantity(quantity: number): void {
   if (!Number.isInteger(quantity) || quantity < 1) {
-    throw new Error('La quantité doit être un entier supérieur ou égal à 1.');
+    throw new Error('La quantité doit être un entier supérieur ou égal à 1.'); // en grammes ou millilitres pour un produit pesé
   }
 }
 
@@ -19,7 +20,13 @@ export function addProduct(cart: readonly CartLine[], product: CatalogueProduct,
   }
   return [
     ...cart,
-    { productId: product.id, name: product.name, unitPriceFcfa: product.salePriceFcfa, quantity },
+    {
+      productId: product.id,
+      name: product.name,
+      unitPriceFcfa: product.salePriceFcfa,
+      quantity,
+      ...(product.unit && product.unit !== 'Piece' ? { unit: product.unit } : {}),
+    },
   ];
 }
 
@@ -33,5 +40,5 @@ export function removeLine(cart: readonly CartLine[], productId: string): CartLi
 }
 
 export function cartTotal(cart: readonly CartLine[]): number {
-  return cart.reduce((total, line) => total + line.unitPriceFcfa * line.quantity, 0);
+  return cart.reduce((total, line) => total + lineTotal(line.unitPriceFcfa, line.quantity, line.unit), 0);
 }

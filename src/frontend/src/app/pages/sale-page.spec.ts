@@ -579,3 +579,128 @@ describe('SalePage: last ticket (docs/specs/etiquettes-tickets TKT-01)', () => {
     expect(page.has('Imprimer le ticket')).toBe(false);
   });
 });
+
+describe('SalePage: weighed products (docs/specs/vente-au-poids)', () => {
+  const riz: CatalogueProduct = {
+    id: 'p-riz', name: 'Riz parfumé', barcode: '6111000000028', category: null, salePriceFcfa: 800, tracksStock: true, quantityOnHand: 25_000, unit: 'Kilogram',
+  };
+
+  async function open() {
+    const { cash } = await setup({}, [riz, jus]);
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.textContent).toContain('Riz parfumé');
+    });
+    const settle = async () => {
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      fixture.detectChanges();
+    };
+    const click = async (label: string) => {
+      const target = [...root.querySelectorAll('button')].find((button) => (button.textContent ?? '').includes(label) || button.getAttribute('aria-label')?.includes(label));
+      expect(target, `bouton « ${label} » introuvable`).toBeTruthy();
+      target!.click();
+      await settle();
+    };
+    const type = async (value: string) => {
+      const field = root.querySelector<HTMLInputElement>('#peser-valeur')!;
+      field.value = value;
+      field.dispatchEvent(new Event('input'));
+      await settle();
+    };
+    return { cash, fixture, root, click, type, settle, has: (text: string) => (root.textContent ?? '').includes(text) };
+  }
+
+  it('shows the price of one kilo and the stock in kilos on the product', async () => {
+    const page = await open();
+
+    expect(page.root.textContent).toContain('800\u00a0FCFA / kg');
+    expect(page.root.textContent).toContain('Stock : 25,000 kg');
+  });
+
+  it('opens the weighing instead of adding one when a weighed product is touched', async () => {
+    const page = await open();
+
+    await page.click('Riz parfumé');
+
+    expect(page.has('Peser : Riz parfumé')).toBe(true);
+    expect(page.cash.cart()).toEqual([]);
+  });
+
+  it('adds the weighed quantity in grams with its unit, shows it in words and totals it', async () => {
+    const page = await open();
+    await page.click('Riz parfumé');
+
+    await page.type('1,25');
+    await page.click('Ajouter au panier');
+
+    expect(page.cash.cart()).toEqual([{ productId: 'p-riz', name: 'Riz parfumé', unitPriceFcfa: 800, quantity: 1250, unit: 'Kilogram' }]);
+    expect(page.has('1,250 kg')).toBe(true);
+    expect(page.cash.total()).toBe(1000);
+    expect(page.has('Peser : Riz parfumé')).toBe(false);
+    expect(page.root.querySelector('[data-testid="scan-note"]')?.textContent).toContain('Riz parfumé ajouté au panier');
+  });
+
+  it('adds « pour 1 000 francs » as 1,250 kg', async () => {
+    const page = await open();
+    await page.click('Riz parfumé');
+    await page.click('Montant');
+
+    await page.type('1000');
+    await page.click('Ajouter au panier');
+
+    expect(page.cash.cart()[0].quantity).toBe(1250);
+  });
+
+  it('corrects the weight of a line by retyping it, without plus and minus buttons', async () => {
+    const page = await open();
+    await page.click('Riz parfumé');
+    await page.type('1,25');
+    await page.click('Ajouter au panier');
+    expect(page.root.querySelector('[aria-label="Augmenter la quantité de Riz parfumé"]')).toBeNull();
+
+    await page.click('Modifier le poids de Riz parfumé');
+    expect(page.root.querySelector<HTMLInputElement>('#peser-valeur')!.value).toBe('1,250');
+    await page.type('2');
+    await page.click('Enregistrer');
+
+    expect(page.cash.cart()[0].quantity).toBe(2000);
+    expect(page.cash.total()).toBe(1600);
+  });
+
+  it('counts a weighed line as one article, not as thousands of them', async () => {
+    const page = await open();
+    page.cash.add(riz, 1250);
+    page.cash.add(jus, 2);
+    page.fixture.detectChanges();
+
+    expect(page.has('3 articles')).toBe(true);
+    expect(page.has('1 250 articles')).toBe(false);
+  });
+
+  it('remembers what is already in the cart when it checks the stock', async () => {
+    const page = await open();
+    page.cash.add(riz, 20_000);
+    page.fixture.detectChanges();
+    await page.click('Riz parfumé');
+
+    await page.type('6');
+
+    expect(page.root.querySelector('[role="alert"]')?.textContent).toContain('Il n’en reste que 5,000 kg.');
+  });
+
+  it('opens the weighing when a weighed product is scanned, and leaves the pieces to the scan as before', async () => {
+    const page = await open();
+    const typeScan = (await import('../core/scan-test-support')).typeScan;
+
+    typeScan(document.body, riz.barcode!);
+    await vi.waitFor(() => {
+      page.fixture.detectChanges();
+      expect(page.has('Peser : Riz parfumé')).toBe(true);
+    });
+    expect(page.cash.cart()).toEqual([]);
+  });
+});

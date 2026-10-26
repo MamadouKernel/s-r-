@@ -9,13 +9,14 @@ namespace Soro.Domain.Sales;
 /// </summary>
 public sealed record SaleLine
 {
-    private SaleLine(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost)
+    private SaleLine(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost, MeasureUnit unit)
     {
         ProductId = productId;
         ProductName = productName;
         Quantity = quantity;
         UnitPrice = unitPrice;
         UnitCost = unitCost;
+        Unit = unit;
     }
 
     public ProductId ProductId { get; }
@@ -28,16 +29,19 @@ public sealed record SaleLine
 
     public Money? UnitCost { get; }
 
-    public Money Total => UnitPrice * Quantity;
+    /// <summary>L'unité du moment (copie figée) : « 1,250 kg × 800 FCFA » restera vrai même si le produit change plus tard. La quantité est comptée en millièmes pour un produit pesé.</summary>
+    public MeasureUnit Unit { get; }
+
+    public Money Total => UnitPrice.ForQuantity(Quantity, Unit);
 
     /// <summary>Reconstruction depuis le stockage : les données ont déjà été validées à la création.</summary>
-    internal static SaleLine Restore(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost) =>
-        new(productId, productName, quantity, unitPrice, unitCost);
+    internal static SaleLine Restore(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost, MeasureUnit unit = MeasureUnit.Piece) =>
+        new(productId, productName, quantity, unitPrice, unitCost, unit);
 
-    public static SaleLine Create(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost = null)
+    public static SaleLine Create(ProductId productId, string productName, int quantity, Money unitPrice, Money? unitCost = null, MeasureUnit unit = MeasureUnit.Piece)
     {
         Ensure.That(!string.IsNullOrWhiteSpace(productName), "Le nom du produit est obligatoire.");
         Ensure.That(quantity > 0, "La quantité doit être strictement positive.");
-        return new SaleLine(productId, productName.Trim(), quantity, unitPrice, unitCost);
+        return new SaleLine(productId, productName.Trim(), quantity, unitPrice, unitCost, unit);
     }
 }

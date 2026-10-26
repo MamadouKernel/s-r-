@@ -1,3 +1,4 @@
+using Soro.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -114,6 +115,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
             table.HasCheckConstraint("ck_sale_lines_values", "quantity > 0 AND unit_price >= 0 AND (unit_cost IS NULL OR unit_cost >= 0)"));
         line.HasKey(row => new { row.SaleId, row.Position });
         line.Property(row => row.ProductName).HasMaxLength(200);
+        line.Property(row => row.Unit).HasConversion<string>().HasMaxLength(16).HasDefaultValue(MeasureUnit.Piece);
     }
 
     private static void ConfigurePayments(EntityTypeBuilder<PaymentRow> payment)
@@ -292,6 +294,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         product.HasKey(row => row.Id);
         product.Property(row => row.Name).HasMaxLength(200);
         product.Property(row => row.Barcode).HasMaxLength(64);
+        product.Property(row => row.Unit).HasConversion<string>().HasMaxLength(16).HasDefaultValue(MeasureUnit.Piece);
         product.Property(row => row.Category).HasMaxLength(100);
         product.Property(row => row.FormatLabel).HasMaxLength(40);
         product.HasOne<ProductFamilyRow>().WithMany().HasForeignKey(row => row.FamilyId).OnDelete(DeleteBehavior.Restrict);
