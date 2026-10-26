@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal, viewChild } from '@angular/core';
 import { formatFcfa } from '../core/money';
 import { cartTotal } from '../domain/cart';
 import { FamilyGroup, groupByFamily } from '../domain/families';
@@ -6,10 +6,13 @@ import { CartLine, CatalogueProduct } from '../domain/types';
 import { CashService } from '../services/cash.service';
 import { AuthService } from '../services/auth.service';
 import { CatalogueService } from '../services/catalogue.service';
+import { isEditable, ScanService } from '../services/scan.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ProductAvatar } from '../shared/product-avatar';
 import { RouterLink } from '@angular/router';
+import { ReceiptService } from '../services/receipt.service';
 import { PaymentPanel } from './payment-panel';
+import { TicketActions } from './ticket-actions';
 
 const MAX_VISIBLE = 60;
 /** En dessous de ce stock, le choix du format écrit « Plus que N » pour prévenir le caissier. */
@@ -18,9 +21,15 @@ const LOW_STOCK_HINT = 5;
 /** S4 : catalogue (recherche, scan) et panier. Le total reste visible (DESIGN.md §4, §5). */
 @Component({
   selector: 'app-sale-page',
-  imports: [PaymentPanel, ProductAvatar, RouterLink],
+  imports: [PaymentPanel, ProductAvatar, RouterLink, TicketActions],
   template: `
     <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
+    @if (scanNote(); as note) {
+      <!-- Un nouvel élément à chaque scan : deux scans du même produit s'annoncent chacun. -->
+      @for (item of [note]; track item.serial) {
+        <p data-testid="scan-note" class="mb-3 rounded border border-feuille bg-surface p-2 font-semibold text-feuille" role="status">{{ item.text }}</p>
+      }
+    }
 
     @if (paying()) {
       <div class="mx-auto max-w-xl">
@@ -58,12 +67,25 @@ const LOW_STOCK_HINT = 5;
             </section>
           }
 
+          @if (receipts.last(); as lastTicket) {
+            @if (reprinting()) {
+              <section class="panel mb-4" aria-labelledby="dernier-ticket-titre">
+                <h3 id="dernier-ticket-titre" class="mb-2 text-lg font-bold">Dernier ticket</h3>
+                <app-ticket-actions [receipt]="lastTicket" />
+                <button type="button" class="btn mt-3" (click)="reprinting.set(false)">Fermer</button>
+              </section>
+            } @else {
+              <button type="button" class="btn mb-3" (click)="reprinting.set(true)">Réimprimer le dernier ticket</button>
+            }
+          }
+
           <form (submit)="scan($event)" role="search">
             <label class="field-label" for="recherche">Rechercher ou scanner un code-barres</label>
             <input
               id="recherche"
               class="field"
               type="search"
+              data-scan="search"
               autocomplete="off"
               enterkeyhint="done"
               [value]="term()"
@@ -73,7 +95,7 @@ const LOW_STOCK_HINT = 5;
             <p id="recherche-aide" class="field-help">Un code-barres exact s’ajoute au panier avec la touche Entrée.</p>
           </form>
           @if (unknownCode()) {
-            <p class="field-error" role="alert">Aucun produit pour le code {{ unknownCode() }}.</p>
+            <p class="field-error" role="alert">Aucun produit pour le code {{ shortCode(unknownCode()) }}.</p>
           }
           @if (catalogue.refreshFailed()) {
             <p class="mt-2 text-sm text-avertissement" role="note">
@@ -234,6 +256,18 @@ export class SalePage implements OnInit {
   protected readonly catalogue = inject(CatalogueService);
   private readonly subscription = inject(SubscriptionService);
   private readonly auth = inject(AuthService);
+  protected readonly receipts = inject(ReceiptService);
+  private readonly scanner = inject(ScanService);
+  private readonly panel = viewChild(PaymentPanel);
+
+  constructor() {
+    // Lecteur de codes-barres (ADR 0015) : un scan est pris sur la page ou dans la zone de recherche, jamais dans un autre champ de saisie.
+    const stop = this.scanner.listen({
+      accept: (target) => !isEditable(target) || (target as HTMLElement).dataset['scan'] === 'search',
+      onScan: (scan) => void this.onScan(scan.code),
+    });
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   /** Abonnement terminé (lecture seule) : on ne démarre plus de nouvel encaissement ; l'écran dit pourquoi et vers qui se tourner. */
   protected readonly suspended = this.subscription.readOnly;
@@ -241,8 +275,12 @@ export class SalePage implements OnInit {
 
   protected readonly term = signal('');
   protected readonly paying = signal(false);
+  protected readonly reprinting = signal(false);
   protected readonly unknownCode = signal('');
   protected readonly announcement = signal('');
+  protected readonly scanNote = signal<{ serial: number; text: string } | null>(null);
+  private scanSerial = 0;
+  private scanNoteTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly holding = signal(false);
   protected readonly holdLabel = signal('');
   protected readonly confirmDelete = signal<string | null>(null);
@@ -278,10 +316,48 @@ export class SalePage implements OnInit {
     const product = await this.catalogue.findByBarcode(code);
     if (product) {
       this.add(product);
+      this.scanner.feedback(true);
       await this.search('');
     } else if (/^\d{6,}$/.test(code)) {
       this.unknownCode.set(code);
+      this.scanner.feedback(false);
     }
+  }
+
+  /** Un scan reconnu par sa vitesse : produit ajouté, ou code inconnu dit à voix haute et à l'écran. La zone de recherche est toujours vidée. */
+  private async onScan(code: string): Promise<void> {
+    if (this.paying()) {
+      if (!this.panel()?.isDone()) {
+        this.scanner.feedback(false);
+        this.tell('Terminez ou annulez le paiement avant de scanner un article.');
+        return;
+      }
+      // Le client suivant : sur l'écran du ticket, le premier article scanné referme la vente finie et commence la suivante.
+      await this.endSale();
+    }
+    const product = await this.catalogue.findByBarcode(code);
+    await this.search('');
+    if (product) {
+      this.add(product);
+      this.scanner.feedback(true);
+      this.tell(`${product.name} ajouté au panier`);
+    } else {
+      this.unknownCode.set(code);
+      this.announcement.set(`Aucun produit pour le code ${this.shortCode(code)}`);
+      this.scanner.feedback(false);
+    }
+  }
+
+  /** Message visible après un scan (le son peut être coupé) ; chaque message est un nouvel élément, annoncé même s'il répète le précédent. */
+  private tell(text: string): void {
+    clearTimeout(this.scanNoteTimer);
+    this.scanNote.set({ serial: ++this.scanSerial, text });
+    this.scanNoteTimer = setTimeout(() => this.scanNote.set(null), 4000);
+  }
+
+  /** Le texte d'un QR code peut être long : on n'en montre que le début. */
+  protected shortCode(code: string): string {
+    return code.length > 30 ? `${code.slice(0, 30)}…` : code;
   }
 
   protected articleCount(lines: readonly CartLine[]): string {

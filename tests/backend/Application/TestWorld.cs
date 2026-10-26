@@ -118,7 +118,7 @@ internal sealed class TestWorld
 
     public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, UnitOfWork);
 
-    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Directory, Audit, Clock, UnitOfWork);
+    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Users, Hasher, Repayments, Audit, Clock, UnitOfWork);
 
     public SyncSalesHandler SyncSales => new(RecordSale);
 
@@ -223,6 +223,8 @@ internal sealed class TestWorld
     public PreviewProductImportHandler PreviewImport => new(Current, SheetReader, Families, Products);
 
     public ImportProductsHandler ImportProducts => new(Current, SheetReader, Families, Products, Movements, Audit, Clock, UnitOfWork);
+
+    public CreateInternalBarcodeHandler CreateInternalBarcode => new(Current, Products, Audit, Clock, UnitOfWork);
 
     public DeactivateProductHandler DeactivateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
 
@@ -336,7 +338,7 @@ internal sealed class TestWorld
         long sequence = 1,
         long discount = 0,
         long? tendered = null,
-        UserId? approver = null) =>
+        Approval? approval = null) =>
         new(
             SaleId.New(),
             session.Id,
@@ -346,7 +348,7 @@ internal sealed class TestWorld
             discount,
             [new PaymentInput(PaymentId.New(), PaymentMethod.Cash, price - discount, tendered ?? price - discount, null)],
             null,
-            approver);
+            approval);
 
     public RecordSaleCommand MobileSale(
         CashRegisterSession session,

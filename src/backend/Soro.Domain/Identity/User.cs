@@ -121,14 +121,15 @@ public sealed class User
         };
     }
 
-    /// <summary>Nouveau mot de passe (réinitialisation par e-mail) : lève aussi un éventuel verrouillage.</summary>
-    public void ChangePassword(string passwordHash)
+    /// <summary>Nouveau mot de passe (réinitialisation par e-mail) : lève un éventuel verrouillage et met fin aux sessions ouvertes (un jeton volé ne survit pas).</summary>
+    public void ChangePassword(string passwordHash, DateTimeOffset at)
     {
         Ensure.That(PasswordHash is not null, "Ce profil se connecte par PIN : il n'a pas de mot de passe.");
         Ensure.That(!string.IsNullOrWhiteSpace(passwordHash), "Le condensat du mot de passe est obligatoire.");
         PasswordHash = passwordHash;
         FailedAttempts = 0;
         LockedUntil = null;
+        InvalidateSessions(at);
     }
 
     public bool IsLocked(DateTimeOffset now) => LockedUntil is { } until && now < until;

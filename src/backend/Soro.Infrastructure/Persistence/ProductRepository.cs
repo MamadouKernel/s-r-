@@ -15,6 +15,18 @@ public sealed class ProductRepository(SoroDbContext db) : IProductRepository
         return row is null ? null : ProductMapper.ToDomain(row);
     }
 
+    public async Task<IReadOnlyList<string>> RecentInternalBarcodesAsync(TenantId tenant, int count, CancellationToken cancellationToken) =>
+        await db.Products
+            .AsNoTracking()
+            .Where(product => product.TenantId == tenant.Value
+                && product.Barcode != null
+                && product.Barcode.StartsWith(InternalBarcode.Prefix)
+                && product.Barcode.Length == 13)
+            .Select(product => product.Barcode!)
+            .OrderByDescending(code => code)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+
     public Task<bool> IsBarcodeUsedAsync(
         TenantId tenant,
         string barcode,

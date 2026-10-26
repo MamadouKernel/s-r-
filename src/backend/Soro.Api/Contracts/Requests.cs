@@ -70,8 +70,13 @@ public sealed record RecordSaleRequest
 
     public Guid? DiscountApproverId { get; init; }
 
+    /// <summary>Le PIN du gérant qui valide la remise : l'identifiant seul ne prouve rien (docs/decisions/0018).</summary>
+    public string? DiscountApproverPin { get; init; }
+
     /// <summary>Le gérant qui a validé un dépassement du plafond de crédit du client (CRD-04), comme pour une remise.</summary>
     public Guid? CreditApproverId { get; init; }
+
+    public string? CreditApproverPin { get; init; }
 }
 
 public sealed record SyncSalesRequest

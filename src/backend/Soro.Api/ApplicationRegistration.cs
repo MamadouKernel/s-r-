@@ -80,6 +80,7 @@ public static class ApplicationRegistration
         services.AddScoped<ListUsersHandler>();
         services.AddScoped<GetDirectoryHandler>();
         services.AddScoped<CreateProductHandler>();
+        services.AddScoped<CreateInternalBarcodeHandler>();
         services.AddScoped<UpdateProductHandler>();
         services.AddScoped<DeactivateProductHandler>();
         services.AddScoped<CreateFamilyHandler>();

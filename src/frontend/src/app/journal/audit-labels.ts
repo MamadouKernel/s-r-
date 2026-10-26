@@ -6,6 +6,7 @@ const ACTIONS: Record<string, string> = {
   'product.created': 'Produit créé',
   'product.updated': 'Fiche produit modifiée',
   'product.deactivated': 'Produit désactivé',
+  'product.barcode.created': 'Code interne créé',
   'stock.loss': 'Perte de stock',
   'user.disabled': 'Compte désactivé',
   'user.pin.reset': 'PIN d’un membre changé',

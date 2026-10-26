@@ -137,3 +137,6 @@ public sealed record DeclareSubscriptionPaymentRequest
 }
 
 public sealed record SubscriptionPaymentDeclaredResponse(Guid PaymentId, bool AlreadyProcessed);
+
+/// <summary>Le code interne créé pour un produit (EAN-13, préfixe 29).</summary>
+public sealed record InternalBarcodeResponse(string Barcode);

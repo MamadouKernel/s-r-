@@ -116,7 +116,7 @@ public sealed class ConfirmPasswordResetHandler(
 
         try
         {
-            user.ChangePassword(passwords.Hash(command.NewPassword));
+            user.ChangePassword(passwords.Hash(command.NewPassword), now);
             verification.Consume(now);
         }
         catch (DomainException exception)

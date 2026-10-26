@@ -8,6 +8,8 @@ import { AuthService } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
 import { NetworkService } from '../services/network.service';
 import { SyncService } from '../services/sync.service';
+import { Receipt } from '../core/receipt';
+import { ReceiptService } from '../services/receipt.service';
 import { PaymentPanel } from './payment-panel';
 
 const sale = (draft: PaymentDraft[]): SaleOperation => ({
@@ -32,6 +34,7 @@ async function render(used: string[] = [], pending = 1, options: Omit<Options, '
   const confirmSale = vi.fn(async (drafts: PaymentDraft[], customerId?: string | null) => ({
     ...sale(drafts), ...(customerId ? { customerId } : {}),
   }));
+  const receipts = { remember: vi.fn(async (_sale: SaleOperation, _customer: string | null) => ({ commerce: 'Supérette' }) as Receipt), last: signal<Receipt | null>(null) };
   const customersSignal = signal(options.customers ?? []);
   const customerService = {
     customers: customersSignal.asReadonly(),
@@ -44,6 +47,7 @@ async function render(used: string[] = [], pending = 1, options: Omit<Options, '
   };
   TestBed.configureTestingModule({
     providers: [
+      { provide: ReceiptService, useValue: receipts },
       { provide: SyncService, useValue: { counts: signal({ pending, synced: 0, rejected: 0 }) } },
       { provide: CustomerService, useValue: customerService },
       { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'Awa', role: options.role ?? 'Cashier' }) } },
@@ -74,7 +78,7 @@ async function render(used: string[] = [], pending = 1, options: Omit<Options, '
     element.dispatchEvent(new Event('change'));
     await fixture.whenStable();
   };
-  return { fixture, root, confirmSale, customerService, type, click, choose };
+  return { fixture, root, confirmSale, customerService, receipts, type, click, choose };
 }
 
 describe('PaymentPanel', () => {
@@ -316,3 +320,63 @@ describe('PaymentPanel: credit (CRD-04)', () => {
   });
 });
 
+
+/** Laisse finir les attentes en chaîne de la validation (enregistrement de la vente, puis préparation du ticket). */
+async function later(fixture: ComponentFixture<PaymentPanel>): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await fixture.whenStable();
+  fixture.detectChanges();
+}
+
+describe('PaymentPanel: ticket (docs/specs/etiquettes-tickets TKT-01)', () => {
+  it('offers to print, share or copy the ticket once the sale is recorded, next to « Nouvelle vente »', async () => {
+    const { root, click, receipts, fixture } = await render();
+
+    await click('Valider la vente');
+    await later(fixture);
+
+    expect(receipts.remember).toHaveBeenCalledOnce();
+    expect(root.textContent).toContain('Imprimer le ticket');
+    expect(root.textContent).toContain('Copier le ticket');
+    expect(root.textContent).toContain('Nouvelle vente');
+  });
+
+  it('builds the ticket from the recorded sale, with no customer for a cash sale', async () => {
+    const { click, receipts, fixture } = await render();
+
+    await click('Valider la vente');
+    await later(fixture);
+
+    const [recorded, customerName] = receipts.remember.mock.calls[0];
+    expect(recorded.netTotalFcfa).toBe(1450);
+    expect(customerName).toBeNull();
+  });
+
+  it('gives the name of the customer to the ticket of a credit sale', async () => {
+    const { root, click, type, receipts, fixture } = await render([], 1, { customers: [customer()] });
+    await type(root.querySelectorAll<HTMLInputElement>('input')[0], '1000');
+    await click('Ajouter un paiement');
+    const selects = root.querySelectorAll<HTMLSelectElement>('select');
+    selects[1].value = 'Credit';
+    selects[1].dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    await click('Awa Koné');
+
+    await click('Valider la vente');
+    await later(fixture);
+
+    expect(receipts.remember.mock.calls[0][1]).toBe('Awa Koné');
+  });
+
+  it('never blocks the sale when the ticket cannot be built', async () => {
+    const { root, click, receipts, fixture } = await render();
+    receipts.remember.mockRejectedValue(new Error('journal indisponible'));
+
+    await click('Valider la vente');
+    await later(fixture);
+
+    expect(root.textContent).toContain('Vente enregistrée');
+    expect(root.textContent).toContain('Nouvelle vente');
+    expect(root.textContent).not.toContain('Imprimer le ticket');
+  });
+});

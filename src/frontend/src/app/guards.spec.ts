@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, teamGuard, welcomeGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, scannerGuard, teamGuard, welcomeGuard, labelsGuard } from './guards';
 import { AuthService } from './services/auth.service';
 
 function run(signedIn: boolean, role: string | undefined, guard = managementGuard) {
@@ -139,5 +139,23 @@ describe('customersGuard', () => {
   it('sends a stock keeper back to the products and a signed out visitor to the login', () => {
     expect(run(true, 'StockKeeper', customersGuard)).toBe('/gestion/produits');
     expect(run(false, undefined, customersGuard)).toBe('/connexion');
+  });
+});
+
+describe('scannerGuard', () => {
+  it('lets only the owner and the manager test the barcode reader', () => {
+    expect(['Owner', 'Manager'].map((role) => run(true, role, scannerGuard))).toEqual([true, true]);
+    expect(['Cashier', 'StockKeeper', 'Accountant'].map((role) => run(true, role, scannerGuard))).toEqual([
+      '/gestion/produits', '/gestion/produits', '/gestion/produits',
+    ]);
+    expect(run(false, undefined, scannerGuard)).toBe('/connexion');
+  });
+});
+
+describe('labelsGuard', () => {
+  it('lets the owner, the manager and the stock keeper print labels', () => {
+    expect(['Owner', 'Manager', 'StockKeeper'].map((role) => run(true, role, labelsGuard))).toEqual([true, true, true]);
+    expect(['Cashier', 'Accountant'].map((role) => run(true, role, labelsGuard))).toEqual(['/gestion/produits', '/gestion/produits']);
+    expect(run(false, undefined, labelsGuard)).toBe('/connexion');
   });
 });

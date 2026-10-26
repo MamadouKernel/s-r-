@@ -368,7 +368,7 @@ public class CreditSaleTests
         CustomerId? customer,
         long credit,
         long cash = 0,
-        UserId? approver = null,
+        Approval? approval = null,
         bool enforce = true,
         long sequence = 1)
     {
@@ -380,7 +380,7 @@ public class CreditSaleTests
 
         return world.CashSale(session, credit + cash, sequence) with
         {
-            Customer = customer, Payments = payments, CreditApprover = approver, EnforceCreditCeiling = enforce,
+            Customer = customer, Payments = payments, CreditApproval = approval, EnforceCreditCeiling = enforce,
         };
     }
 
@@ -446,8 +446,9 @@ public class CreditSaleTests
     {
         var (world, session) = Till();
         var customer = world.GivenCustomer(ceiling: 20_000, debt: 8_000);
+        var manager = world.GivenUser("gerant", pin: "4321", role: Role.Manager);
 
-        var result = await world.RecordSale.HandleAsync(CreditSale(world, session, customer.Id, 15_000, approver: world.Manager));
+        var result = await world.RecordSale.HandleAsync(CreditSale(world, session, customer.Id, 15_000, approval: new Approval(manager.Id, "4321")));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(Money.Fcfa(23_000), customer.Debt);
@@ -472,10 +473,9 @@ public class CreditSaleTests
     {
         var (world, session) = Till();
         var customer = world.GivenCustomer(ceiling: 1_000);
-        var colleague = UserId.New();
-        world.Directory.Set(world.Tenant, colleague, Role.Cashier);
+        var colleague = world.GivenUser("caissier2", pin: "1111", role: Role.Cashier);
 
-        var result = await world.RecordSale.HandleAsync(CreditSale(world, session, customer.Id, 5_000, approver: colleague));
+        var result = await world.RecordSale.HandleAsync(CreditSale(world, session, customer.Id, 5_000, approval: new Approval(colleague.Id, "1111")));
 
         Assert.Equal(ErrorCodes.CreditLimitExceeded, result.Error!.Code);
         Assert.Equal(Money.Zero, customer.Debt);

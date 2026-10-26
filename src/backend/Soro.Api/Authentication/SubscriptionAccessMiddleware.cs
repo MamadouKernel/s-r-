@@ -24,8 +24,8 @@ public static class SubscriptionAccessMiddleware
         {
             var path = context.Request.Path.Value ?? string.Empty;
             if (IsWrite(context.Request.Method)
-                && path.StartsWith(Prefix, StringComparison.Ordinal)
-                && !path.StartsWith(Prefix + "subscription", StringComparison.Ordinal)
+                && path.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)
+                && !path.StartsWith(Prefix + "subscription", StringComparison.OrdinalIgnoreCase)
                 && HttpCurrentUser.Read(context.User) is { } identity)
             {
                 var state = await StateOfAsync(context, identity.Tenant);
@@ -57,9 +57,9 @@ public static class SubscriptionAccessMiddleware
     /// <summary>Les envois de la file de la caisse : ventes synchronisées, ouverture et clôture de caisse.</summary>
     private static bool IsOfflineQueueEndpoint(string method, string path) =>
         HttpMethods.IsPost(method)
-        && (path == Prefix + "sales/sync"
-            || path == Prefix + "register-sessions"
-            || (path.StartsWith(Prefix + "register-sessions/", StringComparison.Ordinal) && path.EndsWith("/close", StringComparison.Ordinal)));
+        && (string.Equals(path, Prefix + "sales/sync", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, Prefix + "register-sessions", StringComparison.OrdinalIgnoreCase)
+            || (path.StartsWith(Prefix + "register-sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/close", StringComparison.OrdinalIgnoreCase)));
 
     private static async Task<SubscriptionState?> StateOfAsync(HttpContext context, TenantId tenant)
     {

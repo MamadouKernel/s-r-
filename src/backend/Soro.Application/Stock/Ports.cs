@@ -10,6 +10,9 @@ public interface IProductRepository
     /// <summary>Un code-barres est unique dans le commerce (CAT-01), hors le produit lui-même lors d'une modification.</summary>
     Task<bool> IsBarcodeUsedAsync(TenantId tenant, string barcode, ProductId? except, CancellationToken cancellationToken);
 
+    /// <summary>Les codes de 13 chiffres commençant par le préfixe interne, les plus grands d'abord : de quoi trouver la dernière séquence.</summary>
+    Task<IReadOnlyList<string>> RecentInternalBarcodesAsync(TenantId tenant, int count, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Product>> ListAsync(
         TenantId tenant,
         string? search,

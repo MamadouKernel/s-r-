@@ -32,7 +32,7 @@ public sealed class SyncSalesHandler(RecordSaleHandler recordSale)
         foreach (var sale in command.Sales.OrderBy(sale => sale.LocalSequence))
         {
             // La vente a déjà eu lieu : un plafond de crédit dépassé entre-temps ne la fait pas rejeter, il est signalé au gérant (CRD-04).
-            var result = await recordSale.HandleAsync(sale with { EnforceCreditCeiling = false }, cancellationToken);
+            var result = await recordSale.HandleAsync(sale with { EnforceCreditCeiling = false, FromOfflineQueue = true }, cancellationToken);
             statuses.Add(ToStatus(sale.Id, result));
         }
 

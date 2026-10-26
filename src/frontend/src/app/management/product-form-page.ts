@@ -1,7 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { parseFcfa } from '../core/money';
 import { ImageService } from '../core/image';
+import { ScanService } from '../services/scan.service';
 import { ApiError } from '../sync/sync-api';
 import { describeError } from './errors';
 import { FlashService } from './flash.service';
@@ -54,6 +55,13 @@ interface FieldErrors {
           <label class="field-label mt-4" for="code-barres">Code-barres (facultatif)</label>
           <input id="code-barres" class="field font-mono" type="text" maxlength="64" autocomplete="off" inputmode="numeric" [value]="barcode()" (input)="barcode.set($any($event.target).value)" [attr.aria-invalid]="errors().barcode ? 'true' : null" aria-describedby="code-aide code-erreur" />
           <p id="code-aide" class="field-help">Un même code-barres ne peut servir qu’à un seul produit.</p>
+          @if (!barcode().trim() && productId()) {
+            <button type="button" class="btn mt-2" [disabled]="creatingCode()" (click)="createCode()">Créer un code interne</button>
+            <p class="field-help">Pour un article sans code-barres (vrac, pain…) : l’application en fabrique un que vous pourrez imprimer en étiquette.</p>
+          }
+          @if (codeNotice()) {
+            <p class="mt-2 font-semibold text-succes" role="status">{{ codeNotice() }}</p>
+          }
           <p id="code-erreur" class="field-error">{{ errors().barcode }}</p>
 
           <label class="field-label mt-4" for="categorie">Catégorie (facultatif)</label>
@@ -123,6 +131,8 @@ export class ProductFormPage implements OnInit {
   private readonly images = inject(ImageService);
 
   protected readonly productId = signal<string>('');
+  protected readonly creatingCode = signal(false);
+  protected readonly codeNotice = signal('');
   protected readonly familyId = signal('');
   protected readonly siblings = signal(1);
   protected readonly displayName = signal('');
@@ -146,6 +156,15 @@ export class ProductFormPage implements OnInit {
   protected readonly purchasePrice = signal('0');
   protected readonly threshold = signal('0');
   protected readonly tracksStock = signal(true);
+
+  constructor() {
+    // Lecteur de codes-barres (ADR 0015) : un scan dans la zone « Code-barres » la remplit, et Entrée n'enregistre pas la fiche.
+    const stop = inject(ScanService).listen({
+      accept: (target) => (target as HTMLElement | null)?.id === 'code-barres',
+      onScan: (scan) => this.barcode.set(scan.code),
+    });
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
@@ -241,6 +260,24 @@ export class ProductFormPage implements OnInit {
       this.photoError.set(describeError(error));
     } finally {
       this.photoBusy.set(false);
+    }
+  }
+
+  /** Le serveur fabrique et enregistre le code interne ; le champ le montre aussitôt (rien d'autre n'est enregistré avec lui). */
+  protected async createCode(): Promise<void> {
+    if (this.creatingCode()) {
+      return;
+    }
+    this.creatingCode.set(true);
+    this.failure.set('');
+    this.codeNotice.set('');
+    try {
+      this.barcode.set(await this.api.createInternalBarcode(this.productId()));
+      this.codeNotice.set('Code interne créé. Vous pouvez l’imprimer dans « Étiquettes ».');
+    } catch (error) {
+      this.failure.set(describeError(error));
+    } finally {
+      this.creatingCode.set(false);
     }
   }
 

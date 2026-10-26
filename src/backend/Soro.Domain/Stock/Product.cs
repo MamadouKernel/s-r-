@@ -166,6 +166,13 @@ public sealed class Product
     public void SetPhoto(PhotoId? photo) => PhotoId = photo;
 
     /// <summary>Un produit désactivé reste lisible dans l'historique mais n'est plus proposé à la vente.</summary>
+    /// <summary>Donne à un produit sans code-barres son code interne (ETQ-01). Un produit n'en reçoit jamais un second.</summary>
+    public void AssignBarcode(string barcode)
+    {
+        Ensure.That(Barcode is null, "Ce produit a déjà un code-barres : réimprimez-le au lieu d'en créer un autre.");
+        Barcode = barcode;
+    }
+
     public void Deactivate() => IsActive = false;
 
     /// <summary>

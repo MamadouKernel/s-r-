@@ -79,6 +79,9 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         session.HasKey(row => row.Id);
         session.Property(row => row.Status).HasConversion<string>().HasMaxLength(16);
 
+        // Une vente et la clôture au même instant : la seconde écriture échoue (xmin) et est rejouée, au lieu d'écraser les espèces encaissées (docs/decisions/0018).
+        session.Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+
         // RG-23 : une seule session ouverte par caisse, garanti aussi par la base.
         session.HasIndex(row => new { row.TenantId, row.RegisterId })
             .IsUnique()

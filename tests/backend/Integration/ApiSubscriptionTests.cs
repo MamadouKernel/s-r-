@@ -210,6 +210,21 @@ public sealed class ApiSubscriptionTests(PostgresFixture fixture) : IDisposable
         Assert.Equal(HttpStatusCode.OK, pay.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/API/v1/products")]
+    [InlineData("/Api/V1/Products")]
+    public async Task Read_only_cannot_be_bypassed_by_changing_the_case_of_the_address(string path)
+    {
+        var expired = await ShopAsync(daysAgo: 60, email: $"casse{Guid.NewGuid():N}@exemple.ci");
+        using var readOnly = As(expired, Role.Owner);
+        var product = new { productId = Guid.NewGuid(), name = "Jus", barcode = (string?)null, category = (string?)null, purchasePriceFcfa = 100, salePriceFcfa = 200, alertThreshold = 0, tracksStock = true };
+
+        var refused = await readOnly.PostAsJsonAsync(path, product);
+
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Equal("subscription_expired", (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task A_sync_from_the_offline_queue_is_accepted_in_read_only_and_recorded_in_the_journal()
     {
