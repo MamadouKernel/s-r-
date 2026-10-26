@@ -206,6 +206,8 @@ internal sealed class TestWorld
 
     public GetSubscriptionStateHandler SubscriptionState => new(Commerces, Clock);
 
+    public RecordOfflineLoginsHandler RecordOfflineLogins => new(Current, Directory, Audit, Clock, UnitOfWork);
+
     public RecordExpiredSyncHandler RecordExpiredSync => new(Current, Audit, Clock, UnitOfWork);
 
     public ValidateSubscriptionPaymentHandler ValidatePayment => new(Subscriptions, Mail, Audit, Clock, UnitOfWork);

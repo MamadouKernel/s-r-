@@ -1,3 +1,4 @@
+import { OfflineProof } from '../core/offline-proof';
 import { HELD, inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
 import { CartLine, CatalogueProduct, CustomerSnapshot, PaymentDraft } from '../domain/types';
 import { cartTotal } from '../domain/cart';
@@ -68,6 +69,27 @@ export interface StoredToken {
   value: string;
   expiresAt: string;
   user: { id: string; displayName: string; role: string };
+}
+
+/** Le compte entré sans réseau : aucun jeton, seulement qui est au comptoir (docs/specs/connexion-hors-ligne HLC-07). */
+export interface OfflineSession {
+  userId: string;
+  identifier: string;
+  /** L'événement du journal que cette session ouvre (envoyé au serveur avec la file). */
+  eventId: string;
+  displayName: string;
+  role: string;
+  startedAt: string;
+  /** Fin de validité de la preuve qui a ouvert la session. */
+  validUntil: string;
+}
+
+/** Une entrée sans réseau, notée pour le journal du serveur (docs/specs/connexion-hors-ligne HLC-10). */
+export interface OfflineLoginEvent {
+  eventId: string;
+  userId: string;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 export interface LocalSession {
@@ -144,6 +166,36 @@ export class Journal {
 
   saveToken(token: StoredToken): Promise<void> {
     return this.putMeta('token', token);
+  }
+
+  async getProofs(): Promise<OfflineProof[]> {
+    return (await this.getMeta<OfflineProof[]>('offline-proofs')) ?? [];
+  }
+
+  saveProofs(proofs: OfflineProof[]): Promise<void> {
+    return this.putMeta('offline-proofs', proofs);
+  }
+
+  async getOfflineLogins(): Promise<OfflineLoginEvent[]> {
+    return (await this.getMeta<OfflineLoginEvent[]>('offline-logins')) ?? [];
+  }
+
+  saveOfflineLogins(events: OfflineLoginEvent[]): Promise<void> {
+    return this.putMeta('offline-logins', events);
+  }
+
+  getOfflineSession(): Promise<OfflineSession | null> {
+    return this.getMeta<OfflineSession>('offline-session');
+  }
+
+  async saveOfflineSession(session: OfflineSession | null): Promise<void> {
+    if (session) {
+      await this.putMeta('offline-session', session);
+      return;
+    }
+    await inTransaction(this.db, [META], 'readwrite', async (tx) => {
+      await promisify(tx.objectStore(META).delete('offline-session'));
+    });
   }
 
   async clearToken(): Promise<void> {

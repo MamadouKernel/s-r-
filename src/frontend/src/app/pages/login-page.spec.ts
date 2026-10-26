@@ -2,18 +2,23 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { ApiError } from '../sync/sync-api';
-import { AuthService } from '../services/auth.service';
+import { AuthService, OfflineLoginError } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { SyncService } from '../services/sync.service';
 import { FlashService } from '../management/flash.service';
 import { LoginPage } from './login-page';
 
-async function render(login = vi.fn().mockResolvedValue(undefined), session: unknown = null, role: string | undefined = 'Cashier') {
+async function render(
+  login = vi.fn().mockResolvedValue(undefined),
+  session: unknown = null,
+  role: string | undefined = 'Cashier',
+  loginOffline = vi.fn().mockResolvedValue(undefined),
+) {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: AuthService, useValue: { login, user: () => (role ? { id: 'u', displayName: 'X', role } : null) } },
+      { provide: AuthService, useValue: { login, loginOffline, user: () => (role ? { id: 'u', displayName: 'X', role } : null) } },
       { provide: CashService, useValue: { session: signal(session).asReadonly() } },
       { provide: CatalogueService, useValue: { refresh: vi.fn().mockResolvedValue(undefined) } },
       { provide: SyncService, useValue: { requestFlush: vi.fn().mockResolvedValue(null) } },
@@ -33,8 +38,76 @@ async function render(login = vi.fn().mockResolvedValue(undefined), session: unk
     root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     await fixture.whenStable();
   };
-  return { root, type, submit, login, navigate };
+  const click = async (label: string) => {
+    [...root.querySelectorAll('button')].find((button) => button.textContent?.includes(label))!.click();
+    await fixture.whenStable();
+  };
+  return { root, type, submit, click, login, loginOffline, navigate };
 }
+
+describe('LoginPage: sans réseau (HLC-02, HLC-11)', () => {
+  const noNetwork = () => vi.fn().mockRejectedValue(new ApiError(0, 'network', ''));
+
+  it('offers to open the register without the network only when the server did not answer', async () => {
+    const { root, type, submit, navigate } = await render(noNetwork());
+    await type('#identifiant', 'awa');
+    await type('#pin', '4821');
+
+    await submit();
+
+    expect(root.textContent).toContain('Pas de réseau. Vous pouvez ouvrir la caisse sans réseau avec votre code.');
+    expect([...root.querySelectorAll('button')].some((button) => button.textContent?.includes('Ouvrir la caisse sans réseau'))).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it.each([502, 503, 504])('offers it too when the relay in front of the server answers %i, as the server itself did not answer', async (status) => {
+    const { root, type, submit } = await render(vi.fn().mockRejectedValue(new ApiError(status, 'bad_gateway', '')));
+    await type('#identifiant', 'awa');
+    await type('#pin', '4821');
+
+    await submit();
+
+    expect(root.textContent).toContain('Ouvrir la caisse sans réseau');
+  });
+
+  it('never offers it when the server answered, even to refuse the code', async () => {
+    const refused = vi.fn().mockRejectedValue(new ApiError(401, 'invalid_credentials', ''));
+    const { root, type, submit, loginOffline } = await render(refused);
+    await type('#identifiant', 'awa');
+    await type('#pin', '0000');
+
+    await submit();
+
+    expect(root.textContent).not.toContain('sans réseau');
+    expect(loginOffline).not.toHaveBeenCalled();
+  });
+
+  it('opens the register with the code typed, then goes where an online login would', async () => {
+    const { type, submit, click, loginOffline, navigate } = await render(noNetwork());
+    await type('#identifiant', ' Awa ');
+    await type('#pin', '4821');
+    await submit();
+
+    await click('Ouvrir la caisse sans réseau');
+
+    expect(loginOffline).toHaveBeenCalledWith(' Awa ', '4821');
+    expect(navigate).toHaveBeenCalledWith('/ouverture');
+  });
+
+  it('says what is wrong and clears the code when the offline login is refused', async () => {
+    const refused = vi.fn().mockRejectedValue(new OfflineLoginError('Réessayez dans 15 minutes.'));
+    const { root, type, submit, click, navigate } = await render(noNetwork(), null, 'Cashier', refused);
+    await type('#identifiant', 'awa');
+    await type('#pin', '0000');
+    await submit();
+
+    await click('Ouvrir la caisse sans réseau');
+
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('Réessayez dans 15 minutes.');
+    expect(root.querySelector<HTMLInputElement>('#pin')!.value).toBe('');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+});
 
 describe('LoginPage', () => {
   it('keeps the submit button active and explains what is missing instead', async () => {

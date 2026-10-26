@@ -193,6 +193,7 @@ public static class AuditCategories
         ["credit"] = ["credit.", "debt."],
         ["subscription"] = ["subscription."],
         ["data"] = ["data."],
+        ["security"] = ["login."],
     };
 
     public static IReadOnlyCollection<string> Names => Prefixes.Keys;

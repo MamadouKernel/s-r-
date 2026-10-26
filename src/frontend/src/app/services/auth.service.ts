@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { Device, StoredToken } from '../data/journal';
+import { failedAttempt, isExpired, isLocked, makeProof, minutesLeft, OFFLINE_DAYS, OFFLINE_ITERATIONS, OFFLINE_ROLES, succeededOffline, verifyPin } from '../core/offline-proof';
+import { Device, OfflineSession, StoredToken } from '../data/journal';
 import { OnboardingApi, OwnerSession } from '../onboarding/onboarding-api';
 import { ApiError } from '../sync/sync-api';
 import { ApiService } from './api.service';
@@ -27,22 +28,38 @@ export function loginErrorMessage(error: unknown): string {
   return 'La connexion a échoué. Réessayez.';
 }
 
+/** Refus d'une connexion sans réseau : le message dit quoi faire (docs/specs/connexion-hors-ligne HLC-11). */
+export class OfflineLoginError extends Error {}
+
+const WRONG = 'Identifiant ou code incorrect.';
+
 /** Appareil, utilisateur et jeton. Le PIN n'est jamais conservé (ADR 0004). */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiService);
   private readonly onboarding = inject(OnboardingApi);
   private readonly journalService = inject(JournalService);
+  private readonly iterations = inject(OFFLINE_ITERATIONS);
 
   private readonly deviceState = signal<Device | null>(null);
   private readonly tokenState = signal<StoredToken | null>(null);
   private readonly loadedState = signal(false);
+  private readonly offlineState = signal<OfflineSession | null>(null);
   private readonly clock = signal(Date.now());
 
   readonly device = this.deviceState.asReadonly();
   readonly loaded = this.loadedState.asReadonly();
   readonly token = this.tokenState.asReadonly();
-  readonly user = computed(() => this.tokenState()?.user ?? null);
+  /** Qui est au comptoir sans réseau : pas de jeton, donc ni envoi au serveur ni écran de gestion. */
+  readonly offlineSession = this.offlineState.asReadonly();
+  readonly user = computed(() => {
+    const online = this.tokenState()?.user;
+    if (online) {
+      return online;
+    }
+    const offline = this.offlineState();
+    return offline ? { id: offline.userId, displayName: offline.displayName, role: offline.role } : null;
+  });
   /** Le jeton existe et n'est pas expiré. Un jeton expiré n'empêche pas de vendre, seulement de synchroniser. */
   readonly signedIn = computed(() => {
     const token = this.tokenState();
@@ -53,6 +70,13 @@ export class AuthService {
     const journal = await this.journalService.get();
     this.deviceState.set(await journal.getDevice());
     this.tokenState.set(await journal.getToken());
+    const offline = await journal.getOfflineSession();
+    // Une session sans réseau ne survit pas à sa preuve : au-delà de trois jours il faut du réseau.
+    if (offline && Date.parse(offline.validUntil) > Date.now()) {
+      this.offlineState.set(offline);
+    } else if (offline) {
+      await journal.saveOfflineSession(null);
+    }
     this.loadedState.set(true);
   }
 
@@ -104,6 +128,7 @@ export class AuthService {
     await (await this.journalService.get()).saveDevice(device);
     this.deviceState.set(device);
     await this.logout();
+    await this.forgetAllProofs();
   }
 
   async login(identifier: string, pin: string): Promise<void> {
@@ -112,8 +137,109 @@ export class AuthService {
       throw new Error('Cet appareil n’est pas configuré.');
     }
     const credentials = device.deviceId && device.deviceSecret ? { id: device.deviceId, secret: device.deviceSecret } : undefined;
-    const response = await this.api.login(device.tenantId, identifier.trim(), pin, credentials);
+    let response;
+    try {
+      response = await this.api.login(device.tenantId, identifier.trim(), pin, credentials);
+    } catch (error) {
+      // Le serveur a répondu et refuse ce compte (désactivé, nouveau PIN) : la preuve locale ne vaut plus rien. Sans réponse (réseau), on la garde.
+      if (error instanceof ApiError && error.status === 401) {
+        await this.forgetProof(identifier);
+      }
+      throw error;
+    }
+    await this.endOfflineSession();
     await this.keepToken({ value: response.accessToken, expiresAt: response.expiresAt, user: response.user });
+    await this.rememberProof(identifier, pin, response.user);
+  }
+
+  /**
+   * Entrée sans réseau : le PIN tapé est comparé à la preuve gardée lors de la dernière connexion en ligne. Ne s'appelle que quand le serveur n'a
+   * pas répondu ; rien n'est envoyé au serveur.
+   */
+  async loginOffline(identifier: string, pin: string): Promise<void> {
+    const journal = await this.journalService.get();
+    const proofs = await journal.getProofs();
+    const key = identifier.trim().toLowerCase();
+    const found = proofs.find((candidate) => candidate.identifier === key);
+    if (!found) {
+      throw new OfflineLoginError(WRONG);
+    }
+    const now = Date.now();
+    if (isExpired(found, now)) {
+      await journal.saveProofs(proofs.filter((candidate) => candidate !== found));
+      throw new OfflineLoginError('Il faut du réseau pour vous reconnecter.');
+    }
+    if (found.blocked) {
+      throw new OfflineLoginError('Ce compte demande le réseau pour se reconnecter.');
+    }
+    if (isLocked(found, now)) {
+      throw new OfflineLoginError(waitMessage(minutesLeft(found, now)));
+    }
+
+    const ok = await verifyPin(pin, found);
+    const updated = ok ? succeededOffline(found) : failedAttempt(found, now);
+    await journal.saveProofs(proofs.map((candidate) => (candidate === found ? updated : candidate)));
+    if (!ok) {
+      throw new OfflineLoginError(isLocked(updated, now) ? (updated.blocked ? 'Ce compte demande le réseau pour se reconnecter.' : waitMessage(minutesLeft(updated, now))) : WRONG);
+    }
+
+    const session: OfflineSession = {
+      userId: found.userId,
+      identifier: found.identifier,
+      eventId: crypto.randomUUID(),
+      displayName: found.displayName,
+      role: found.role,
+      startedAt: new Date(now).toISOString(),
+      validUntil: new Date(Date.parse(found.createdAt) + OFFLINE_DAYS * 24 * 3_600_000).toISOString(),
+    };
+    await journal.saveOfflineLogins([
+      ...(await journal.getOfflineLogins()),
+      { eventId: session.eventId, userId: session.userId, startedAt: session.startedAt, endedAt: null },
+    ]);
+    await journal.saveOfflineSession(session);
+    this.offlineState.set(session);
+  }
+
+  /** Clôt l'événement de la session sans réseau en cours (déconnexion, retour en ligne, appareil retiré) pour le journal du serveur. */
+  private async endOfflineSession(): Promise<void> {
+    const session = this.offlineState();
+    const journal = await this.journalService.get();
+    if (session) {
+      const now = new Date().toISOString();
+      const events = await journal.getOfflineLogins();
+      await journal.saveOfflineLogins(events.map((event) => (event.eventId === session.eventId && !event.endedAt ? { ...event, endedAt: now } : event)));
+    }
+    await journal.saveOfflineSession(null);
+    this.offlineState.set(null);
+  }
+
+  /** Efface la preuve locale de tous les comptes de cet appareil (appareil retiré, ou « Oublier les comptes »). */
+  async forgetAllProofs(): Promise<void> {
+    await this.endOfflineSession();
+    await (await this.journalService.get()).saveProofs([]);
+  }
+
+  private async rememberProof(identifier: string, pin: string, user: { id: string; displayName: string; role: string }): Promise<void> {
+    if (!OFFLINE_ROLES.includes(user.role)) {
+      return;
+    }
+    try {
+      const journal = await this.journalService.get();
+      const proof = await makeProof(pin, { id: user.id, identifier, displayName: user.displayName, role: user.role }, Date.now(), this.iterations);
+      const others = (await journal.getProofs()).filter((candidate) => candidate.userId !== user.id && candidate.identifier !== proof.identifier);
+      await journal.saveProofs([...others, proof]);
+    } catch {
+      // La preuve est un confort : sans elle la connexion en ligne réussit quand même.
+    }
+  }
+
+  private async forgetProof(identifier: string): Promise<void> {
+    const journal = await this.journalService.get();
+    const key = identifier.trim().toLowerCase();
+    const proofs = await journal.getProofs();
+    if (proofs.some((candidate) => candidate.identifier === key)) {
+      await journal.saveProofs(proofs.filter((candidate) => candidate.identifier !== key));
+    }
   }
 
   private async keepToken(token: StoredToken): Promise<void> {
@@ -123,6 +249,7 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    await this.endOfflineSession();
     await (await this.journalService.get()).clearToken();
     this.tokenState.set(null);
   }
@@ -131,4 +258,8 @@ export class AuthService {
   tick(): void {
     this.clock.set(Date.now());
   }
+}
+
+function waitMessage(minutes: number): string {
+  return `Réessayez dans ${minutes} minute${minutes > 1 ? 's' : ''}.`;
 }

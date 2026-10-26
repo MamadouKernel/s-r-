@@ -45,3 +45,21 @@ public sealed record UserSummary(Guid Id, string DisplayName, Role Role);
 public sealed record LogInResponse(string AccessToken, string TokenType, DateTimeOffset ExpiresAt, UserSummary User);
 
 public sealed record UserRegisteredResponse(Guid UserId, bool AlreadyProcessed);
+
+public sealed record OfflineLoginRequest
+{
+    public required Guid EventId { get; init; }
+
+    public required Guid UserId { get; init; }
+
+    public required DateTimeOffset StartedAt { get; init; }
+
+    public DateTimeOffset? EndedAt { get; init; }
+}
+
+public sealed record OfflineLoginsRequest
+{
+    public required IReadOnlyList<OfflineLoginRequest> Logins { get; init; }
+}
+
+public sealed record OfflineLoginsRecordedResponse(int Recorded);

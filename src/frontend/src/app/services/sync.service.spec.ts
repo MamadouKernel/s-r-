@@ -36,6 +36,9 @@ async function setup(sales = 2) {
       return batch.map((sale) => ({ saleId: sale.saleId, outcome: 'Accepted' as const }));
     }),
     closeSession: vi.fn(),
+    sendOfflineLogins: vi.fn(async () => {
+      if (api.failure) throw api.failure;
+    }),
   };
   TestBed.configureTestingModule({
     providers: [
@@ -99,5 +102,36 @@ describe('SyncService', () => {
     await sync.requestFlush();
     expect((await journal.counts()).rejected).toBe(1);
     expect(sync.banner()).toEqual({ tone: 'error', text: '1 opération refusée par le serveur' });
+  });
+
+  it('sends the offline logins with the queue once signed in, then forgets them (HLC-10)', async () => {
+    const { sync, journal, api } = await setup(0);
+    await journal.saveOfflineLogins([{ eventId: 'e-1', userId: 'u-1', startedAt: '2026-10-26T08:02:00.000Z', endedAt: '2026-10-26T14:40:00.000Z' }]);
+
+    await sync.requestFlush();
+
+    expect(api.sendOfflineLogins).toHaveBeenCalledWith([{ eventId: 'e-1', userId: 'u-1', startedAt: '2026-10-26T08:02:00.000Z', endedAt: '2026-10-26T14:40:00.000Z' }]);
+    expect(await journal.getOfflineLogins()).toEqual([]);
+  });
+
+  it('keeps them when the server cannot be reached, and does not send without a token or while a session is still running', async () => {
+    const { sync, journal, api, signedIn } = await setup(0);
+    await journal.saveOfflineLogins([
+      { eventId: 'e-1', userId: 'u-1', startedAt: '2026-10-26T08:02:00.000Z', endedAt: '2026-10-26T14:40:00.000Z' },
+      { eventId: 'e-2', userId: 'u-2', startedAt: '2026-10-26T15:00:00.000Z', endedAt: null },
+    ]);
+    signedIn.set(false);
+    await sync.requestFlush();
+    expect(api.sendOfflineLogins).not.toHaveBeenCalled();
+
+    signedIn.set(true);
+    api.failure = new ApiError(0, 'network', '');
+    await sync.requestFlush();
+    expect(await journal.getOfflineLogins()).toHaveLength(2);
+
+    api.failure = null;
+    await sync.requestFlush();
+    expect(api.sendOfflineLogins).toHaveBeenLastCalledWith([expect.objectContaining({ eventId: 'e-1' })]);
+    expect((await journal.getOfflineLogins()).map((event) => event.eventId)).toEqual(['e-2']);
   });
 });
