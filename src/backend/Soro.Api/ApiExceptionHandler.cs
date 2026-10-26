@@ -1,3 +1,4 @@
+using Soro.Application.Common;
 using Microsoft.AspNetCore.Diagnostics;
 using Soro.Infrastructure.Persistence;
 
@@ -30,7 +31,7 @@ public sealed partial class ApiExceptionHandler(ILogger<ApiExceptionHandler> log
                 statusCode: bad.StatusCode,
                 extensions: new Dictionary<string, object?> { ["code"] = "bad_request" });
         }
-        else if (PersistenceErrors.IsUniqueViolation(exception) || PersistenceErrors.IsConcurrencyConflict(exception))
+        else if (exception is ConflictException || PersistenceErrors.IsUniqueViolation(exception) || PersistenceErrors.IsConcurrencyConflict(exception))
         {
             LogConcurrentWrite(exception, httpContext.Request.Path);
             problem = Results.Problem(

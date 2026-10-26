@@ -84,7 +84,7 @@ public class PersistenceTests(PostgresFixture fixture)
         await new SessionRepository(second).UpdateAsync(selling, Ct);
 
         await new EfUnitOfWork(first).CommitAsync(Ct);
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => new EfUnitOfWork(second).CommitAsync(Ct));
+        await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(second).CommitAsync(Ct));
 
         await using var read = Db.App(fixture, tenant);
         var stored = (await new SessionRepository(read).GetAsync(session.Id, tenant, Ct))!;

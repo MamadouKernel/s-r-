@@ -243,6 +243,20 @@ public sealed class ApiTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task A_sale_that_reuses_a_local_number_is_rejected_alone_and_never_blocks_the_batch()
+    {
+        using var client = Cashier();
+        var sessionId = await OpenSessionAsync(client);
+        var batch = new { sales = new[] { CashSaleBody(sessionId, sequence: 1), CashSaleBody(sessionId, sequence: 1), CashSaleBody(sessionId, sequence: 2) } };
+
+        var response = await client.PostAsJsonAsync("/api/v1/sales/sync", batch);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var statuses = (await JsonAsync(response)).GetProperty("statuses").EnumerateArray().Select(s => s.GetProperty("outcome").GetString()!).ToArray();
+        Assert.Equal(["Accepted", "Rejected", "Accepted"], statuses);
+    }
+
+    [Fact]
     public async Task Keeps_serving_requests_after_many_calls()
     {
         using var client = Cashier();

@@ -10,8 +10,12 @@ public interface IClock
 /// <summary>Valide d'un seul bloc tout ce qui a été écrit pendant le cas d'usage.</summary>
 public interface IUnitOfWork
 {
+    /// <exception cref="ConflictException">Une écriture concurrente ou un doublon a empêché l'enregistrement : rien n'a été écrit.</exception>
     Task CommitAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Un doublon (clé unique) ou une écriture concurrente a fait échouer l'enregistrement ; la transaction entière est annulée.</summary>
+public sealed class ConflictException(Exception inner) : Exception("Opération concurrente ou doublon détecté.", inner);
 
 public interface IAuditTrail
 {
