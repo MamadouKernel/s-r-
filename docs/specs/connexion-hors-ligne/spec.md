@@ -13,10 +13,10 @@ Qu'un caissier **puisse ouvrir la caisse et vendre quand le réseau est coupé**
 Après une connexion par PIN réussie, l'appareil calcule sur lui-même un condensat du PIN (PBKDF2-SHA256, 600 000 tours, sel aléatoire de 16 octets, Web Crypto) et le range dans IndexedDB avec : identifiant du compte, nom, rôle, date de la connexion en ligne, compteurs d'essais. **Le PIN n'est jamais gardé**, ni en mémoire au-delà de l'appel, ni écrit nulle part, ni journalisé. Un compte par entrée ; une nouvelle connexion en ligne remplace l'entrée (nouveau sel).
 
 ### HLC-02 Quand la connexion sans réseau est proposée
-Seulement si l'appel de connexion échoue **faute de réponse** du serveur (réseau coupé, serveur injoignable, délai dépassé). Toute réponse du serveur (401, 423, 403, 429…) est affichée telle quelle, sans bascule. L'écran dit en clair : « Pas de réseau. Vous pouvez ouvrir la caisse sans réseau avec votre code. »
+Seulement si l'appel de connexion échoue **faute de réponse** du serveur (réseau coupé, serveur injoignable, délai dépassé, ou réponse 502, 503 ou 504 du relais placé devant le serveur). Toute autre réponse du serveur (401, 423, 403, 429…) est affichée telle quelle, sans bascule. L'écran dit en clair : « Pas de réseau. Vous pouvez ouvrir la caisse sans réseau avec votre code. »
 
 ### HLC-03 Contrôle local
-Le PIN tapé est transformé avec le sel du compte et comparé en temps constant au condensat. L'identifiant tapé est comparé sans tenir compte de la casse. Réponse **identique** pour « compte inconnu sur cet appareil » et « PIN faux » : « Identifiant ou code incorrect. » Un compte jamais connecté en ligne sur cet appareil ne peut pas entrer hors ligne : « Ce compte doit d'abord se connecter une fois avec le réseau. »
+Le PIN tapé est transformé avec le sel du compte et comparé en temps constant au condensat. L'identifiant tapé est comparé sans tenir compte de la casse. Réponse **identique** pour « compte inconnu sur cet appareil » (dont un compte jamais connecté en ligne ici) et « PIN faux » : « Identifiant ou code incorrect. » : l'écran ne révèle pas quels comptes l'appareil connaît. L'aide sous le bouton dit que seuls les comptes déjà connectés avec le réseau sur ce téléphone ces trois derniers jours peuvent entrer.
 
 ### HLC-04 Profils concernés
 Caissier et gérant seulement. Le propriétaire, le magasinier et le comptable n'ont pas de connexion hors ligne (le message dit « Cette connexion exige le réseau »). Aucune preuve locale n'est créée pour ces profils.
@@ -51,7 +51,7 @@ Aucun mot technique à l'écran : « sans réseau », « code », jamais « hors
 ## Scénarios
 
 1. **Coupure le matin.** Awa s'est connectée hier avec le réseau. Ce matin, plus de réseau : elle tape son code, la caisse s'ouvre avec le bandeau « sans réseau », elle vend. À 14 h le réseau revient : « Tapez votre code pour envoyer vos ventes » ; elle le tape, la file part, le bandeau disparaît.
-2. **Relève pendant une coupure.** Kofi, qui s'était connecté sur ce téléphone il y a 2 jours, prend la relève : il entre. Mariam, jamais venue sur ce téléphone, voit « Ce compte doit d'abord se connecter une fois avec le réseau ».
+2. **Relève pendant une coupure.** Kofi, qui s'était connecté sur ce téléphone il y a 2 jours, prend la relève : il entre. Mariam, jamais venue sur ce téléphone, voit « Identifiant ou code incorrect. »
 3. **Code faux.** Après 5 codes faux : « Réessayez dans 15 minutes. » Recharger la page garde le verrou.
 4. **Quatre jours sans réseau.** « Il faut du réseau pour vous reconnecter. »
 5. **Serveur qui répond.** Le réseau marche mais le code est faux : « Identifiant ou code PIN incorrect », sans bascule locale.

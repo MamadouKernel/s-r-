@@ -8,6 +8,9 @@ import { CashService } from '../services/cash.service';
 import { CatalogueService } from '../services/catalogue.service';
 import { SyncService } from '../services/sync.service';
 
+/** Statuts qui disent « le serveur n'a pas répondu » : 0 (réseau), 502, 503 et 504 (relais devant l'API sans réponse de celle-ci). */
+const NO_ANSWER = [0, 502, 503, 504];
+
 /** S2 : identifiant et code PIN (PWA-01). Le PIN n'est jamais conservé. */
 @Component({
   selector: 'app-login-page',
@@ -96,8 +99,8 @@ export class LoginPage {
       void this.sync.requestFlush();
       await this.router.navigateByUrl(landingPath(this.auth.user()?.role, this.cash.session() !== null));
     } catch (error) {
-      if (error instanceof ApiError && error.status === 0) {
-        // Pas de réponse du serveur : le code tapé reste dans le champ le temps de choisir « sans réseau » ; il n'est écrit nulle part.
+      if (error instanceof ApiError && NO_ANSWER.includes(error.status)) {
+        // Pas de réponse du serveur (réseau coupé, ou le relais devant l'API répond qu'il ne la joint pas) : le code tapé reste dans le champ le temps de choisir « sans réseau » ; il n'est écrit nulle part.
         this.noNetwork.set(true);
         return;
       }

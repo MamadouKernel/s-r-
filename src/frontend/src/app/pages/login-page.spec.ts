@@ -60,6 +60,16 @@ describe('LoginPage: sans réseau (HLC-02, HLC-11)', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it.each([502, 503, 504])('offers it too when the relay in front of the server answers %i, as the server itself did not answer', async (status) => {
+    const { root, type, submit } = await render(vi.fn().mockRejectedValue(new ApiError(status, 'bad_gateway', '')));
+    await type('#identifiant', 'awa');
+    await type('#pin', '4821');
+
+    await submit();
+
+    expect(root.textContent).toContain('Ouvrir la caisse sans réseau');
+  });
+
   it('never offers it when the server answered, even to refuse the code', async () => {
     const refused = vi.fn().mockRejectedValue(new ApiError(401, 'invalid_credentials', ''));
     const { root, type, submit, loginOffline } = await render(refused);
