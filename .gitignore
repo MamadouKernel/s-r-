@@ -12,3 +12,6 @@ dist/
 
 # Environnement de développement local (scripts/dev.sh)
 .dev/
+
+# Dossiers de travail des outils de l'assistant
+.omc/

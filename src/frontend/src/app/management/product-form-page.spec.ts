@@ -1,7 +1,7 @@
 import { ImageService } from '../core/image';
 import { ApiError } from '../sync/sync-api';
 import { ProductFormPage } from './product-form-page';
-import { fakeApi, product, render } from './test-support';
+import { fakeApi, product, render, scanInto } from './test-support';
 
 describe('ProductFormPage: edition', () => {
   it('loads the product, shows its values, and fixes the stock tracking choice', async () => {
@@ -130,6 +130,50 @@ describe('ProductFormPage: formats', () => {
 
     await page.click('Retirer la photo');
     expect(api.removePhoto).toHaveBeenCalledWith('format', 'w1');
+  });
+});
+
+describe('ProductFormPage: barcode scanner (ADR 0015)', () => {
+  it('fills the barcode from a scan, whatever the keyboard layout, without saving the form', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9' })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' } });
+    const field = page.root.querySelector<HTMLInputElement>('#code-barres')!;
+    field.focus();
+
+    const end = scanInto(field, '6111000000011');
+    await page.fixture.whenStable();
+
+    expect(field.value).toBe('6111000000011');
+    expect(end!.defaultPrevented).toBe(true); // Entrée ne valide pas le formulaire
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
+  it('fills the barcode when the scan has no ending', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9' })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' } });
+    const field = page.root.querySelector<HTMLInputElement>('#code-barres')!;
+    field.focus();
+
+    scanInto(field, '6111000000011', null);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await page.fixture.whenStable();
+
+    expect(field.value).toBe('6111000000011');
+  });
+
+  it('leaves the other fields alone: a scan typed in the name field is not taken', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9' })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' } });
+    const name = page.root.querySelector<HTMLInputElement>('#nom')!;
+    name.focus();
+
+    scanInto(name, '6111000000011');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(page.root.querySelector<HTMLInputElement>('#code-barres')!.value).toBe('111');
   });
 });
 

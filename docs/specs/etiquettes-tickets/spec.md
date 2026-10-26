@@ -50,7 +50,7 @@ En haut : **nom du commerce**. Puis : date et heure, **caissier**, **référence
 Le ticket se compose avec les données de la vente connues de l'appareil : il s'imprime sans réseau.
 
 ### TKT-05 La mise en page
-Largeur **80 mm** par défaut, **58 mm** au choix (réglage gardé sur l'appareil), texte noir sur blanc, police lisible, sans image ; la hauteur suit le contenu (pas de page A4 gâchée). L'impression passe par la fenêtre d'impression de l'appareil : toute imprimante installée convient.
+Largeur **58 mm** par défaut (les petites imprimantes Bluetooth des téléphones, les plus courantes), **80 mm** au choix (réglage gardé sur l'appareil), texte noir sur blanc, police lisible, sans image ; la hauteur suit le contenu (pas de page A4 gâchée). L'impression passe par la fenêtre d'impression de l'appareil : toute imprimante installée convient.
 
 ### TKT-06 Rien n'est envoyé par l'application
 L'application n'envoie jamais un ticket elle-même (e-mail, WhatsApp, SMS) dans cette version : c'est l'utilisateur qui le dirige, avec TKT-07.

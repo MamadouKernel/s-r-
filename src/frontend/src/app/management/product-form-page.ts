@@ -1,7 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { parseFcfa } from '../core/money';
 import { ImageService } from '../core/image';
+import { ScanService } from '../services/scan.service';
 import { ApiError } from '../sync/sync-api';
 import { describeError } from './errors';
 import { FlashService } from './flash.service';
@@ -155,6 +156,15 @@ export class ProductFormPage implements OnInit {
   protected readonly purchasePrice = signal('0');
   protected readonly threshold = signal('0');
   protected readonly tracksStock = signal(true);
+
+  constructor() {
+    // Lecteur de codes-barres (ADR 0015) : un scan dans la zone « Code-barres » la remplit, et Entrée n'enregistre pas la fiche.
+    const stop = inject(ScanService).listen({
+      accept: (target) => (target as HTMLElement | null)?.id === 'code-barres',
+      onScan: (scan) => this.barcode.set(scan.code),
+    });
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id') ?? '';

@@ -58,7 +58,9 @@ import { ManagedProduct, ProductsApi } from './products-api';
         <ul class="mb-4 flex flex-col gap-2">
           @for (product of visible(); track product.id) {
             <li class="panel flex flex-wrap items-center gap-3">
-              <input type="checkbox" class="h-6 w-6" [attr.aria-label]="'Choisir ' + product.name + formatSuffix(product)" [checked]="isChosen(product)" (change)="toggle(product, $any($event.target).checked)" />
+              <span class="flex min-h-11 min-w-11 items-center justify-center">
+                <input type="checkbox" class="h-6 w-6" [attr.aria-label]="'Choisir ' + product.name + formatSuffix(product)" [checked]="isChosen(product)" (change)="toggle(product, $any($event.target).checked)" />
+              </span>
               <div class="min-w-0 flex-1">
                 <p class="break-words font-semibold">{{ product.name }}@if (product.formatLabel) { <span class="font-normal text-ardoise"> · {{ product.formatLabel }}</span> }</p>
                 <p class="text-sm text-ardoise">

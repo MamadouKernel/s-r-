@@ -231,6 +231,8 @@ export class PaymentPanel implements OnInit {
   protected readonly mobileMoney = MOBILE_MONEY_METHODS;
   protected readonly rows = signal<Row[]>([]);
   protected readonly confirmed = signal<SaleOperation | null>(null);
+  /** La vente est enregistrée et l'écran du ticket est affiché : un scan peut lancer la vente suivante. */
+  readonly isDone = computed(() => this.confirmed() !== null);
   protected readonly receipt = signal<Receipt | null>(null);
   protected readonly failure = signal('');
   protected readonly touched = signal(false);

@@ -62,6 +62,11 @@ export function canExportData(role: string | undefined): boolean {
   return role === 'Owner';
 }
 
+/** Écran « Lecteur de codes-barres » (test du lecteur) : propriétaire et gérant, ceux qui équipent la caisse. */
+export function canTestScanner(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager';
+}
+
 /** Écran « Étiquettes » (imprimer des étiquettes de produits) : ceux qui gèrent le stock, comme le serveur. */
 export function canPrintLabels(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager' || role === 'StockKeeper';

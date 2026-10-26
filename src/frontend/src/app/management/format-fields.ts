@@ -1,4 +1,5 @@
-import { Component, input, output } from '@angular/core';
+import { Component, DestroyRef, inject, input, output } from '@angular/core';
+import { ScanService } from '../services/scan.service';
 import { FormatDraft, FormatErrors } from './format-draft';
 
 /** Les champs d'un format (maquette « créer le riz ») : format, code-barres, prix d'achat et de vente, alerte de stock, suivi du stock. */
@@ -78,6 +79,15 @@ export class FormatFields {
 
   readonly patch = output<Partial<FormatDraft>>();
   readonly remove = output<void>();
+
+  constructor() {
+    // Lecteur de codes-barres (ADR 0015) : un scan dans la zone « Code-barres » de ce format la remplit, et Entrée n'enregistre pas la fiche.
+    const stop = inject(ScanService).listen({
+      accept: (target) => (target as HTMLElement | null)?.id === this.id('code-barres'),
+      onScan: (scan) => this.patch.emit({ barcode: scan.code }),
+    });
+    inject(DestroyRef).onDestroy(stop);
+  }
 
   protected id(name: string): string {
     return `${this.idBase()}-${name}`;

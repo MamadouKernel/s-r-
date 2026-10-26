@@ -24,7 +24,7 @@ import { TicketService } from '../services/ticket.service';
       </div>
     </div>
     @if (notice()) {
-      <p class="mt-2 font-semibold text-succes" role="status">{{ notice() }}</p>
+      <p class="mt-2 font-semibold" [class.text-succes]="copied()" [class.text-avertissement]="!copied()" role="status">{{ notice() }}</p>
     }
   `,
 })
@@ -32,6 +32,7 @@ export class TicketActions {
   protected readonly tickets = inject(TicketService);
   readonly receipt = input.required<Receipt>();
   protected readonly notice = signal('');
+  protected readonly copied = signal(true);
 
   protected async share(): Promise<void> {
     await this.tickets.share(this.receipt());
@@ -39,6 +40,7 @@ export class TicketActions {
 
   protected async copy(): Promise<void> {
     const done = await this.tickets.copy(this.receipt());
+    this.copied.set(done);
     this.notice.set(
       done
         ? 'Ticket copié. Collez-le dans l’application de votre imprimante.'
