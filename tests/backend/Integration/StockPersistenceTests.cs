@@ -1,3 +1,4 @@
+using Soro.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Soro.Domain.Common;
@@ -62,8 +63,8 @@ public class StockPersistenceTests(PostgresFixture fixture)
         await using var db = Db.App(fixture, tenantA);
         await ProductSeed.AddAsync(db, NewProduct(tenantA, "999", "Doublon"), Ct);
 
-        var failure = await Assert.ThrowsAsync<DbUpdateException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
-        Assert.Equal(PostgresErrorCodes.UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+        var failure = await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException!.InnerException).SqlState);
     }
 
     [Fact]
@@ -138,7 +139,7 @@ public class StockPersistenceTests(PostgresFixture fixture)
             Apply(secondProduct, p => p.Receive(7, null, UserId.New(), At)), Ct);
 
         await new EfUnitOfWork(first).CommitAsync(Ct);
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => new EfUnitOfWork(second).CommitAsync(Ct));
+        await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(second).CommitAsync(Ct));
 
         await using var read = Db.App(fixture, tenant);
         Assert.Equal(10, (await new ProductRepository(read).GetAsync(product.Id, tenant, Ct))!.QuantityOnHand);

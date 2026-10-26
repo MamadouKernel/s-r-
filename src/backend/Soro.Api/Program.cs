@@ -9,9 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSoroAuthentication(builder.Configuration);
 builder.Services.AddSoroRateLimiting(builder.Configuration);
 builder.Services.AddSoroApplication(builder.Configuration, builder.Environment);
-builder.Services.AddSoroPersistence(
-    builder.Configuration.GetConnectionString("Soro")
-    ?? throw new InvalidOperationException("La chaîne de connexion ConnectionStrings:Soro n'est pas configurée."));
+var connectionString = builder.Configuration.GetConnectionString("Soro")
+    ?? throw new InvalidOperationException("La chaîne de connexion ConnectionStrings:Soro n'est pas configurée.");
+builder.Services.AddSoroPersistence(connectionString);
+builder.Services.AddHostedService(provider => new DatabaseRoleCheck(connectionString, provider.GetRequiredService<IConfiguration>()));
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
@@ -23,6 +24,17 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
+if (ForwardedHeadersSetup.OptionsFrom(app.Configuration) is { } forwarded)
+{
+    app.UseForwardedHeaders(forwarded);
+}
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
+app.UseSecurityHeaders();
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseTenantScope();

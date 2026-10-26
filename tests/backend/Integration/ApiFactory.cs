@@ -19,7 +19,8 @@ internal sealed class ApiFactory(
     int? permitPerMinute = null,
     int? loginPermitsPerMinute = null,
     int? publicPermitsPerMinute = null,
-    bool devicesRequired = false) : WebApplicationFactory<Program>
+    bool devicesRequired = false,
+    IReadOnlyDictionary<string, string>? settings = null) : WebApplicationFactory<Program>
 {
     private const string Issuer = "https://soro.tests";
     private const string Audience = "soro-api-tests";
@@ -59,6 +60,11 @@ internal sealed class ApiFactory(
         if (publicPermitsPerMinute is { } publicPermits)
         {
             builder.UseSetting("RateLimit:PublicPermitsPerMinute", publicPermits.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+        {
+            builder.UseSetting(key, value);
         }
 
         if (permitPerMinute is { } permits)

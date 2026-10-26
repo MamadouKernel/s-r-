@@ -41,6 +41,9 @@ public static class SubscriptionRules
 {
     public const int GraceDays = 7;
 
+    /// <summary>Après le début de la lecture seule, les ventes faites hors ligne sont encore acceptées pendant ce délai ; au-delà, il faut payer d'abord.</summary>
+    public const int OfflineQueueDays = 7;
+
     public static DateTimeOffset CurrentEnd(DateTimeOffset trialEndsAt, DateTimeOffset? paidUntil) =>
         paidUntil is { } paid && paid > trialEndsAt ? paid : trialEndsAt;
 

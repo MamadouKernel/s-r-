@@ -130,6 +130,14 @@ public sealed class DeclareSubscriptionPaymentHandler(
             await unitOfWork.CommitAsync(cancellationToken);
             return Result<DeclareSubscriptionPaymentResult>.Success(new(command.Id, AlreadyProcessed: false));
         }
+        catch (ConflictException)
+        {
+            // Une autre déclaration vient de prendre la même référence (ou ce même envoi est arrivé deux fois) : on le dit en clair.
+            return await payments.GetAsync(command.Id, user.Tenant, cancellationToken) is not null
+                ? Result<DeclareSubscriptionPaymentResult>.Success(new(command.Id, AlreadyProcessed: true))
+                : Result<DeclareSubscriptionPaymentResult>.Failure(
+                    new ApplicationError(ErrorCodes.MobileMoneyReferenceUsed, "Cette référence de transaction a déjà été utilisée. Vérifiez-la dans le message de votre opérateur."));
+        }
         catch (DomainException exception)
         {
             return Result<DeclareSubscriptionPaymentResult>.Failure(ApplicationError.RuleViolation(exception.Message));

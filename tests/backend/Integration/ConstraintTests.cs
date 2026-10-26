@@ -1,3 +1,4 @@
+using Soro.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Soro.Domain.Cash;
@@ -35,8 +36,8 @@ public class ConstraintTests(PostgresFixture fixture)
         await using var db = Db.App(fixture, tenant);
         await new SaleRepository(db).AddAsync(duplicate, Ct);
 
-        var failure = await Assert.ThrowsAsync<DbUpdateException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
-        Assert.Equal(PostgresErrorCodes.UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException).SqlState);
+        var failure = await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, Assert.IsType<PostgresException>(failure.InnerException!.InnerException).SqlState);
     }
 
     [Fact]
@@ -76,7 +77,7 @@ public class ConstraintTests(PostgresFixture fixture)
         await using var db = Db.App(fixture, tenant);
         await new SaleRepository(db).AddAsync(Samples.CashSale(session, sequence: 1), Ct);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
+        await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
     }
 
     [Fact]
@@ -89,7 +90,7 @@ public class ConstraintTests(PostgresFixture fixture)
         await using var db = Db.App(fixture, tenant);
         await new SessionRepository(db).AddAsync(Samples.Session(tenant, register), Ct);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
+        await Assert.ThrowsAsync<ConflictException>(() => new EfUnitOfWork(db).CommitAsync(Ct));
     }
 
     [Fact]
