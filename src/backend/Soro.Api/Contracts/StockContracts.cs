@@ -1,3 +1,5 @@
+using Soro.Domain.Common;
+
 namespace Soro.Api.Contracts;
 
 public sealed record CreateProductRequest
@@ -17,6 +19,9 @@ public sealed record CreateProductRequest
     public int AlertThreshold { get; init; }
 
     public bool TracksStock { get; init; } = true;
+
+    /// <summary>Unité de vente : pièce (par défaut), kilogramme ou litre (docs/decisions/0017).</summary>
+    public MeasureUnit Unit { get; init; } = MeasureUnit.Piece;
 }
 
 public sealed record UpdateProductRequest
@@ -36,6 +41,9 @@ public sealed record UpdateProductRequest
     public required long SalePriceFcfa { get; init; }
 
     public int AlertThreshold { get; init; }
+
+    /// <summary>Nouvelle unité ; absente, elle ne change pas. Refusée dès que le produit a un historique.</summary>
+    public MeasureUnit? Unit { get; init; }
 }
 
 public sealed record ReceiveStockRequest

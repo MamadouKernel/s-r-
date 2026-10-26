@@ -32,6 +32,7 @@ internal static class ProductMapper
         row.FamilyId = product.FamilyId.Value;
         row.FormatLabel = product.FormatLabel;
         row.PhotoId = product.PhotoId?.Value;
+        row.Unit = product.Unit;
     }
 
     public static ProductFamilyRow ToRow(ProductFamily family)
@@ -78,7 +79,8 @@ internal static class ProductMapper
             row.QuantityOnHand,
             new FamilyId(row.FamilyId),
             row.FormatLabel,
-            row.PhotoId is { } photo ? new PhotoId(photo) : null);
+            row.PhotoId is { } photo ? new PhotoId(photo) : null,
+            row.Unit);
 
     public static StockMovementRow ToRow(StockMovement movement) =>
         new()

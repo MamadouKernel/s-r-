@@ -1,3 +1,4 @@
+using Soro.Domain.Common;
 using Soro.Domain.Subscription;
 using Soro.Domain.Cash;
 using Soro.Domain.Identity;
@@ -90,6 +91,9 @@ internal sealed class SaleLineRow
 
     public int Quantity { get; set; }
 
+    /// <summary>Unité de la ligne au moment de la vente (copie figée).</summary>
+    public MeasureUnit Unit { get; set; }
+
     public long UnitPrice { get; set; }
 
     /// <summary>Prix d'achat moyen retenu à la vente (RG-11) ; <c>null</c> pour un produit inconnu ou une vente antérieure.</summary>
@@ -181,6 +185,9 @@ internal sealed class ProductRow
     public string? Category { get; set; }
 
     public long PurchasePrice { get; set; }
+
+    /// <summary>Unité de vente (docs/decisions/0017) ; les quantités d'un produit pesé sont en millièmes.</summary>
+    public MeasureUnit Unit { get; set; }
 
     public long SalePrice { get; set; }
 

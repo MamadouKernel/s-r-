@@ -13,7 +13,11 @@ public sealed record CreateProductCommand(
     long PurchasePriceFcfa,
     long SalePriceFcfa,
     int AlertThreshold,
-    bool TracksStock);
+    bool TracksStock)
+{
+    /// <summary>Unité de vente (docs/decisions/0017) ; une pièce par défaut.</summary>
+    public MeasureUnit Unit { get; init; } = MeasureUnit.Piece;
+}
 
 public sealed record CreateProductResult(ProductId ProductId, bool AlreadyProcessed);
 
@@ -53,7 +57,8 @@ public sealed class CreateProductHandler(
                 Money.Fcfa(command.SalePriceFcfa),
                 command.AlertThreshold,
                 command.TracksStock,
-                clock.UtcNow);
+                clock.UtcNow,
+                unit: command.Unit);
 
             if (await BarcodeConflictAsync(product.Barcode, null, cancellationToken))
             {
@@ -91,7 +96,11 @@ public sealed record UpdateProductCommand(
     long PurchasePriceFcfa,
     long SalePriceFcfa,
     int AlertThreshold,
-    string? FormatLabel = null);
+    string? FormatLabel = null)
+{
+    /// <summary>Nouvelle unité de vente ; absente, l'unité ne change pas. Refusée dès que le produit a un historique.</summary>
+    public MeasureUnit? Unit { get; init; }
+}
 
 /// <summary>
 /// Modification d'une fiche produit (CAT-02). Les changements de prix sont tracés. Le nom et la catégorie sont ceux de la <b>famille</b> (tous
@@ -120,8 +129,18 @@ public sealed class UpdateProductHandler(
             return Result<ProductId>.Failure(ApplicationError.NotFound("Produit introuvable."));
         }
 
+        if (command.Unit is { } unit && unit != product.Unit && await products.HasHistoryAsync(user.Tenant, product.Id, cancellationToken))
+        {
+            return Result<ProductId>.Failure(ApplicationError.RuleViolation("Cette unité ne peut plus changer : ce produit a déjà un historique."));
+        }
+
         try
         {
+            if (command.Unit is { } newUnit && newUnit != product.Unit)
+            {
+                product.ChangeUnit(newUnit);
+            }
+
             var before = product.SalePrice;
             var family = await families.GetAsync(product.FamilyId, user.Tenant, cancellationToken);
             var isNewFamily = family is null;

@@ -16,7 +16,14 @@ namespace Soro.Application.Sales;
 /// <summary>Approbation d'un gérant : son identifiant ET son PIN, que le serveur vérifie (docs/decisions/0018).</summary>
 public sealed record Approval(UserId Approver, string Pin);
 
-public sealed record SaleLineInput(ProductId Product, string Name, int Quantity, long UnitPriceFcfa);
+public sealed record SaleLineInput(ProductId Product, string Name, int Quantity, long UnitPriceFcfa)
+{
+    /// <summary>
+    /// Unité de la ligne (docs/decisions/0017). Une caisse qui ne la connaît pas ne l'envoie pas : sa ligne est lue en pièces, et refusée si le produit
+    /// est vendu au poids ou à la mesure (jamais une quantité mal interprétée).
+    /// </summary>
+    public MeasureUnit? Unit { get; init; }
+}
 
 public sealed record PaymentInput(
     PaymentId Id,
@@ -103,6 +110,12 @@ public sealed class RecordSaleHandler(
         CancellationToken cancellationToken)
     {
         var catalogue = await LoadProductsAsync(command, cancellationToken);
+        var unitError = CheckUnits(command, catalogue);
+        if (unitError is not null)
+        {
+            return Result<RecordSaleResult>.Failure(unitError);
+        }
+
         var draft = WithCosts(ToDraft(command), catalogue);
 
         // Les inscriptions au journal d'une vente ne sont écrites qu'une fois la vente acceptée par la session : une vente refusée ne laisse
@@ -183,6 +196,28 @@ public sealed class RecordSaleHandler(
     }
 
     /// <summary>
+    /// L'unité d'une ligne est celle de la fiche (docs/decisions/0017, VPO-09). Une caisse pas à jour n'envoie pas d'unité : sa ligne vaut « pièces »,
+    /// ce qui, pour un produit au poids, ferait lire « 2 » comme 2 pièces au lieu de 2 grammes ; on la refuse avec un message clair.
+    /// </summary>
+    private static ApplicationError? CheckUnits(RecordSaleCommand command, Dictionary<ProductId, Product?> catalogue)
+    {
+        foreach (var line in command.Lines)
+        {
+            if (catalogue[line.Product] is not { } product || (line.Unit ?? MeasureUnit.Piece) == product.Unit)
+            {
+                continue;
+            }
+
+            return ApplicationError.RuleViolation(
+                line.Unit is null
+                    ? $"« {product.Name} » se vend au poids ou à la mesure : mettre à jour l'application de cette caisse, puis recommencer."
+                    : $"L'unité de vente de « {product.Name} » ne correspond pas à sa fiche : actualisez le catalogue de la caisse.");
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Fige sur chaque ligne le prix d'achat moyen du produit à cet instant (RG-11, docs/decisions/0007) : la marge d'une vente ne bougera plus
     /// quand les prix des fournisseurs changeront. Un produit inconnu du commerce n'a pas de coût.
     /// </summary>
@@ -190,7 +225,7 @@ public sealed class RecordSaleHandler(
         draft with
         {
             Lines = draft.Lines
-                .Select(line => SaleLine.Create(line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, catalogue[line.ProductId]?.PurchasePrice))
+                .Select(line => SaleLine.Create(line.ProductId, line.ProductName, line.Quantity, line.UnitPrice, catalogue[line.ProductId]?.PurchasePrice, line.Unit))
                 .ToArray(),
         };
 
@@ -368,7 +403,7 @@ public sealed class RecordSaleHandler(
             command.LocalSequence,
             command.At,
             command.Lines
-                .Select(line => SaleLine.Create(line.Product, line.Name, line.Quantity, Money.Fcfa(line.UnitPriceFcfa)))
+                .Select(line => SaleLine.Create(line.Product, line.Name, line.Quantity, Money.Fcfa(line.UnitPriceFcfa), null, line.Unit ?? MeasureUnit.Piece))
                 .ToArray(),
             Money.Fcfa(command.DiscountFcfa),
             command.Payments.Select(ToPayment).ToArray(),

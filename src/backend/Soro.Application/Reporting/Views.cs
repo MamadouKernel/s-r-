@@ -1,3 +1,4 @@
+using Soro.Domain.Common;
 using Soro.Domain.Cash;
 using Soro.Domain.Sales;
 
@@ -17,7 +18,7 @@ public sealed record SaleSummary(
     IReadOnlyList<PaymentMethod> PaymentMethods,
     int LineCount);
 
-public sealed record SaleLineView(Guid ProductId, string ProductName, int Quantity, long UnitPriceFcfa, long TotalFcfa);
+public sealed record SaleLineView(Guid ProductId, string ProductName, int Quantity, long UnitPriceFcfa, long TotalFcfa, MeasureUnit Unit = MeasureUnit.Piece);
 
 public sealed record PaymentView(PaymentMethod Method, long AmountFcfa, long ChangeFcfa, string? Reference);
 
@@ -83,7 +84,8 @@ public enum RankingCriterion
 /// </summary>
 /// <param name="MarginFcfa">Chiffre d'affaires moins les coûts retenus à la vente ; <c>null</c> sans droit de voir les prix d'achat.</param>
 /// <param name="MarginIsEstimate">Vrai si au moins une ligne de la période n'a pas de coût retenu (vente antérieure à RG-11) : la marge utilise alors le prix d'achat actuel.</param>
-public sealed record ProductRanking(Guid ProductId, string Name, int Quantity, long RevenueFcfa, long? MarginFcfa, bool MarginIsEstimate = false);
+/// <param name="Unit">L'unité du produit : la quantité d'un produit pesé est en millièmes (grammes, millilitres).</param>
+public sealed record ProductRanking(Guid ProductId, string Name, int Quantity, long RevenueFcfa, long? MarginFcfa, bool MarginIsEstimate = false, MeasureUnit Unit = MeasureUnit.Piece);
 
 /// <summary>Une entrée du journal des actions sensibles (MV-02).</summary>
 public sealed record AuditEntryView(Guid Id, DateTimeOffset At, Guid UserId, string Action, Guid ResourceId, string Detail);

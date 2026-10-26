@@ -21,7 +21,7 @@ internal static class RequestMapping
             request.LocalSequence,
             request.At,
             request.Lines
-                .Select(line => new SaleLineInput(new ProductId(line.ProductId), line.Name, line.Quantity, line.UnitPriceFcfa))
+                .Select(line => new SaleLineInput(new ProductId(line.ProductId), line.Name, line.Quantity, line.UnitPriceFcfa) { Unit = line.Unit })
                 .ToArray(),
             request.DiscountFcfa,
             request.Payments

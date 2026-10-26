@@ -1,3 +1,4 @@
+using Soro.Domain.Common;
 using Soro.Domain.Sales;
 
 namespace Soro.Api.Contracts;
@@ -35,6 +36,9 @@ public sealed record SaleLineRequest
     public required int Quantity { get; init; }
 
     public required long UnitPriceFcfa { get; init; }
+
+    /// <summary>Unité de la ligne ; absente (caisse pas à jour), la ligne est lue en pièces et refusée pour un produit pesé.</summary>
+    public MeasureUnit? Unit { get; init; }
 }
 
 public sealed record PaymentRequest

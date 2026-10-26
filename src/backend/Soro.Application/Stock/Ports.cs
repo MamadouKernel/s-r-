@@ -13,6 +13,9 @@ public interface IProductRepository
     /// <summary>Les codes de 13 chiffres commençant par le préfixe interne, les plus grands d'abord : de quoi trouver la dernière séquence.</summary>
     Task<IReadOnlyList<string>> RecentInternalBarcodesAsync(TenantId tenant, int count, CancellationToken cancellationToken);
 
+    /// <summary>Le produit a-t-il un historique (un mouvement de stock ou une ligne de vente) ? Si oui, son unité ne change plus.</summary>
+    Task<bool> HasHistoryAsync(TenantId tenant, ProductId id, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Product>> ListAsync(
         TenantId tenant,
         string? search,

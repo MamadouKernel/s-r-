@@ -86,7 +86,7 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
                 item.line.ProductName,
                 item.line.Quantity,
                 item.line.UnitPrice,
-                item.line.UnitPrice * item.line.Quantity,
+                Money.Fcfa(item.line.UnitPrice).ForQuantity(item.line.Quantity, item.line.Unit).Amount,
                 item.line.UnitCost))
             .ToArray();
 

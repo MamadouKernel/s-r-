@@ -82,6 +82,7 @@ internal static class SaleMapper
             ProductId = line.ProductId.Value,
             ProductName = line.ProductName,
             Quantity = line.Quantity,
+            Unit = line.Unit,
             UnitPrice = line.UnitPrice.Amount,
             UnitCost = line.UnitCost?.Amount,
         };
@@ -102,7 +103,7 @@ internal static class SaleMapper
 
     private static SaleLine ToDomain(SaleLineRow row) =>
         SaleLine.Restore(
-            new ProductId(row.ProductId), row.ProductName, row.Quantity, Money.Fcfa(row.UnitPrice), row.UnitCost is { } cost ? Money.Fcfa(cost) : null);
+            new ProductId(row.ProductId), row.ProductName, row.Quantity, Money.Fcfa(row.UnitPrice), row.UnitCost is { } cost ? Money.Fcfa(cost) : null, row.Unit);
 
     private static Payment ToDomain(PaymentRow row) =>
         Payment.Restore(
