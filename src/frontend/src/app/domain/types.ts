@@ -1,3 +1,5 @@
+import { MeasureUnit } from '../core/measure';
+
 // Types partagés du poste de caisse. Les montants sont des entiers en FCFA (RG-18).
 
 export type PaymentMethod = 'Cash' | 'OrangeMoney' | 'MtnMomo' | 'MoovMoney' | 'Wave' | 'Credit';
@@ -20,6 +22,8 @@ export interface CatalogueProduct {
   salePriceFcfa: number;
   tracksStock: boolean;
   quantityOnHand: number;
+  /** Unité de vente ; absente d'une copie locale d'avant la vente au poids : une pièce. Pesé, la quantité et le stock sont en grammes ou millilitres. */
+  unit?: MeasureUnit;
   /** Famille et format (docs/specs/formats-produits) ; absents d'une copie locale d'avant les formats : le produit est alors sa propre famille. */
   familyId?: string;
   familyName?: string;
@@ -33,7 +37,10 @@ export interface CartLine {
   productId: string;
   name: string;
   unitPriceFcfa: number;
+  /** En pièces, ou en grammes / millilitres pour un produit pesé ou mesuré. */
   quantity: number;
+  /** Absente pour une pièce : une ligne d'avant la vente au poids reste identique. */
+  unit?: MeasureUnit;
 }
 
 /**

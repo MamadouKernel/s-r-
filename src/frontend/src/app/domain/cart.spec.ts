@@ -57,3 +57,37 @@ describe('cart', () => {
     expect(() => addProduct([], jus, -1)).toThrow();
   });
 });
+
+describe('cart: weighed products (docs/specs/vente-au-poids)', () => {
+  const riz: CatalogueProduct = {
+    id: 'p-riz', name: 'Riz parfumé', barcode: null, category: null, salePriceFcfa: 800, tracksStock: true, quantityOnHand: 25_000, unit: 'Kilogram',
+  };
+
+  it('adds a weighed quantity in grams and keeps the unit on the line', () => {
+    expect(addProduct([], riz, 1250)).toEqual([{ productId: 'p-riz', name: 'Riz parfumé', unitPriceFcfa: 800, quantity: 1250, unit: 'Kilogram' }]);
+  });
+
+  it('adds the same weighed product to the existing line', () => {
+    const cart = addProduct(addProduct([], riz, 1250), riz, 500);
+    expect(cart).toHaveLength(1);
+    expect(cart[0].quantity).toBe(1750);
+  });
+
+  it('sets the weight of a line again by retyping it', () => {
+    expect(setQuantity(addProduct([], riz, 1250), 'p-riz', 2000)[0].quantity).toBe(2000);
+  });
+
+  it('totals a weighed line with the rounded price of its weight, and a piece line as before', () => {
+    const cart = addProduct(addProduct([], riz, 1250), jus, 2);
+    expect(cartTotal(cart)).toBe(1000 + 1200);
+  });
+
+  it('rounds each weighed line, then adds: the total is the sum of what the customer reads', () => {
+    const cart = addProduct(addProduct([], riz, 333), { ...riz, id: 'p-sucre', name: 'Sucre' }, 333);
+    expect(cartTotal(cart)).toBe(266 + 266);
+  });
+
+  it('keeps a piece line exactly as before: no unit key', () => {
+    expect(addProduct([], jus)[0]).not.toHaveProperty('unit');
+  });
+});

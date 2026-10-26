@@ -1,4 +1,5 @@
 import { SaleOperation } from '../data/journal';
+import { formatQuantity, lineTotal, MeasureUnit } from './measure';
 import { MOBILE_MONEY_METHODS, PaymentMethod } from '../domain/types';
 
 /** Le ticket de caisse (docs/specs/etiquettes-tickets lot 2) : tout ce qu'il montre, déjà connu de l'appareil, donc imprimable sans réseau. */
@@ -10,7 +11,8 @@ export interface Receipt {
   register: string;
   /** Rang de la vente sur cette caisse ce jour-là : une référence lisible, pas une numérotation légale (ADR 0016). */
   rank: number;
-  lines: { name: string; quantity: number; unitPriceFcfa: number; totalFcfa: number }[];
+  /** `quantity` est en grammes ou millilitres pour une ligne pesée ou mesurée (`unit`) ; `unitPriceFcfa` est alors le prix d'un kilo ou d'un litre. */
+  lines: { name: string; quantity: number; unit?: MeasureUnit; unitPriceFcfa: number; totalFcfa: number }[];
   discountFcfa: number;
   totalFcfa: number;
   payments: { label: string; amountFcfa: number }[];
@@ -58,8 +60,9 @@ export function buildReceipt(sale: SaleOperation, context: ReceiptContext): Rece
     lines: sale.lines.map((line) => ({
       name: line.name,
       quantity: line.quantity,
+      ...(line.unit && line.unit !== 'Piece' ? { unit: line.unit } : {}),
       unitPriceFcfa: line.unitPriceFcfa,
-      totalFcfa: line.unitPriceFcfa * line.quantity,
+      totalFcfa: lineTotal(line.unitPriceFcfa, line.quantity, line.unit),
     })),
     discountFcfa: sale.discountFcfa,
     totalFcfa: sale.netTotalFcfa,
@@ -140,7 +143,7 @@ export function receiptText(receipt: Receipt, columns: number): string {
     rule,
   ];
   for (const line of receipt.lines) {
-    out.push(...wrap(line.name, columns), ...row(`  ${line.quantity} x ${amount(line.unitPriceFcfa)}`, amount(line.totalFcfa), columns));
+    out.push(...wrap(line.name, columns), ...row(`  ${formatQuantity(line.quantity, line.unit).replace(/\u00a0/g, ' ')} x ${amount(line.unitPriceFcfa)}`, amount(line.totalFcfa), columns));
   }
   out.push(rule);
   if (receipt.discountFcfa > 0) {

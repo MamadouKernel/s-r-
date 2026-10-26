@@ -125,4 +125,32 @@ describe('ApiService', () => {
     close.flush({ expectedCashFcfa: 11800, countedCashFcfa: 11300, varianceFcfa: -500, alreadyProcessed: false });
     expect((await closing).varianceFcfa).toBe(-500);
   });
+
+  it('sends the unit of a weighed line with its quantity in grams, and nothing for a piece (an old server reads pieces)', async () => {
+    const weighed: SaleOperation = {
+      ...sale,
+      lines: [{ productId: 'r', name: 'Riz', unitPriceFcfa: 800, quantity: 1250, unit: 'Kilogram' }, { productId: 'q', name: 'Savon', unitPriceFcfa: 300, quantity: 1 }],
+    };
+
+    const result = api.syncSales([weighed]);
+    const request = http.expectOne('/api/v1/sales/sync');
+    const lines = request.request.body.sales[0].lines;
+    request.flush({ statuses: [] });
+    await result;
+
+    expect(lines[0]).toEqual({ productId: 'r', name: 'Riz', quantity: 1250, unitPriceFcfa: 800, unit: 'Kilogram' });
+    expect(lines[1]).not.toHaveProperty('unit');
+  });
+
+  it('reads the unit of the products of the catalogue and leaves pieces without one', async () => {
+    const result = api.products();
+    http.expectOne('/api/v1/products').flush([
+      { id: 'r', name: 'Riz', barcode: null, category: null, salePriceFcfa: 800, tracksStock: true, quantityOnHand: 25000, isActive: true, unit: 'Kilogram' },
+      { id: 'j', name: 'Jus', barcode: null, category: null, salePriceFcfa: 600, tracksStock: true, quantityOnHand: 4, isActive: true, unit: 'Piece' },
+    ]);
+    const products = await result;
+
+    expect(products[0].unit).toBe('Kilogram');
+    expect(products[1]).not.toHaveProperty('unit');
+  });
 });

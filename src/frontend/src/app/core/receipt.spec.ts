@@ -149,6 +149,29 @@ describe('receiptText', () => {
   });
 });
 
+describe('receipts of weighed products (docs/specs/vente-au-poids)', () => {
+  it('writes the weight, the unit and the price of one kilo, and the rounded total of the line', () => {
+    const weighed = receiptOf({
+      lines: [{ productId: 'r', name: 'Riz parfumé', unitPriceFcfa: 800, quantity: 1250, unit: 'Kilogram' }],
+      netTotalFcfa: 1000, payments: [{ id: 'p', method: 'Cash', amountFcfa: 1000, tenderedFcfa: 1000 }], changeFcfa: 0,
+    });
+
+    expect(weighed.lines).toEqual([{ name: 'Riz parfumé', quantity: 1250, unit: 'Kilogram', unitPriceFcfa: 800, totalFcfa: 1000 }]);
+    expect(receiptText(weighed, 32)).toMatch(/1,250 kg x 800 FCFA\s+1 000 FCFA/);
+  });
+
+  it('keeps a piece line exactly as before and never writes a non-breaking space for a big weight', () => {
+    const text = receiptText(
+      receiptOf({ lines: [{ productId: 'r', name: 'Riz', unitPriceFcfa: 800, quantity: 1_234_567, unit: 'Kilogram' }], netTotalFcfa: 987_654, payments: [{ id: 'p', method: 'Cash', amountFcfa: 987_654 }], changeFcfa: 0 }),
+      42,
+    );
+
+    expect(text).not.toContain('\u00a0');
+    expect(text).toContain('1 234,567 kg x 800 FCFA');
+    expect(receiptOf().lines[0]).not.toHaveProperty('unit');
+  });
+});
+
 describe('receiptDocument', () => {
   it('is a whole page that prints the ticket at the right width, in a fixed-width font', () => {
     const html = receiptDocument(receiptOf(), 58);
