@@ -29,13 +29,13 @@ export const devicesGuard: CanActivateFn = () => {
 };
 
 /**
- * Un utilisateur connecté, ou une session de caisse déjà ouverte sur l'appareil : jeton expiré n'empêche pas de vendre
+ * Un utilisateur connecté (ou entré sans réseau, ADR 0019), ou une session de caisse déjà ouverte sur l'appareil : jeton expiré n'empêche pas de vendre
  * (ADR 0004), la synchronisation attend simplement une reconnexion.
  */
 export const userGuard: CanActivateFn = () => {
   const router = inject(Router);
   const auth = inject(AuthService);
-  return auth.signedIn() || inject(CashService).session() ? true : router.parseUrl('/connexion');
+  return auth.signedIn() || auth.offlineSession() || inject(CashService).session() ? true : router.parseUrl('/connexion');
 };
 
 export const openSessionGuard: CanActivateFn = () => {

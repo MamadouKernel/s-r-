@@ -26,7 +26,7 @@ export class App {
   protected readonly showCustomers = computed(() => this.auth.signedIn() && canReadCustomers(this.auth.user()?.role));
   protected readonly showJournal = computed(() => this.auth.signedIn() && canReadAuditLog(this.auth.user()?.role));
   protected readonly showManagement = computed(() => this.auth.signedIn() && canManageStock(this.auth.user()?.role));
-  protected readonly showMenu = computed(() => this.auth.device() !== null && (this.auth.signedIn() || this.hasSession()));
+  protected readonly showMenu = computed(() => this.auth.device() !== null && (this.auth.signedIn() || this.auth.offlineSession() !== null || this.hasSession()));
 
   constructor() {
     // L'état d'abonnement se lit dès la connexion et se relit chaque minute ; il s'efface à la déconnexion.

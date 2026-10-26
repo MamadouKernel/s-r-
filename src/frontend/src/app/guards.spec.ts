@@ -1,7 +1,8 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, scannerGuard, teamGuard, welcomeGuard, labelsGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, scannerGuard, teamGuard, userGuard, welcomeGuard, labelsGuard } from './guards';
+import { CashService } from './services/cash.service';
 import { AuthService } from './services/auth.service';
 
 function run(signedIn: boolean, role: string | undefined, guard = managementGuard) {
@@ -19,6 +20,30 @@ function run(signedIn: boolean, role: string | undefined, guard = managementGuar
   const result = TestBed.runInInjectionContext(() => guard({} as never, {} as never));
   return result instanceof UrlTree ? TestBed.inject(Router).serializeUrl(result) : result;
 }
+
+describe('userGuard et la session sans réseau', () => {
+  function runUser(offline: boolean) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { signedIn: signal(false), offlineSession: signal(offline ? { userId: 'u' } : null) } },
+        { provide: CashService, useValue: { session: signal(null) } },
+      ],
+    });
+    const result = TestBed.runInInjectionContext(() => userGuard({} as never, {} as never));
+    return result instanceof UrlTree ? TestBed.inject(Router).serializeUrl(result) : result;
+  }
+
+  it('lets a cashier entered without the network reach the register (HLC-07)', () => {
+    expect(runUser(true)).toBe(true);
+    expect(runUser(false)).toBe('/connexion');
+  });
+
+  it('keeps the management area closed to a session without the network (HLC-07)', () => {
+    expect(run(false, 'Manager')).toBe('/connexion');
+  });
+});
 
 describe('managementGuard', () => {
   it('lets the owner, the manager and the stock keeper in', () => {
