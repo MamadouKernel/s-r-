@@ -1,4 +1,4 @@
-import { amountToQuantity, formatQuantity, lineTotal, parseQuantity, quantityWords, scaleOf, unitSymbol } from './measure';
+import { amountToQuantity, formatQuantity, lineTotal, parseQuantity, parseThreshold, perUnit, quantityInput, quantityWords, scaleOf, unitSymbol } from './measure';
 
 describe('scaleOf and unitSymbol', () => {
   it('counts a weighed or measured quantity in thousandths and a piece as it is', () => {
@@ -113,5 +113,32 @@ describe('quantityWords', () => {
   it('says the quantity and the total of a line in words', () => {
     expect(quantityWords(1250, 'Kilogram', 800)).toBe('1,250 kg · 1 000 FCFA');
     expect(quantityWords(2, 'Piece', 600)).toBe('2 · 1 200 FCFA');
+  });
+});
+
+describe('parseThreshold, quantityInput, perUnit', () => {
+  it('accepts 0 and an empty field as « no alert »', () => {
+    expect(parseThreshold('0', 'Kilogram')).toEqual({ ok: true, quantity: 0 });
+    expect(parseThreshold('', 'Piece')).toEqual({ ok: true, quantity: 0 });
+  });
+
+  it('reads decimals for a weighed product and integers for pieces', () => {
+    expect(parseThreshold('2,5', 'Kilogram')).toEqual({ ok: true, quantity: 2500 });
+    expect(parseThreshold('1,5', 'Piece').ok).toBe(false);
+    expect(parseThreshold('1,2345', 'Litre').ok).toBe(false);
+  });
+
+  it('writes a quantity back the way it is typed', () => {
+    expect(quantityInput(2500, 'Kilogram')).toBe('2,5');
+    expect(quantityInput(12_000, 'Kilogram')).toBe('12');
+    expect(quantityInput(250, 'Litre')).toBe('0,25');
+    expect(quantityInput(7, 'Piece')).toBe('7');
+  });
+
+  it('names the unit next to a price', () => {
+    expect(perUnit('Kilogram')).toBe(' par kg');
+    expect(perUnit('Litre')).toBe(' par litre');
+    expect(perUnit('Piece')).toBe('');
+    expect(perUnit()).toBe('');
   });
 });

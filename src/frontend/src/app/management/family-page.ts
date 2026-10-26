@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ImageService } from '../core/image';
+import { formatQuantity, perUnit } from '../core/measure';
 import { formatFcfa } from '../core/money';
 import { ApiError } from '../sync/sync-api';
 import { describeError } from './errors';
@@ -64,12 +65,12 @@ import { ManagedProduct, ProductsApi } from './products-api';
                     }
                   </p>
                   <p class="amount text-sm text-ardoise">
-                    {{ item.barcode ? 'Code-barres ' + item.barcode + ' · ' : 'Sans code-barres · ' }}vente {{ format(item.salePriceFcfa) }}
+                    {{ item.barcode ? 'Code-barres ' + item.barcode + ' · ' : 'Sans code-barres · ' }}vente {{ format(item.salePriceFcfa) }}{{ perUnit(item.unit) }}
                     @if (item.purchasePriceFcfa !== null) {
-                      · achat {{ format(item.purchasePriceFcfa) }}
+                      · achat {{ format(item.purchasePriceFcfa) }}{{ perUnit(item.unit) }}
                     }
                     @if (item.tracksStock) {
-                      · stock {{ item.quantityOnHand }} · seuil {{ item.alertThreshold }}
+                      · stock {{ quantity(item, item.quantityOnHand) }} · seuil {{ quantity(item, item.alertThreshold) }}
                     }
                   </p>
                 </div>
@@ -142,6 +143,11 @@ export class FamilyPage implements OnInit {
     return active.length === 1 && !active[0].formatLabel;
   });
   protected format = formatFcfa;
+  protected perUnit = perUnit;
+
+  protected quantity(item: ManagedProduct, value: number): string {
+    return formatQuantity(value, item.unit);
+  }
 
   async ngOnInit(): Promise<void> {
     this.familyId.set(this.route.snapshot.paramMap.get('familyId') ?? '');

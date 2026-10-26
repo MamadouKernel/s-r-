@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, Observable } from 'rxjs';
+import { MeasureUnit } from '../core/measure';
 import { API_ROOT, toApiError } from '../services/api.service';
 
 /** Produit tel que le serveur le renvoie : le prix d'achat est absent pour les profils qui n'ont pas le droit de le voir. */
@@ -23,6 +24,8 @@ export interface ManagedProduct {
   photoId?: string | null;
   /** Photo de la famille seule : la différence avec `photoId` dit si le format a la sienne. */
   familyPhotoId?: string | null;
+  /** Unité de vente ; absente d'une réponse d'avant la vente au poids (= pièce). Les quantités d'un produit pesé sont en grammes ou millilitres. */
+  unit?: MeasureUnit;
 }
 
 export type MovementKind = 'Reception' | 'Sale' | 'Loss' | 'SaleCancellation';
@@ -48,6 +51,8 @@ export interface ProductInput {
   alertThreshold: number;
   /** Format du produit dans sa famille ; `name` est alors le nom de la famille. */
   formatLabel?: string | null;
+  /** Renvoyée telle quelle à la modification : le serveur refuse de la changer dès que le produit a un stock ou un historique. */
+  unit?: MeasureUnit;
 }
 
 /** Un format à créer : son identifiant est fixé à l'ouverture du formulaire pour qu'un nouvel essai ne le crée pas deux fois. */
@@ -59,6 +64,7 @@ export interface FormatInput {
   salePriceFcfa: number;
   alertThreshold: number;
   tracksStock: boolean;
+  unit?: MeasureUnit;
 }
 
 export interface CreateFamilyInput {

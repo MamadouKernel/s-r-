@@ -44,7 +44,10 @@ internal static class ProductEndpoints
             format.PurchasePriceFcfa,
             format.SalePriceFcfa,
             format.AlertThreshold,
-            format.TracksStock);
+            format.TracksStock)
+        {
+            Unit = format.Unit,
+        };
 
     private static async Task<IResult> CreateFamilyAsync(
         CreateFamilyRequest request,

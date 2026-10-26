@@ -1,5 +1,6 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { MeasureUnit, parseThreshold, perUnit, quantityInput, unitSymbol } from '../core/measure';
 import { parseFcfa } from '../core/money';
 import { ImageService } from '../core/image';
 import { ScanService } from '../services/scan.service';
@@ -67,17 +68,25 @@ interface FieldErrors {
           <label class="field-label mt-4" for="categorie">Catégorie (facultatif)</label>
           <input id="categorie" class="field" type="text" maxlength="100" autocomplete="off" [value]="category()" (input)="category.set($any($event.target).value)" />
 
-          <label class="field-label mt-4" for="prix-vente">Prix de vente (FCFA)</label>
+          <label class="field-label mt-4" for="unite">Vendu</label>
+          <select id="unite" class="field" disabled aria-describedby="unite-aide">
+            <option selected>{{ unitName() }}</option>
+          </select>
+          <p id="unite-aide" class="field-help">
+            Cette unité ne peut plus changer : le stock et les ventes de ce produit sont comptés avec elle. Pour vendre autrement, créez un nouveau produit.
+          </p>
+
+          <label class="field-label mt-4" for="prix-vente">Prix de vente (FCFA{{ priceUnit() }})</label>
           <input id="prix-vente" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="salePrice()" (input)="salePrice.set($any($event.target).value)" [attr.aria-invalid]="errors().salePrice ? 'true' : null" aria-describedby="prix-vente-erreur" />
           <p id="prix-vente-erreur" class="field-error">{{ errors().salePrice }}</p>
 
-          <label class="field-label mt-4" for="prix-achat">Prix d’achat moyen (FCFA)</label>
+          <label class="field-label mt-4" for="prix-achat">Prix d’achat moyen (FCFA{{ priceUnit() }})</label>
           <input id="prix-achat" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="purchasePrice()" (input)="purchasePrice.set($any($event.target).value)" [attr.aria-invalid]="errors().purchasePrice ? 'true' : null" aria-describedby="prix-achat-aide prix-achat-erreur" />
           <p id="prix-achat-aide" class="field-help">Recalculé à chaque réception où vous indiquez le prix de la livraison. Le modifier ici le remplace.</p>
           <p id="prix-achat-erreur" class="field-error">{{ errors().purchasePrice }}</p>
 
-          <label class="field-label mt-4" for="seuil">Seuil d’alerte de stock</label>
-          <input id="seuil" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="threshold()" (input)="threshold.set($any($event.target).value)" [attr.aria-invalid]="errors().threshold ? 'true' : null" aria-describedby="seuil-aide seuil-erreur" />
+          <label class="field-label mt-4" for="seuil">Seuil d’alerte de stock{{ thresholdUnit() }}</label>
+          <input id="seuil" class="field amount text-right" type="text" [attr.inputmode]="unit() === 'Piece' ? 'numeric' : 'decimal'" autocomplete="off" [value]="threshold()" (input)="threshold.set($any($event.target).value)" [attr.aria-invalid]="errors().threshold ? 'true' : null" aria-describedby="seuil-aide seuil-erreur" />
           <p id="seuil-aide" class="field-help">Une alerte apparaît quand le stock atteint ce nombre. 0 : pas d’alerte.</p>
           <p id="seuil-erreur" class="field-error">{{ errors().threshold }}</p>
 
@@ -156,6 +165,10 @@ export class ProductFormPage implements OnInit {
   protected readonly purchasePrice = signal('0');
   protected readonly threshold = signal('0');
   protected readonly tracksStock = signal(true);
+  protected readonly unit = signal<MeasureUnit>('Piece');
+  protected readonly unitName = computed(() => (this.unit() === 'Kilogram' ? 'Au poids (kg)' : this.unit() === 'Litre' ? 'À la mesure (litre)' : 'À la pièce'));
+  protected readonly priceUnit = computed(() => perUnit(this.unit()));
+  protected readonly thresholdUnit = computed(() => (this.unit() === 'Piece' ? '' : ` (en ${unitSymbol(this.unit())})`));
 
   constructor() {
     // Lecteur de codes-barres (ADR 0015) : un scan dans la zone « Code-barres » la remplit, et Entrée n'enregistre pas la fiche.
@@ -201,7 +214,8 @@ export class ProductFormPage implements OnInit {
     this.category.set(product.category ?? '');
     this.salePrice.set(String(product.salePriceFcfa));
     this.purchasePrice.set(String(product.purchasePriceFcfa ?? 0));
-    this.threshold.set(String(product.alertThreshold));
+    this.unit.set(product.unit ?? 'Piece');
+    this.threshold.set(quantityInput(product.alertThreshold, this.unit()));
     this.tracksStock.set(product.tracksStock);
     this.active.set(product.isActive);
   }
@@ -306,13 +320,14 @@ export class ProductFormPage implements OnInit {
       salePriceFcfa: number;
       alertThreshold: number;
       formatLabel: string | null;
+      unit: MeasureUnit;
     } | null;
   } {
     const errors: FieldErrors = {};
     const name = this.name().trim();
     const salePrice = parseFcfa(this.salePrice());
     const purchasePrice = parseFcfa(this.purchasePrice());
-    const threshold = parseFcfa(this.threshold());
+    const threshold = parseThreshold(this.threshold(), this.unit());
 
     const label = this.label().split(/\s+/).filter(Boolean).join(' ');
     if (name === '') {
@@ -327,10 +342,10 @@ export class ProductFormPage implements OnInit {
     if (purchasePrice === null) {
       errors.purchasePrice = 'Saisissez le prix d’achat en chiffres, sans virgule (0 s’il est inconnu).';
     }
-    if (threshold === null) {
-      errors.threshold = 'Saisissez le seuil en chiffres entiers (0 pour aucune alerte).';
+    if (!threshold.ok) {
+      errors.threshold = threshold.message;
     }
-    if (Object.keys(errors).length > 0 || salePrice === null || purchasePrice === null || threshold === null) {
+    if (Object.keys(errors).length > 0 || salePrice === null || purchasePrice === null || !threshold.ok) {
       return { errors, input: null };
     }
     return {
@@ -341,8 +356,9 @@ export class ProductFormPage implements OnInit {
         category: this.category().trim() || null,
         purchasePriceFcfa: purchasePrice,
         salePriceFcfa: salePrice,
-        alertThreshold: threshold,
+        alertThreshold: threshold.quantity,
         formatLabel: label === '' ? null : label,
+        unit: this.unit(),
       },
     };
   }

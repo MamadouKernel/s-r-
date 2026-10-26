@@ -56,6 +56,33 @@ export function parseQuantity(text: string, unit: MeasureUnit): QuantityParse {
   return quantity > MAX_QUANTITY ? { ok: false, message: `${noun(unit) === 'poids' ? 'Ce poids' : 'Cette quantité'} est trop grand${noun(unit) === 'poids' ? '' : 'e'}.` } : { ok: true, quantity };
 }
 
+/** Un seuil ou un stock de départ : comme `parseQuantity`, mais 0 est permis (« pas d'alerte »). */
+export function parseThreshold(text: string, unit: MeasureUnit): QuantityParse {
+  const cleaned = text.replace(/[\s ]/g, '').replace(',', '.');
+  if (cleaned === '' || /^0*(\.0*)?$/.test(cleaned)) {
+    return { ok: true, quantity: 0 };
+  }
+  const parsed = parseQuantity(cleaned, unit);
+  return parsed.ok ? parsed : { ok: false, message: unit === 'Piece' ? 'Saisissez le seuil en chiffres entiers (0 pour aucune alerte).' : parsed.message };
+}
+
+/** La quantité telle qu'on la retape dans un champ : « 12,5 » pour 12 500 g, « 3 » pour 3 pièces (sans l'unité). */
+export function quantityInput(quantity: number, unit: MeasureUnit = 'Piece'): string {
+  if (unit === 'Piece') {
+    return String(quantity);
+  }
+  const whole = Math.floor(quantity / 1000);
+  const fraction = String(quantity % 1000)
+    .padStart(3, '0')
+    .replace(/0+$/, '');
+  return fraction === '' ? String(whole) : `${whole},${fraction}`;
+}
+
+/** « par kg », « par litre » : à côté d'un prix de vente ; rien pour une pièce. */
+export function perUnit(unit: MeasureUnit = 'Piece'): string {
+  return unit === 'Kilogram' ? ' par kg' : unit === 'Litre' ? ' par litre' : '';
+}
+
 /** Total d'une ligne : prix d'une unité × quantité, arrondi au franc, demi vers le haut. Le même calcul que le serveur. */
 export function lineTotal(unitPriceFcfa: number, quantity: number, unit: MeasureUnit = 'Piece'): number {
   const scale = scaleOf(unit);

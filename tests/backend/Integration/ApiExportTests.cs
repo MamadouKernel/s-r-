@@ -28,6 +28,7 @@ public class ExportWriterTests
         [
             new ProductExportRow("Eau minérale", "1 L", "Boissons", "6111000000011", 180, 300, 3, 5, true, true),
             new ProductExportRow("Ancien produit", null, null, null, 0, 100, 0, 0, false, false),
+            new ProductExportRow("Riz en vrac", null, null, null, 450, 600, 12_500, 2_250, true, true, MeasureUnit.Kilogram),
         ],
         [new CustomerExportRow("=1+1", "+225 07 07 07 07 07", 20_000, 1_500, true)],
         [new RepaymentExportRow(At, "=1+1", 500, PaymentMethod.Wave, "W-1", "Awa Koné")],
@@ -38,6 +39,7 @@ public class ExportWriterTests
         [
             new SaleLineExportRow("15/10/2026 08:05 · ticket 7 · Awa Koné", At, 7, "Eau minérale · 1 L", 2, 300, 600, 180),
             new SaleLineExportRow("15/10/2026 08:05 · ticket 7 · Awa Koné", At, 7, "Savon", 1, 50, 50, null),
+            new SaleLineExportRow("15/10/2026 08:05 · ticket 7 · Awa Koné", At, 7, "Riz en vrac", 1_250, 600, 750, 450, MeasureUnit.Kilogram),
         ],
         [new MovementExportRow(At, "Eau minérale · 1 L", StockMovementKind.Reception, 24, "Grossiste Koné", 180, "Awa Koné")]);
 
@@ -52,14 +54,14 @@ public class ExportWriterTests
         using var workbook = Open(Sample());
 
         Assert.Equal(["Lisez-moi", "Produits", "Clients", "Versements", "Ventes", "Lignes de vente", "Mouvements de stock"], workbook.Worksheets.Select(sheet => sheet.Name).ToArray());
-        Assert.Equal(["Produit", "Format", "Catégorie", "Code-barres", "Prix d'achat", "Prix de vente", "Stock", "Alerte stock", "Suivi du stock", "État"], Headers(workbook.Worksheet("Produits")));
+        Assert.Equal(["Produit", "Format", "Catégorie", "Code-barres", "Prix d'achat", "Prix de vente", "Stock", "Alerte stock", "Suivi du stock", "État", "Unité"], Headers(workbook.Worksheet("Produits")));
         Assert.Equal(["Nom", "Téléphone", "Plafond de crédit", "Dette", "État"], Headers(workbook.Worksheet("Clients")));
         Assert.Equal(["Date et heure", "Client", "Montant", "Moyen", "Référence", "Encaissé par"], Headers(workbook.Worksheet("Versements")));
         Assert.Equal(
             ["Vente", "Date et heure", "N° de ticket", "Caissier", "Client", "Total brut", "Remise", "Total net", "Moyens de paiement", "État", "Motif d'annulation"],
             Headers(workbook.Worksheet("Ventes")));
-        Assert.Equal(["Vente", "Date et heure", "N° de ticket", "Produit", "Quantité", "Prix unitaire", "Total", "Coût unitaire retenu"], Headers(workbook.Worksheet("Lignes de vente")));
-        Assert.Equal(["Date et heure", "Produit", "Type", "Quantité", "Fournisseur ou motif", "Coût unitaire", "Fait par"], Headers(workbook.Worksheet("Mouvements de stock")));
+        Assert.Equal(["Vente", "Date et heure", "N° de ticket", "Produit", "Quantité", "Prix unitaire", "Total", "Coût unitaire retenu", "Unité"], Headers(workbook.Worksheet("Lignes de vente")));
+        Assert.Equal(["Date et heure", "Produit", "Type", "Quantité", "Fournisseur ou motif", "Coût unitaire", "Fait par", "Unité"], Headers(workbook.Worksheet("Mouvements de stock")));
     }
 
     [Fact]
@@ -119,6 +121,22 @@ public class ExportWriterTests
     }
 
     [Fact]
+    public void Weighed_quantities_are_written_in_kilos_with_their_unit_never_in_grams()
+    {
+        using var workbook = Open(Sample());
+
+        var products = workbook.Worksheet("Produits");
+        Assert.Equal(12.5d, products.Cell(4, 7).GetDouble());
+        Assert.Equal(2.25d, products.Cell(4, 8).GetDouble());
+        Assert.Equal("kg", products.Cell(4, 11).GetString());
+        Assert.Equal("pièce", products.Cell(2, 11).GetString());
+        var lines = workbook.Worksheet("Lignes de vente");
+        Assert.Equal(1.25d, lines.Cell(4, 5).GetDouble());
+        Assert.Equal(750d, lines.Cell(4, 7).GetDouble());
+        Assert.Equal("kg", lines.Cell(4, 9).GetString());
+    }
+
+    [Fact]
     public void Movements_and_repayments_are_named_in_french()
     {
         using var workbook = Open(Sample());
@@ -167,7 +185,7 @@ public class ExportWriterTests
         Assert.Contains("25/10/2026 à 17:30", text, StringComparison.Ordinal);
         Assert.Contains("du 01/10/2026 au 31/10/2026", text, StringComparison.Ordinal);
         Assert.Contains("Ventes : 2 lignes", text, StringComparison.Ordinal);
-        Assert.Contains("Lignes de vente : 2 lignes", text, StringComparison.Ordinal);
+        Assert.Contains("Lignes de vente : 3 lignes", text, StringComparison.Ordinal);
         Assert.Contains("Côte d'Ivoire", text, StringComparison.Ordinal);
         Assert.Contains("numéros de téléphone de vos clients", text, StringComparison.Ordinal);
     }

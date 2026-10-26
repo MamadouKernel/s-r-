@@ -187,13 +187,15 @@ public sealed class ClosedXmlProductTemplateWriter : IProductTemplateWriter
             "• « Prix d'achat », « Prix de vente », « Alerte stock », « Stock de départ » : des nombres entiers, sans virgule. Le prix de vente est obligatoire.",
             "• « Stock de départ » : la quantité que vous avez aujourd'hui. Elle est enregistrée comme une première réception.",
             "• « Suivi du stock » : Oui (par défaut) ou Non pour une prestation sans stock (coupe, réparation…).",
+            "• « Unité » (facultatif) : pièce (par défaut), kg ou litre. Pour un produit vendu au poids ou à la mesure, le prix est celui d'un kg ou d'un litre, et « Alerte stock » et « Stock de départ » peuvent avoir une virgule (12,5).",
             "• Un produit déjà dans votre catalogue n'est jamais modifié : sa ligne est simplement ignorée.",
             string.Empty,
             "Exemple (à ne pas recopier tel quel) :",
-            "Nom du produit | Format | Catégorie | Code-barres | Prix d'achat | Prix de vente | Alerte stock | Stock de départ | Suivi du stock",
-            "Riz parfumé | 5 kg | Épicerie | 6111000000011 | 2400 | 3200 | 5 | 20 | Oui",
-            "Riz parfumé | 25 kg | Épicerie |  | 11500 | 14500 | 2 | 6 | Oui",
-            "Sel fin |  | Épicerie |  | 120 | 200 | 5 | 40 | Oui",
+            "Nom du produit | Format | Catégorie | Code-barres | Prix d'achat | Prix de vente | Alerte stock | Stock de départ | Suivi du stock | Unité",
+            "Riz parfumé | 5 kg | Épicerie | 6111000000011 | 2400 | 3200 | 5 | 20 | Oui | pièce",
+            "Riz parfumé | 25 kg | Épicerie |  | 11500 | 14500 | 2 | 6 | Oui | pièce",
+            "Sel fin |  | Épicerie |  | 120 | 200 | 5 | 40 | Oui | pièce",
+            "Riz en vrac |  | Épicerie |  | 450 | 600 | 10 | 120,5 | Oui | kg",
         };
         for (var index = 0; index < lines.Length; index++)
         {
@@ -203,7 +205,7 @@ public sealed class ClosedXmlProductTemplateWriter : IProductTemplateWriter
         }
 
         guide.Cell(1, 1).Style.Font.Bold = true;
-        guide.Cell(11, 1).Style.Font.Bold = true;
+        guide.Cell(12, 1).Style.Font.Bold = true;
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);

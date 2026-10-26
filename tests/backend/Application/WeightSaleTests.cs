@@ -201,3 +201,58 @@ public class ProductUnitManagementTests
         Assert.Equal(MeasureUnit.Piece, product.Unit);
     }
 }
+
+public class FamilyUnitTests
+{
+    private static FormatInput Format(string? label, MeasureUnit unit, long sale = 800, long threshold = 0) =>
+        new(ProductId.New(), label, null, 600, sale, (int)threshold, true) { Unit = unit };
+
+    private static TestWorld AsManager()
+    {
+        var world = new TestWorld();
+        world.ActAs(world.Manager, Role.Manager);
+        return world;
+    }
+
+    [Fact]
+    public async Task A_family_can_mix_a_bag_sold_whole_and_the_same_rice_sold_by_the_kilo()
+    {
+        var world = AsManager();
+        var bag = Format("Sac de 25 kg", MeasureUnit.Piece, sale: 17_500);
+        var loose = Format("Au kilo", MeasureUnit.Kilogram, sale: 800);
+
+        var result = await world.CreateFamily.HandleAsync(new CreateFamilyCommand(FamilyId.New(), "Riz parfumé", "Épicerie", [bag, loose]));
+
+        Assert.True(result.IsSuccess);
+        var stored = await world.Products.ListAsync(world.Tenant, null, true, CancellationToken.None);
+        Assert.Equal(MeasureUnit.Piece, stored.Single(product => product.Id == bag.Id).Unit);
+        Assert.Equal(MeasureUnit.Kilogram, stored.Single(product => product.Id == loose.Id).Unit);
+    }
+
+    [Fact]
+    public async Task A_single_product_created_by_the_litre_keeps_its_unit_and_its_threshold_in_millilitres()
+    {
+        var world = AsManager();
+        var oil = Format(null, MeasureUnit.Litre, sale: 1_500, threshold: 5_000); // alerte à 5 litres
+
+        await world.CreateFamily.HandleAsync(new CreateFamilyCommand(FamilyId.New(), "Huile", "Épicerie", [oil]));
+
+        var product = (await world.Products.ListAsync(world.Tenant, null, true, CancellationToken.None)).Single();
+        Assert.Equal(MeasureUnit.Litre, product.Unit);
+        Assert.Equal(5_000, product.AlertThreshold);
+    }
+
+    [Fact]
+    public async Task A_format_added_later_can_have_its_own_unit()
+    {
+        var world = AsManager();
+        var family = FamilyId.New();
+        await world.CreateFamily.HandleAsync(new CreateFamilyCommand(family, "Sucre", "Épicerie", [Format("Sachet", MeasureUnit.Piece, sale: 100)]));
+
+        var added = await world.AddFormat.HandleAsync(new AddFormatCommand(family, Format("Au kilo", MeasureUnit.Kilogram, sale: 700), null));
+
+        Assert.True(added.IsSuccess);
+        var loose = (await world.Products.ListAsync(world.Tenant, null, true, CancellationToken.None)).Single(product => product.FormatLabel == "Au kilo");
+        Assert.Equal(MeasureUnit.Kilogram, loose.Unit);
+    }
+}

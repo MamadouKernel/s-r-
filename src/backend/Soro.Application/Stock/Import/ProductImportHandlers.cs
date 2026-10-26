@@ -255,7 +255,8 @@ public sealed class ImportProductsHandler(
             format.TracksStock,
             clock.UtcNow,
             family.Id,
-            format.Label);
+            format.Label,
+            format.Unit);
         if (format.InitialStock <= 0)
         {
             await products.AddAsync(product, cancellationToken);

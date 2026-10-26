@@ -15,6 +15,7 @@ public enum ImportColumn
     AlertThreshold,
     InitialStock,
     TracksStock,
+    Unit,
 }
 
 public static class ImportColumns
@@ -32,7 +33,8 @@ public static class ImportColumns
         ImportColumn.SalePrice => "Prix de vente",
         ImportColumn.AlertThreshold => "Alerte stock",
         ImportColumn.InitialStock => "Stock de départ",
-        _ => "Suivi du stock",
+        ImportColumn.TracksStock => "Suivi du stock",
+        _ => "Unité",
     };
 
     private static readonly Dictionary<string, ImportColumn> Aliases = new()
@@ -48,6 +50,7 @@ public static class ImportColumns
         ["stockdedepart"] = ImportColumn.InitialStock, ["stockdepart"] = ImportColumn.InitialStock, ["stockinitial"] = ImportColumn.InitialStock,
         ["stock"] = ImportColumn.InitialStock, ["quantite"] = ImportColumn.InitialStock,
         ["suividustock"] = ImportColumn.TracksStock, ["suivistock"] = ImportColumn.TracksStock, ["suivi"] = ImportColumn.TracksStock,
+        ["unite"] = ImportColumn.Unit, ["unit"] = ImportColumn.Unit, ["vendupar"] = ImportColumn.Unit,
     };
 
     /// <summary>Reconnaît un en-tête sans tenir compte de la casse, des accents, des espaces ni des apostrophes.</summary>

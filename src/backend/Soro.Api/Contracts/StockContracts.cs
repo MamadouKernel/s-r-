@@ -86,6 +86,9 @@ public sealed record FormatRequest
     public int AlertThreshold { get; init; }
 
     public bool TracksStock { get; init; } = true;
+
+    /// <summary>Unité de vente du format : pièce (par défaut), kilogramme ou litre.</summary>
+    public MeasureUnit Unit { get; init; } = MeasureUnit.Piece;
 }
 
 public sealed record CreateFamilyRequest

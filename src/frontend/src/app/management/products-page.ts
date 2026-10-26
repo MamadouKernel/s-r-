@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { formatQuantity, perUnit } from '../core/measure';
 import { formatFcfa } from '../core/money';
 import { AuthService } from '../services/auth.service';
 import { NetworkService } from '../services/network.service';
@@ -123,11 +124,11 @@ import { ProductAvatar } from '../shared/product-avatar';
                         }
                       }
                     </th>
-                    <td class="amount px-3 py-3 text-right">{{ format(product.salePriceFcfa) }}</td>
+                    <td class="amount px-3 py-3 text-right">{{ format(product.salePriceFcfa) }}{{ perUnit(product.unit) }}</td>
                     @if (showPurchase()) {
                       <td class="amount px-3 py-3 text-right">{{ product.purchasePriceFcfa === null ? '—' : format(product.purchasePriceFcfa) }}</td>
                     }
-                    <td class="amount px-3 py-3 text-right">{{ product.tracksStock ? product.quantityOnHand : '—' }}</td>
+                    <td class="amount px-3 py-3 text-right">{{ product.tracksStock ? quantity(product) : '—' }}</td>
                     <td class="px-3 py-3">
                       <span class="font-semibold" [class.text-erreur]="stockState(product) === 'Rupture de stock'" [class.text-avertissement]="stockState(product) === 'Stock bas'">
                         {{ stockState(product) }}
@@ -180,6 +181,11 @@ export class ProductsPage implements OnInit {
   protected readonly columns = computed(() => (this.showPurchase() ? 6 : 5));
   protected readonly showPurchase = computed(() => this.products().some((product) => product.purchasePriceFcfa !== null));
   protected format = formatFcfa;
+  protected perUnit = perUnit;
+
+  protected quantity(product: ManagedProduct): string {
+    return formatQuantity(product.quantityOnHand, product.unit);
+  }
 
   async ngOnInit(): Promise<void> {
     this.flash.set(this.flashService.consume());

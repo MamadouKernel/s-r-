@@ -41,6 +41,22 @@ describe('FamilyFormPage', () => {
     expect(page.flash.current()).toBe('Produit créé.');
   });
 
+  it('creates a product sold by weight: price per kilo, threshold in kilos sent in grams', async () => {
+    const api = fakeApi();
+    const page = await render(FamilyFormPage, { api });
+    await page.type('#nom', 'Riz en vrac');
+    await page.select('#f0-unite', 'Kilogram');
+    expect(page.has('Prix de vente (FCFA par kg)')).toBe(true);
+    expect(page.has('Alerte quand il reste (en kg)')).toBe(true);
+    await fillFormat(page, 0, { buy: '450', sell: '600', threshold: '2,5' });
+
+    await page.submit();
+
+    expect(api.createFamily.mock.calls[0][0].formats).toEqual([
+      expect.objectContaining({ unit: 'Kilogram', salePriceFcfa: 600, alertThreshold: 2500 }),
+    ]);
+  });
+
   it('creates the rice with three formats in one operation', async () => {
     const api = fakeApi();
     const page = await render(FamilyFormPage, { api });

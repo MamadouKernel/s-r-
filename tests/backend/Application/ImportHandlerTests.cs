@@ -50,6 +50,20 @@ public class ImportHandlerTests
     }
 
     [Fact]
+    public async Task A_weighed_product_is_created_with_its_unit_and_stock_in_grams()
+    {
+        var world = ManagerWorld(Row.At(2, "Riz en vrac", sell: "600", buy: "450", unit: "kg", stock: "120,5", alert: "10"));
+
+        var result = await world.ImportProducts.HandleAsync(new ImportProductsCommand(Guid.NewGuid(), File));
+
+        Assert.True(result.IsSuccess);
+        var rice = Assert.Single(await AllAsync(world));
+        Assert.Equal(MeasureUnit.Kilogram, rice.Unit);
+        Assert.Equal(120_500, rice.QuantityOnHand);
+        Assert.Equal(10_000, rice.AlertThreshold);
+    }
+
+    [Fact]
     public async Task A_starting_stock_becomes_a_reception_that_sets_the_average_cost()
     {
         var world = ManagerWorld(RiceAndSalt());

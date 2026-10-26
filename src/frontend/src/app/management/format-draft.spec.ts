@@ -9,8 +9,19 @@ describe('validateFormats', () => {
     const result = validateFormats([draft({ label: '  1,5   L ', barcode: ' 611 ', salePrice: '1 200' })]);
 
     expect(result.inputs).toEqual([
-      { productId: expect.stringMatching(/^[0-9a-f-]{36}$/), label: '1,5 L', barcode: '611', purchasePriceFcfa: 180, salePriceFcfa: 1200, alertThreshold: 3, tracksStock: true },
+      { productId: expect.stringMatching(/^[0-9a-f-]{36}$/), label: '1,5 L', barcode: '611', purchasePriceFcfa: 180, salePriceFcfa: 1200, alertThreshold: 3, tracksStock: true, unit: 'Piece' },
     ]);
+  });
+
+  it('reads the threshold of a weighed product in the unit and keeps it in grams', () => {
+    const result = validateFormats([draft({ unit: 'Kilogram', salePrice: '600', threshold: '2,5' })]);
+
+    expect(result.inputs?.[0]).toMatchObject({ unit: 'Kilogram', alertThreshold: 2500, salePriceFcfa: 600 });
+  });
+
+  it('refuses a threshold with four decimals for a weighed product, and decimals for pieces', () => {
+    expect(validateFormats([draft({ unit: 'Kilogram', threshold: '1,2345' })]).errors[0].threshold).toBeTruthy();
+    expect(validateFormats([draft({ unit: 'Piece', threshold: '1,5' })]).errors[0].threshold).toContain('entiers');
   });
 
   it('lets a single format go without a label', () => {

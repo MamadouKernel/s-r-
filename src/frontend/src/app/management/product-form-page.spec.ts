@@ -25,9 +25,26 @@ describe('ProductFormPage: edition', () => {
     await page.submit();
 
     expect(api.update).toHaveBeenCalledWith('p-9', {
-      name: "Jus d'orange 1L", barcode: '111', category: 'Boissons', purchasePriceFcfa: 400, salePriceFcfa: 700, alertThreshold: 5, formatLabel: null,
+      name: "Jus d'orange 1L", barcode: '111', category: 'Boissons', purchasePriceFcfa: 400, salePriceFcfa: 700, alertThreshold: 5, formatLabel: null, unit: 'Piece',
     });
     expect(page.flash.current()).toBe('Produit modifié.');
+  });
+
+  it('shows the unit of a weighed product as fixed, with the reason, and the threshold in kilos', async () => {
+    const api = fakeApi();
+    api.list.mockResolvedValue([product({ id: 'p-9', unit: 'Kilogram', salePriceFcfa: 600, alertThreshold: 2_500, quantityOnHand: 12_000 })]);
+    const page = await render(ProductFormPage, { api, params: { id: 'p-9' } });
+
+    expect(page.root.querySelector<HTMLSelectElement>('#unite')!.disabled).toBe(true);
+    expect(page.has('Au poids (kg)')).toBe(true);
+    expect(page.has('Cette unité ne peut plus changer')).toBe(true);
+    expect(page.has('Prix de vente (FCFA par kg)')).toBe(true);
+    expect(page.root.querySelector<HTMLInputElement>('#seuil')!.value).toBe('2,5');
+
+    await page.type('#seuil', '3');
+    await page.submit();
+
+    expect(api.update).toHaveBeenCalledWith('p-9', expect.objectContaining({ alertThreshold: 3_000, unit: 'Kilogram' }));
   });
 
   it('says so when the product does not exist', async () => {

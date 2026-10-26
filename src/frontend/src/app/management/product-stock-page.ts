@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { formatQuantity, MeasureUnit, parseQuantity, unitSymbol } from '../core/measure';
 import { formatFcfa, parseFcfa } from '../core/money';
 import { AuthService } from '../services/auth.service';
 import { describeError } from './errors';
@@ -28,11 +29,11 @@ const KIND_LABEL: Record<MovementKind, string> = {
       } @else if (product(); as current) {
         <h2 id="stock-titre" class="text-xl font-bold">{{ current.name }}</h2>
         <p class="amount mt-1 text-2xl font-bold" [class.text-erreur]="current.quantityOnHand <= 0">
-          Stock : {{ current.quantityOnHand }}
+          Stock : {{ quantity(current.quantityOnHand) }}
           @if (current.quantityOnHand <= 0) {
             <span class="text-base">· rupture de stock</span>
           } @else if (current.isLowStock) {
-            <span class="text-base text-avertissement">· stock bas (seuil {{ current.alertThreshold }})</span>
+            <span class="text-base text-avertissement">· stock bas (seuil {{ quantity(current.alertThreshold) }})</span>
           }
         </p>
 
@@ -45,8 +46,8 @@ const KIND_LABEL: Record<MovementKind, string> = {
         <div class="mt-4 grid gap-4 lg:grid-cols-2">
           <form class="panel" (submit)="receive($event)" novalidate aria-labelledby="reception-titre">
             <h3 id="reception-titre" class="text-lg font-bold">Réception de marchandise</h3>
-            <label class="field-label mt-3" for="reception-quantite">Quantité reçue</label>
-            <input id="reception-quantite" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="receiveQuantity()" (input)="receiveQuantity.set($any($event.target).value)" />
+            <label class="field-label mt-3" for="reception-quantite">Quantité reçue{{ unitHint() }}</label>
+            <input id="reception-quantite" class="field amount text-right" type="text" [attr.inputmode]="inputMode()" autocomplete="off" [value]="receiveQuantity()" (input)="receiveQuantity.set($any($event.target).value)" />
             <label class="field-label mt-3" for="reception-fournisseur">Fournisseur ou référence (facultatif)</label>
             <input id="reception-fournisseur" class="field" type="text" maxlength="500" autocomplete="off" [value]="supplier()" (input)="supplier.set($any($event.target).value)" />
             @if (current.purchasePriceFcfa !== null) {
@@ -62,9 +63,9 @@ const KIND_LABEL: Record<MovementKind, string> = {
 
           <form class="panel" (submit)="loss($event)" novalidate aria-labelledby="perte-titre">
             <h3 id="perte-titre" class="text-lg font-bold">Perte ou casse</h3>
-            <label class="field-label mt-3" for="perte-quantite">Quantité perdue</label>
-            <input id="perte-quantite" class="field amount text-right" type="text" inputmode="numeric" autocomplete="off" [value]="lossQuantity()" (input)="lossQuantity.set($any($event.target).value)" aria-describedby="perte-aide" />
-            <p id="perte-aide" class="field-help">Au plus {{ current.quantityOnHand }} (le stock disponible).</p>
+            <label class="field-label mt-3" for="perte-quantite">Quantité perdue{{ unitHint() }}</label>
+            <input id="perte-quantite" class="field amount text-right" type="text" [attr.inputmode]="inputMode()" autocomplete="off" [value]="lossQuantity()" (input)="lossQuantity.set($any($event.target).value)" aria-describedby="perte-aide" />
+            <p id="perte-aide" class="field-help">Au plus {{ quantity(current.quantityOnHand) }} (le stock disponible).</p>
             <label class="field-label mt-3" for="perte-motif">Motif (obligatoire)</label>
             <input id="perte-motif" class="field" type="text" maxlength="500" autocomplete="off" [value]="reason()" (input)="reason.set($any($event.target).value)" />
             <p class="field-help">Par exemple : périmé, cassé, consommation interne.</p>
@@ -98,11 +99,11 @@ const KIND_LABEL: Record<MovementKind, string> = {
                     <tr>
                       <td class="px-3 py-2">{{ date(movement.at) }}</td>
                       <td class="px-3 py-2 font-semibold">{{ kind(movement) }}</td>
-                      <td class="amount px-3 py-2 text-right font-bold">{{ movement.quantityDelta > 0 ? '+' : '' }}{{ movement.quantityDelta }}</td>
+                      <td class="amount px-3 py-2 text-right font-bold">{{ movement.quantityDelta > 0 ? '+' : '' }}{{ quantity(movement.quantityDelta) }}</td>
                       <td class="px-3 py-2">
                         {{ movement.reason || '—' }}
                         @if (movement.unitCostFcfa != null) {
-                          <span class="block text-sm text-ardoise">à {{ format(movement.unitCostFcfa) }} l’unité</span>
+                          <span class="block text-sm text-ardoise">à {{ format(movement.unitCostFcfa) }} {{ costPer() }}</span>
                         }
                       </td>
                       <td class="px-3 py-2">{{ author(movement) }}</td>
@@ -151,6 +152,16 @@ export class ProductStockPage implements OnInit {
   protected readonly id = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
   protected format = formatFcfa;
 
+  protected readonly unit = computed<MeasureUnit>(() => this.product()?.unit ?? 'Piece');
+  protected readonly unitHint = computed(() => (this.unit() === 'Piece' ? '' : ` (en ${unitSymbol(this.unit())})`));
+  protected readonly inputMode = computed(() => (this.unit() === 'Piece' ? 'numeric' : 'decimal'));
+  protected readonly costPer = computed(() => (this.unit() === 'Piece' ? 'l’unité' : `le ${unitSymbol(this.unit()) === 'kg' ? 'kilo' : 'litre'}`));
+
+  /** Une quantité du produit, dans son unité : « 12,500 kg » pour un produit pesé, « 12 » pour des pièces. */
+  protected quantity(value: number): string {
+    return formatQuantity(value, this.unit());
+  }
+
   async ngOnInit(): Promise<void> {
     await this.refresh();
     this.loading.set(false);
@@ -162,11 +173,12 @@ export class ProductStockPage implements OnInit {
       return;
     }
     this.receiveError.set('');
-    const quantity = positiveInteger(this.receiveQuantity());
-    if (quantity === null) {
-      this.receiveError.set('Saisissez la quantité reçue en chiffres entiers, supérieure à zéro.');
+    const parsed = parseQuantity(this.receiveQuantity(), this.unit());
+    if (!parsed.ok) {
+      this.receiveError.set(this.unit() === 'Piece' ? 'Saisissez la quantité reçue en chiffres entiers, supérieure à zéro.' : parsed.message);
       return;
     }
+    const quantity = parsed.quantity;
     const priceText = this.newPurchasePrice().trim();
     const price = priceText === '' ? null : parseFcfa(priceText);
     if (priceText !== '' && price === null) {
@@ -188,7 +200,7 @@ export class ProductStockPage implements OnInit {
         this.newPurchasePrice.set('');
         const average = result.purchasePriceFcfa;
         this.notice.set(
-          `Réception enregistrée. Stock : ${result.quantityOnHand}.` +
+          `Réception enregistrée. Stock : ${this.quantity(result.quantityOnHand)}.` +
             (price !== null && average != null ? ` Prix d’achat moyen : ${formatFcfa(average)}.` : ''),
         );
       },
@@ -202,18 +214,19 @@ export class ProductStockPage implements OnInit {
       return;
     }
     this.lossError.set('');
-    const quantity = positiveInteger(this.lossQuantity());
-    if (quantity === null) {
-      this.lossError.set('Saisissez la quantité perdue en chiffres entiers, supérieure à zéro.');
+    const parsed = parseQuantity(this.lossQuantity(), this.unit());
+    if (!parsed.ok) {
+      this.lossError.set(this.unit() === 'Piece' ? 'Saisissez la quantité perdue en chiffres entiers, supérieure à zéro.' : parsed.message);
       return;
     }
+    const quantity = parsed.quantity;
     if (this.reason().trim() === '') {
       this.lossError.set('Le motif de la perte est obligatoire.');
       return;
     }
     const available = this.product()?.quantityOnHand ?? 0;
     if (quantity > available) {
-      this.lossError.set(`La perte dépasse le stock disponible (${available}).`);
+      this.lossError.set(`La perte dépasse le stock disponible (${this.quantity(available)}).`);
       return;
     }
 
@@ -223,7 +236,7 @@ export class ProductStockPage implements OnInit {
         this.lossId = crypto.randomUUID();
         this.lossQuantity.set('');
         this.reason.set('');
-        this.notice.set(`Perte enregistrée. Stock : ${result.quantityOnHand}.`);
+        this.notice.set(`Perte enregistrée. Stock : ${this.quantity(result.quantityOnHand)}.`);
       },
       (message) => this.lossError.set(message),
     );
@@ -277,9 +290,4 @@ export class ProductStockPage implements OnInit {
       this.loadError.set(describeError(error));
     }
   }
-}
-
-function positiveInteger(text: string): number | null {
-  const value = parseFcfa(text);
-  return value !== null && value > 0 ? value : null;
 }

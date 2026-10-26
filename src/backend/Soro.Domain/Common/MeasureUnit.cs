@@ -23,4 +23,12 @@ public static class MeasureUnits
         MeasureUnit.Litre => "L",
         _ => string.Empty,
     };
+
+    /// <summary>Le mot affiché dans les fichiers : « pièce », « kg », « litre ».</summary>
+    public static string Label(this MeasureUnit unit) => unit switch
+    {
+        MeasureUnit.Kilogram => "kg",
+        MeasureUnit.Litre => "litre",
+        _ => "pièce",
+    };
 }

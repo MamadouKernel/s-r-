@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { formatQuantity } from '../core/measure';
 import { formatFcfa } from '../core/money';
 import { describeVariance } from '../core/variance';
 import { describeError } from '../management/errors';
@@ -368,6 +369,14 @@ export class DashboardPage implements OnInit, OnDestroy {
     void this.refreshRanking();
   }
 
+  /** « 12 vendus » pour des pièces ; « 12,500 kg vendus » pour un produit pesé. */
+  private sold(item: ProductRanking): string {
+    if (item.unit && item.unit !== 'Piece') {
+      return `${formatQuantity(item.quantity, item.unit)} vendu${item.quantity > 1000 ? 's' : ''}`;
+    }
+    return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
+  }
+
   /** Premier chiffre de la ligne : celui du critère choisi. */
   protected headline(item: ProductRanking): string {
     switch (this.criterion()) {
@@ -376,7 +385,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       case 'margin':
         return item.marginFcfa === null ? 'marge inconnue' : formatFcfa(item.marginFcfa) + (item.marginIsEstimate ? ' (estimée)' : '');
       default:
-        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
+        return this.sold(item);
     }
   }
 
@@ -384,9 +393,9 @@ export class DashboardPage implements OnInit, OnDestroy {
   protected details(item: ProductRanking): string {
     switch (this.criterion()) {
       case 'revenue':
-        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''}`;
+        return this.sold(item);
       case 'margin':
-        return `${item.quantity} vendu${item.quantity > 1 ? 's' : ''} · ${formatFcfa(item.revenueFcfa)} de chiffre d’affaires`;
+        return `${this.sold(item)} · ${formatFcfa(item.revenueFcfa)} de chiffre d’affaires`;
       default:
         return `${formatFcfa(item.revenueFcfa)} de chiffre d’affaires`;
     }

@@ -20,7 +20,8 @@ public sealed record ExportCounts(int Products, int Customers, int Repayments, i
 }
 
 public sealed record ProductExportRow(
-    string Name, string? Format, string? Category, string? Barcode, long PurchasePriceFcfa, long SalePriceFcfa, int Stock, int Threshold, bool TracksStock, bool IsActive);
+    string Name, string? Format, string? Category, string? Barcode, long PurchasePriceFcfa, long SalePriceFcfa, int Stock, int Threshold, bool TracksStock, bool IsActive,
+    MeasureUnit Unit = MeasureUnit.Piece);
 
 public sealed record CustomerExportRow(string Name, string? Phone, long CreditCeilingFcfa, long DebtFcfa, bool IsActive);
 
@@ -39,9 +40,11 @@ public sealed record SaleExportRow(
     SaleStatus Status,
     string? CancelReason);
 
-public sealed record SaleLineExportRow(string Key, DateTimeOffset At, long Ticket, string Product, int Quantity, long UnitPriceFcfa, long TotalFcfa, long? UnitCostFcfa);
+public sealed record SaleLineExportRow(string Key, DateTimeOffset At, long Ticket, string Product, int Quantity, long UnitPriceFcfa, long TotalFcfa, long? UnitCostFcfa,
+    MeasureUnit Unit = MeasureUnit.Piece);
 
-public sealed record MovementExportRow(DateTimeOffset At, string Product, StockMovementKind Kind, int QuantityDelta, string? Reason, long? UnitCostFcfa, string By);
+public sealed record MovementExportRow(DateTimeOffset At, string Product, StockMovementKind Kind, int QuantityDelta, string? Reason, long? UnitCostFcfa, string By,
+    MeasureUnit Unit = MeasureUnit.Piece);
 
 /// <summary>Les données lues, sans aucun identifiant technique : tout est déjà en mots (docs/specs/export-donnees DON-02).</summary>
 public sealed record DataExportData(

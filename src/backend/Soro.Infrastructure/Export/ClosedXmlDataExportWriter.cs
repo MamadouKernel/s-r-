@@ -1,6 +1,7 @@
 using System.Globalization;
 using ClosedXML.Excel;
 using Soro.Application.Export;
+using Soro.Domain.Common;
 
 namespace Soro.Infrastructure.Export;
 
@@ -18,7 +19,7 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
         using var workbook = new XLWorkbook();
         ReadMe(workbook.Worksheets.Add("Lisez-moi"), data);
 
-        Table(workbook, "Produits", [("Produit", 30), ("Format", 14), ("Catégorie", 18), ("Code-barres", 18), ("Prix d'achat", 14), ("Prix de vente", 14), ("Stock", 10), ("Alerte stock", 12), ("Suivi du stock", 14), ("État", 12)],
+        Table(workbook, "Produits", [("Produit", 30), ("Format", 14), ("Catégorie", 18), ("Code-barres", 18), ("Prix d'achat", 14), ("Prix de vente", 14), ("Stock", 10), ("Alerte stock", 12), ("Suivi du stock", 14), ("État", 12), ("Unité", 10)],
             data.Products, (sheet, row, item) =>
             {
                 Text(sheet, row, 1, item.Name);
@@ -27,10 +28,11 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
                 Text(sheet, row, 4, item.Barcode);
                 Money(sheet, row, 5, item.PurchasePriceFcfa);
                 Money(sheet, row, 6, item.SalePriceFcfa);
-                sheet.Cell(row, 7).SetValue(item.Stock);
-                sheet.Cell(row, 8).SetValue(item.Threshold);
+                Quantity(sheet, row, 7, item.Stock, item.Unit);
+                Quantity(sheet, row, 8, item.Threshold, item.Unit);
                 Text(sheet, row, 9, item.TracksStock ? "Oui" : "Non");
                 Text(sheet, row, 10, item.IsActive ? "Actif" : "Désactivé");
+                Text(sheet, row, 11, item.Unit.Label());
             });
 
         Table(workbook, "Clients", [("Nom", 28), ("Téléphone", 18), ("Plafond de crédit", 18), ("Dette", 14), ("État", 12)], data.Customers, (sheet, row, item) =>
@@ -68,29 +70,31 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
                 Text(sheet, row, 11, item.CancelReason);
             });
 
-        Table(workbook, "Lignes de vente", [("Vente", 42), ("Date et heure", 18), ("N° de ticket", 12), ("Produit", 30), ("Quantité", 10), ("Prix unitaire", 14), ("Total", 14), ("Coût unitaire retenu", 18)],
+        Table(workbook, "Lignes de vente", [("Vente", 42), ("Date et heure", 18), ("N° de ticket", 12), ("Produit", 30), ("Quantité", 10), ("Prix unitaire", 14), ("Total", 14), ("Coût unitaire retenu", 18), ("Unité", 10)],
             data.SaleLines, (sheet, row, item) =>
             {
                 Text(sheet, row, 1, item.Key);
                 Date(sheet, row, 2, item.At);
                 sheet.Cell(row, 3).SetValue(item.Ticket);
                 Text(sheet, row, 4, item.Product);
-                sheet.Cell(row, 5).SetValue(item.Quantity);
+                Quantity(sheet, row, 5, item.Quantity, item.Unit);
                 Money(sheet, row, 6, item.UnitPriceFcfa);
                 Money(sheet, row, 7, item.TotalFcfa);
                 if (item.UnitCostFcfa is { } cost)
                 {
                     Money(sheet, row, 8, cost);
                 }
+
+                Text(sheet, row, 9, item.Unit.Label());
             });
 
-        Table(workbook, "Mouvements de stock", [("Date et heure", 18), ("Produit", 30), ("Type", 20), ("Quantité", 10), ("Fournisseur ou motif", 30), ("Coût unitaire", 14), ("Fait par", 22)],
+        Table(workbook, "Mouvements de stock", [("Date et heure", 18), ("Produit", 30), ("Type", 20), ("Quantité", 10), ("Fournisseur ou motif", 30), ("Coût unitaire", 14), ("Fait par", 22), ("Unité", 10)],
             data.Movements, (sheet, row, item) =>
             {
                 Date(sheet, row, 1, item.At);
                 Text(sheet, row, 2, item.Product);
                 Text(sheet, row, 3, ExportLabels.Movement(item.Kind));
-                sheet.Cell(row, 4).SetValue(item.QuantityDelta);
+                Quantity(sheet, row, 4, item.QuantityDelta, item.Unit);
                 Text(sheet, row, 5, item.Reason);
                 if (item.UnitCostFcfa is { } cost)
                 {
@@ -98,6 +102,7 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
                 }
 
                 Text(sheet, row, 7, item.By);
+                Text(sheet, row, 8, item.Unit.Label());
             });
 
         using var stream = new MemoryStream();
@@ -114,7 +119,7 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
             $"Fichier fabriqué le {data.At.UtcDateTime.ToString("dd/MM/yyyy à HH:mm", CultureInfo.InvariantCulture)}. Toutes les heures sont celles de la Côte d'Ivoire (identiques à l'heure UTC : le pays n'a pas d'heure d'été).",
             $"Période de l'historique : du {data.Period.From.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} au {data.Period.To.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} (versements, ventes, lignes de vente, mouvements de stock).",
             "Les produits et les clients sont toujours complets : ce sont des états à ce jour, pas des historiques.",
-            "Les montants sont en FCFA.",
+            "Les montants sont en FCFA. Les quantités des produits au poids sont en kg et celles des produits à la mesure en litres (colonne « Unité »).",
             string.Empty,
             "Contenu :",
             $"  Produits : {data.Products.Count} lignes",
@@ -165,6 +170,20 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
         {
             sheet.Cell(row, column).SetValue(value);
         }
+    }
+
+    /// <summary>Une quantité lisible : 1,25 pour un kilo et quart, jamais 1250 grammes. Une pièce reste un entier.</summary>
+    private static void Quantity(IXLWorksheet sheet, int row, int column, long quantity, MeasureUnit unit)
+    {
+        var cell = sheet.Cell(row, column);
+        if (unit == MeasureUnit.Piece)
+        {
+            cell.SetValue(quantity);
+            return;
+        }
+
+        cell.SetValue((double)quantity / unit.Scale());
+        cell.Style.NumberFormat.Format = "#,##0.###";
     }
 
     private static void Money(IXLWorksheet sheet, int row, int column, long value)
