@@ -1,4 +1,4 @@
-import { canTestScanner, canManageCatalogue, canManageCustomers, canManageDevices, canOperateCustomers, canReadCustomers, canSeeRepayments, canManageStock, canManageTeam, canReadAuditLog, canSeeMargin, canViewReports } from './roles';
+import { canTestScanner, canManageCatalogue, canManageCustomers, canManageDevices, canOperateCustomers, canReadCustomers, canSeeRepayments, canManageStock, canManageTeam, canReadAuditLog, canSeeMargin, canViewReports, canPrintLabels } from './roles';
 
 describe('roles', () => {
   it('lets only the owner and the manager manage the catalogue', () => {
@@ -71,6 +71,14 @@ describe('roles: scanner', () => {
   it('lets the owner and the manager test the barcode reader', () => {
     expect(['Owner', 'Manager', 'StockKeeper', 'Cashier', 'Accountant', undefined].map(canTestScanner)).toEqual([
       true, true, false, false, false, false,
+    ]);
+  });
+});
+
+describe('roles: labels', () => {
+  it('lets the owner, the manager and the stock keeper print labels', () => {
+    expect(['Owner', 'Manager', 'StockKeeper', 'Cashier', 'Accountant', undefined].map(canPrintLabels)).toEqual([
+      true, true, true, false, false, false,
     ]);
   });
 });

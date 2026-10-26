@@ -149,4 +149,12 @@ describe('ProductsApi', () => {
     put.flush(null, { status: 204, statusText: 'No Content' });
     await update;
   });
+
+  it('asks the server for an internal code on the right route', async () => {
+    const created = api.createInternalBarcode('p-1');
+    const request = http.expectOne('/api/v1/products/p-1/internal-barcode');
+    expect(request.request.method).toBe('POST');
+    request.flush({ barcode: '2900000000018' });
+    expect(await created).toBe('2900000000018');
+  });
 });

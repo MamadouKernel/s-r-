@@ -38,6 +38,13 @@ describe('ManagementShell', () => {
     expect(await render('StockKeeper')).not.toContain('Lecteur de codes-barres');
   });
 
+  it('shows « Étiquettes » to the owner, the manager and the stock keeper only', async () => {
+    expect(await render('Owner')).toContain('Étiquettes');
+    expect(await render('Manager')).toContain('Étiquettes');
+    expect(await render('StockKeeper')).toContain('Étiquettes');
+    expect(await render('Cashier')).not.toContain('Étiquettes');
+  });
+
   it('shows « Exporter mes données » to the owner only', async () => {
     expect(await render('Owner')).toContain('Exporter mes données');
     expect(await render('Manager')).not.toContain('Exporter mes données');

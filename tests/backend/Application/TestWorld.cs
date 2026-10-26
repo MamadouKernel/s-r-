@@ -224,6 +224,8 @@ internal sealed class TestWorld
 
     public ImportProductsHandler ImportProducts => new(Current, SheetReader, Families, Products, Movements, Audit, Clock, UnitOfWork);
 
+    public CreateInternalBarcodeHandler CreateInternalBarcode => new(Current, Products, Audit, Clock, UnitOfWork);
+
     public DeactivateProductHandler DeactivateProduct => new(Current, Products, Audit, Clock, UnitOfWork);
 
     public ReceiveStockHandler ReceiveStock => new(Current, Products, Movements, Clock, UnitOfWork);

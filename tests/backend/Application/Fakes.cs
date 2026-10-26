@@ -166,6 +166,14 @@ internal sealed class InMemoryProductRepository : IProductRepository
         Task.FromResult(_products.Any(product =>
             product.Tenant == tenant && product.Barcode == barcode && product.Id != except));
 
+    public Task<IReadOnlyList<string>> RecentInternalBarcodesAsync(TenantId tenant, int count, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>(_products
+            .Where(product => product.Tenant == tenant && product.Barcode is { Length: 13 } code && code.StartsWith("29", StringComparison.Ordinal))
+            .Select(product => product.Barcode!)
+            .OrderByDescending(code => code, StringComparer.Ordinal)
+            .Take(count)
+            .ToArray());
+
     public Task<IReadOnlyList<Product>> ListAsync(
         TenantId tenant,
         string? search,

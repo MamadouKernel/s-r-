@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { Journal } from '../data/journal';
 import { typeScan } from '../core/scan-test-support';
@@ -13,6 +14,9 @@ import { JournalService } from '../services/journal.service';
 import { SyncService } from '../services/sync.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ClosePage } from './close-page';
+import { ReceiptService } from '../services/receipt.service';
+import { SaleOperation } from '../data/journal';
+import { PaymentPanel } from './payment-panel';
 import { SalePage } from './sale-page';
 
 const jus: CatalogueProduct = {
@@ -506,6 +510,22 @@ describe('SalePage: barcode scanner (ADR 0015)', () => {
     });
   });
 
+  it('starts the next sale when the next customer\'s first item is scanned on the ticket screen', async () => {
+    const { cash, fixture } = await open();
+    cash.add(jus);
+    fixture.componentInstance['paying'].set(true);
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(PaymentPanel)).componentInstance as PaymentPanel;
+    panel['confirmed'].set({ kind: 'sale', netTotalFcfa: 600, changeFcfa: 0, payments: [], lines: [] } as unknown as SaleOperation);
+    cash.remove(jus.id); // la vente est encaissée : le panier est vide, c'est l'écran du ticket qui reste
+    fixture.detectChanges();
+
+    scan(document.body, eau.barcode!);
+
+    await until(() => expect(cash.cart().map((line) => line.name)).toEqual(['Eau minérale 1,5 L']));
+    expect(fixture.componentInstance['paying']()).toBe(false);
+  });
+
   it('tells the cashier to finish the payment instead of ignoring a scan in silence', async () => {
     const { cash, fixture, root } = await open();
     cash.add(eau);
@@ -518,5 +538,44 @@ describe('SalePage: barcode scanner (ADR 0015)', () => {
 
     expect(cash.cart()).toHaveLength(1);
     expect(root.textContent).toContain('Terminez ou annulez le paiement');
+  });
+});
+
+describe('SalePage: last ticket (docs/specs/etiquettes-tickets TKT-01)', () => {
+  const lastSale = {
+    kind: 'sale', seq: 5, status: 'pending', saleId: 's', sessionId: 'sess', at: new Date().toISOString(), discountFcfa: 0, netTotalFcfa: 600, changeFcfa: 0,
+    lines: [{ productId: 'p-jus', name: 'Jus', unitPriceFcfa: 600, quantity: 1 }], payments: [{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }],
+  } as SaleOperation;
+
+  async function open(withReceipt: boolean) {
+    await setup();
+    if (withReceipt) {
+      await TestBed.inject(ReceiptService).remember(lastSale, null);
+    }
+    const fixture = TestBed.createComponent(SalePage);
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const click = async (label: string) => {
+      [...root.querySelectorAll('button')].find((button) => button.textContent?.includes(label))!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+    return { root, click, has: (text: string) => (root.textContent ?? '').includes(text) };
+  }
+
+  it('offers nothing before a first sale', async () => {
+    expect((await open(false)).has('Réimprimer le dernier ticket')).toBe(false);
+  });
+
+  it('offers to print the last ticket again, with the same ways out as at the payment, then closes', async () => {
+    const page = await open(true);
+    expect(page.has('Imprimer le ticket')).toBe(false);
+
+    await page.click('Réimprimer le dernier ticket');
+    expect(page.has('Imprimer le ticket')).toBe(true);
+    expect(page.has('Copier le ticket')).toBe(true);
+
+    await page.click('Fermer');
+    expect(page.has('Imprimer le ticket')).toBe(false);
   });
 });

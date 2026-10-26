@@ -66,3 +66,8 @@ export function canExportData(role: string | undefined): boolean {
 export function canTestScanner(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager';
 }
+
+/** Écran « Étiquettes » (imprimer des étiquettes de produits) : ceux qui gèrent le stock, comme le serveur. */
+export function canPrintLabels(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager' || role === 'StockKeeper';
+}

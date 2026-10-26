@@ -8,7 +8,10 @@ import { onboardingError } from '../onboarding/wording';
 import { AuthService } from '../services/auth.service';
 import { CashService } from '../services/cash.service';
 import { NetworkService } from '../services/network.service';
+import { ReceiptService } from '../services/receipt.service';
 import { SyncService } from '../services/sync.service';
+import { Receipt } from '../core/receipt';
+import { TicketActions } from './ticket-actions';
 
 interface Row {
   id: string;
@@ -21,6 +24,7 @@ interface Row {
 /** S5 : espèces, Mobile Money et paiement mixte, avec récapitulatif avant validation (PWA-05). */
 @Component({
   selector: 'app-payment-panel',
+  imports: [TicketActions],
   template: `
     @if (confirmed(); as sale) {
       <section class="panel" aria-labelledby="paiement-titre" role="status">
@@ -40,6 +44,12 @@ interface Row {
           <p class="amount mt-2 text-lg font-bold" role="status">
             À crédit pour {{ credit.name }} : {{ format(credit.amount) }}. Sa dette passe à {{ format(credit.newDebt) }}.
           </p>
+        }
+        @if (receipt(); as ticket) {
+          <div class="mt-6 rounded border border-sauge bg-ivoire p-3">
+            <p class="mb-2 font-semibold">Ticket de caisse (facultatif)</p>
+            <app-ticket-actions [receipt]="ticket" />
+          </div>
         }
         <button type="button" class="btn-primary mt-6 w-full" (click)="finished.emit()">Nouvelle vente</button>
       </section>
@@ -212,6 +222,7 @@ export class PaymentPanel implements OnInit {
   protected readonly customers = inject(CustomerService);
   protected readonly network = inject(NetworkService);
   private readonly auth = inject(AuthService);
+  private readonly receipts = inject(ReceiptService);
 
   readonly total = input.required<number>();
   readonly finished = output<void>();
@@ -220,6 +231,9 @@ export class PaymentPanel implements OnInit {
   protected readonly mobileMoney = MOBILE_MONEY_METHODS;
   protected readonly rows = signal<Row[]>([]);
   protected readonly confirmed = signal<SaleOperation | null>(null);
+  /** La vente est enregistrée et l'écran du ticket est affiché : un scan peut lancer la vente suivante. */
+  readonly isDone = computed(() => this.confirmed() !== null);
+  protected readonly receipt = signal<Receipt | null>(null);
   protected readonly failure = signal('');
   protected readonly touched = signal(false);
   private readonly used = signal<ReadonlySet<string>>(new Set());
@@ -345,9 +359,20 @@ export class PaymentPanel implements OnInit {
       return;
     }
     try {
-      this.confirmed.set(await this.cash.confirmSale(this.drafts(), this.hasCredit() ? (this.customer()?.id ?? null) : null));
+      const sale = await this.cash.confirmSale(this.drafts(), this.hasCredit() ? (this.customer()?.id ?? null) : null);
+      this.confirmed.set(sale);
+      await this.prepareTicket(sale);
     } catch (error) {
       this.failure.set(error instanceof Error ? error.message : 'La vente n’a pas pu être enregistrée. Réessayez.');
+    }
+  }
+
+  /** Le ticket est facultatif : s'il ne peut pas être préparé, la vente reste enregistrée et la caisse continue. */
+  private async prepareTicket(sale: SaleOperation): Promise<void> {
+    try {
+      this.receipt.set(await this.receipts.remember(sale, this.hasCredit() ? (this.customer()?.name ?? null) : null));
+    } catch {
+      this.receipt.set(null);
     }
   }
 

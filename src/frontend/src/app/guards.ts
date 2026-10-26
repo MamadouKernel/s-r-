@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
-import { canManageCatalogue, canManageDevices, canTestScanner, canReadCustomers, canManageStock, canManageTeam, canReadAuditLog, canViewReports, canExportData } from './management/roles';
+import { canManageCatalogue, canManageDevices, canTestScanner, canReadCustomers, canManageStock, canManageTeam, canReadAuditLog, canViewReports, canExportData, canPrintLabels } from './management/roles';
 import { CashService } from './services/cash.service';
 
 /** L'appareil doit connaître son commerce (PWA-01). */
@@ -124,4 +124,14 @@ export const scannerGuard: CanActivateFn = () => {
     return router.parseUrl('/connexion');
   }
   return canTestScanner(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
+};
+
+/** Écran « Étiquettes » : propriétaire, gérant et magasinier ; les autres profils retombent sur la liste des produits. */
+export const labelsGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const auth = inject(AuthService);
+  if (!auth.signedIn()) {
+    return router.parseUrl('/connexion');
+  }
+  return canPrintLabels(auth.user()?.role) ? true : router.parseUrl('/gestion/produits');
 };

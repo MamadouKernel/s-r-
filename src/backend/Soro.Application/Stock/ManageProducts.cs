@@ -228,3 +228,61 @@ public sealed class DeactivateProductHandler(
         return Result<ProductId>.Success(product.Id);
     }
 }
+
+public sealed record CreateInternalBarcodeCommand(ProductId Id);
+
+/// <summary>
+/// Code interne d'un produit sans code-barres (docs/specs/etiquettes-tickets ETQ-01) : EAN-13 de la plage « usage en magasin », séquence propre
+/// au commerce, fabriqué ici (jamais sur l'appareil) pour que deux caisses ne créent pas le même code. Deux demandes simultanées qui visent le
+/// même numéro sont départagées par l'unicité de la base : la seconde est rejouée.
+/// </summary>
+public sealed class CreateInternalBarcodeHandler(
+    ICurrentUser user,
+    IProductRepository products,
+    IAuditTrail audit,
+    IClock clock,
+    IUnitOfWork unitOfWork)
+{
+    /// <summary>Nombre de codes lus pour retrouver le dernier valide (les codes tapés à la main avec une clé fausse sont ignorés).</summary>
+    private const int Lookback = 50;
+
+    public async Task<Result<string>> HandleAsync(CreateInternalBarcodeCommand command, CancellationToken cancellationToken = default)
+    {
+        if (!RolePolicy.CanManageCatalogue(user.Role))
+        {
+            return Result<string>.Failure(ApplicationError.Forbidden("Seul un gérant peut créer un code-barres."));
+        }
+
+        var product = await products.GetAsync(command.Id, user.Tenant, cancellationToken);
+        if (product is null)
+        {
+            return Result<string>.Failure(ApplicationError.NotFound("Produit introuvable."));
+        }
+
+        try
+        {
+            var last = 0L;
+            foreach (var code in await products.RecentInternalBarcodesAsync(user.Tenant, Lookback, cancellationToken))
+            {
+                if (InternalBarcode.TryGetSequence(code, out var sequence))
+                {
+                    last = sequence;
+                    break;
+                }
+            }
+
+            var barcode = InternalBarcode.Compose(last + 1);
+            product.AssignBarcode(barcode);
+            await products.UpdateAsync(product, cancellationToken);
+            await audit.RecordAsync(
+                new AuditEntry(user.Tenant, user.User, AuditActions.ProductBarcodeCreated, product.Id.Value, $"Code interne créé : {product.Name}", clock.UtcNow),
+                cancellationToken);
+            await unitOfWork.CommitAsync(cancellationToken);
+            return Result<string>.Success(barcode);
+        }
+        catch (DomainException exception)
+        {
+            return Result<string>.Failure(ApplicationError.RuleViolation(exception.Message));
+        }
+    }
+}
