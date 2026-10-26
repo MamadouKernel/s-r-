@@ -248,7 +248,7 @@ public sealed class ApiSubscriptionTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task A_sync_from_the_offline_queue_is_accepted_in_read_only_and_recorded_in_the_journal()
     {
-        var tenant = await ShopAsync(daysAgo: 60);
+        var tenant = await ShopAsync(daysAgo: 40);
         using var owner = As(tenant, Role.Owner);
 
         var sync = await owner.PostAsJsonAsync("/api/v1/sales/sync", new { sales = Array.Empty<object>() });
@@ -256,6 +256,18 @@ public sealed class ApiSubscriptionTests(PostgresFixture fixture) : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, sync.StatusCode);
         Assert.Contains(journal.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("action").GetString() == "subscription.expired.sale");
+    }
+
+    [Fact]
+    public async Task The_offline_queue_is_refused_once_the_read_only_period_is_older_than_seven_days_with_a_message_that_says_what_to_do()
+    {
+        var tenant = await ShopAsync(daysAgo: 60, email: $"vieux{Guid.NewGuid():N}@exemple.ci");
+        using var owner = As(tenant, Role.Owner);
+
+        var sync = await owner.PostAsJsonAsync("/api/v1/sales/sync", new { sales = Array.Empty<object>() });
+
+        Assert.Equal(HttpStatusCode.Forbidden, sync.StatusCode);
+        Assert.Equal("subscription_expired", (await sync.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
     }
 
     [Fact]

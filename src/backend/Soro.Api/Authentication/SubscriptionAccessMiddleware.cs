@@ -16,8 +16,8 @@ public static class SubscriptionAccessMiddleware
     /// <summary>
     /// Lecture seule (RG-14, docs/specs/abonnement ABO-07) : une fois le délai de grâce écoulé, toute écriture en ligne est refusée avec
     /// <c>subscription_expired</c>, sauf se renseigner sur son abonnement et déclarer un paiement. Les envois de la file hors ligne (ventes,
-    /// ouvertures et clôtures de caisse) passent toujours : ces ventes ont eu lieu, les rejeter ne rendrait pas la marchandise ; elles sont signalées
-    /// au journal. Un commerce inconnu n'est pas bloqué. À placer après <see cref="TenantScopeMiddleware"/> et l'accès appareil.
+    /// ouvertures et clôtures de caisse) passent pendant sept jours encore : ces ventes ont eu lieu, les rejeter ne rendrait pas la marchandise ; elles sont
+    /// signalées au journal. Passé ce délai, il faut payer : la file est conservée sur la caisse et part dès le paiement validé. Un commerce inconnu n'est pas bloqué. À placer après <see cref="TenantScopeMiddleware"/> et l'accès appareil.
     /// </summary>
     public static IApplicationBuilder UseSubscriptionAccess(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
@@ -31,7 +31,8 @@ public static class SubscriptionAccessMiddleware
                 var state = await StateOfAsync(context, identity.Tenant);
                 if (state is { IsReadOnly: true })
                 {
-                    if (IsOfflineQueueEndpoint(context.Request.Method, path))
+                    if (IsOfflineQueueEndpoint(context.Request.Method, path)
+                        && context.RequestServices.GetRequiredService<IClock>().UtcNow < state.ReadOnlyFrom.AddDays(SubscriptionRules.OfflineQueueDays))
                     {
                         await context.RequestServices.GetRequiredService<RecordExpiredSyncHandler>().HandleAsync(path, context.RequestAborted);
                         await next();
