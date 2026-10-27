@@ -65,11 +65,36 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             })
             .ToListAsync(cancellationToken);
 
+        var ranks = await RanksAsync(tenant, rows.Select(row => (row.Id, row.RegisterId, row.RecordedAt)), cancellationToken);
         return rows
             .Select(row => new SaleSummary(
                 row.Id, row.RecordedAt, row.CashierId, row.RegisterId, row.SessionId,
-                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount, row.Returned, row.LocalSequence))
+                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount, row.Returned, ranks[row.Id]))
             .ToArray();
+    }
+
+    /// <summary>
+    /// Le numéro du ticket tel que le client le lit sur son ticket de caisse : le rang de la vente sur sa caisse ce jour-là (le pays suit l'heure UTC),
+    /// annulées comprises (docs/decisions/0016). Le numéro d'ordre interne de la caisse compte aussi les ouvertures et clôtures : il ne se lit pas sur le ticket.
+    /// </summary>
+    private async Task<Dictionary<Guid, long>> RanksAsync(TenantId tenant, IEnumerable<(Guid Id, Guid Register, DateTimeOffset At)> sales, CancellationToken cancellationToken)
+    {
+        var ranks = new Dictionary<Guid, long>();
+        foreach (var group in sales.GroupBy(sale => (sale.Register, Day: sale.At.UtcDateTime.Date)))
+        {
+            var start = new DateTimeOffset(group.Key.Day, TimeSpan.Zero);
+            var sameDay = await db.Sales.AsNoTracking()
+                .Where(sale => sale.TenantId == tenant.Value && sale.RegisterId == group.Key.Register && sale.RecordedAt >= start && sale.RecordedAt < start.AddDays(1))
+                .OrderBy(sale => sale.RecordedAt).ThenBy(sale => sale.LocalSequence)
+                .Select(sale => sale.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var sale in group)
+            {
+                ranks[sale.Id] = sameDay.IndexOf(sale.Id) + 1;
+            }
+        }
+
+        return ranks;
     }
 
     public async Task<SaleDetail?> GetSaleAsync(TenantId tenant, SaleId id, CancellationToken cancellationToken)
@@ -122,7 +147,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 item.Refunds.Where(part => part.Method == PaymentMethod.Cash).Sum(part => part.Amount),
                 item.Lines.OrderBy(line => line.Position).Select(line => new ReturnLineView(line.LineIndex, line.Quantity, line.Resellable)).ToArray(),
                 item.Refunds.OrderBy(part => part.Position).Select(part => new ReturnRefundView(part.Method, part.Amount)).ToArray())).ToArray(),
-            row.LocalSequence);
+            (await RanksAsync(tenant, [(row.Id, row.RegisterId, row.RecordedAt)], cancellationToken))[row.Id]);
     }
 
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(

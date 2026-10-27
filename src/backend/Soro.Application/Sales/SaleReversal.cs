@@ -192,7 +192,7 @@ public sealed class SaleReversal(
     {
         var what = request.Kind == ReturnKind.Cancellation ? "Vente annulée" : "Retour";
         var parts = string.Join(", ", saleReturn.Refund.Select(part => $"{part.Amount} {Label(part.Method)}"));
-        return $"{what} (ticket {sale.LocalSequence}) : {request.Reason.Trim()} — rendu {saleReturn.Total}" + (parts.Length > 0 ? $" ({parts})" : string.Empty);
+        return $"{what} (vente de {sale.RecordedAt.ToString("dd/MM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}, {sale.NetTotal}) : {request.Reason.Trim()} — rendu {saleReturn.Total}" + (parts.Length > 0 ? $" ({parts})" : string.Empty);
     }
 
     private static string Label(PaymentMethod method) => method switch

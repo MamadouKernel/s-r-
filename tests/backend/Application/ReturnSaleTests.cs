@@ -50,7 +50,7 @@ public class ReturnSaleTests
         var stored = Assert.Single(await world.Returns.ListForSaleAsync(sale.Id, world.Tenant, CancellationToken.None));
         Assert.Equal(manager.Id, stored.ApprovedBy);
         Assert.Equal(world.Cashier, stored.By);
-        Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.SaleReturned);
+        Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.SaleReturned && entry.Detail.Contains("vente de 15/10 08:05", StringComparison.Ordinal) && !entry.Detail.Contains("ticket", StringComparison.Ordinal));
         Assert.Equal(1, world.UnitOfWork.Commits);
     }
 

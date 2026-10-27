@@ -217,4 +217,44 @@ public sealed class ApiReturnTests(PostgresFixture fixture) : IDisposable
         Assert.Equal(1_000, top.GetProperty("revenueFcfa").GetInt64());
         Assert.Equal(1, top.GetProperty("quantity").GetInt32());
     }
+
+    [Fact]
+    public async Task The_ticket_number_is_the_rank_of_the_sale_on_its_register_that_day_as_printed_on_the_ticket()
+    {
+        using var manager = Manager();
+        var product = await CreateJuiceAsync(manager);
+        var session = Guid.NewGuid();
+        var opened = await manager.PostAsJsonAsync("/api/v1/register-sessions", new
+        {
+            sessionId = session, pointOfSaleId = Guid.NewGuid(), registerId = Guid.NewGuid(), openingFloatFcfa = 10_000, openedAt = DateTimeOffset.UtcNow.AddDays(-4),
+        });
+        Assert.Equal(HttpStatusCode.OK, opened.StatusCode);
+        async Task<Guid> SellAsync(long sequence, DateTimeOffset at)
+        {
+            var id = Guid.NewGuid();
+            var response = await manager.PostAsJsonAsync("/api/v1/sales", new
+            {
+                saleId = id, sessionId = session, localSequence = sequence, at,
+                lines = new[] { new { productId = product, name = "Jus", quantity = 1, unitPriceFcfa = 1_000 } },
+                discountFcfa = 0,
+                payments = new[] { new { paymentId = Guid.NewGuid(), method = "Cash", amountFcfa = 1_000, tenderedFcfa = (long?)1_000, reference = (string?)null } },
+            });
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return id;
+        }
+
+        var noon = DateTimeOffset.UtcNow.Date.AddDays(-3).AddHours(12);
+        var first = await SellAsync(5, noon);
+        var second = await SellAsync(9, noon.AddMinutes(10));
+        var nextDay = await SellAsync(12, noon.AddDays(1));
+
+        var list = await JsonOf(await manager.GetAsync("/api/v1/sales"));
+        var tickets = list.EnumerateArray().ToDictionary(item => item.GetProperty("id").GetGuid(), item => item.GetProperty("ticket").GetInt64());
+        var detail = await JsonOf(await manager.GetAsync($"/api/v1/sales/{second}"));
+
+        Assert.Equal(1, tickets[first]);
+        Assert.Equal(2, tickets[second]);
+        Assert.Equal(1, tickets[nextDay]);
+        Assert.Equal(2, detail.GetProperty("ticket").GetInt64());
+    }
 }
