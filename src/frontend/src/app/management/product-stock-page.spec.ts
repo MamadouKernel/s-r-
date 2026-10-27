@@ -69,6 +69,15 @@ describe('ProductStockPage: produit au poids', () => {
   });
 });
 
+describe('ProductStockPage: retour d’un client', () => {
+  it('names the movement of a returned article in French', async () => {
+    const { page } = await open('StockKeeper', 25, [movement({ kind: 'Return', quantityDelta: 1, reason: 'Article en trop' })]);
+
+    expect(page.has('Retour d’un client')).toBe(true);
+    expect(page.has('+1')).toBe(true);
+  });
+});
+
 describe('ProductStockPage', () => {
   it('shows the stock, the history with signed quantities and the author', async () => {
     const { page } = await open();

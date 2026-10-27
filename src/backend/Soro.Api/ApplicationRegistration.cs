@@ -51,6 +51,8 @@ public static class ApplicationRegistration
         services.AddScoped<CloseRegisterSessionHandler>();
         services.AddScoped<RecordSaleHandler>();
         services.AddScoped<SyncSalesHandler>();
+        services.AddScoped<SaleReversal>();
+        services.AddScoped<ReturnSaleHandler>();
         services.AddScoped<CancelSaleHandler>();
         services.AddScoped<LogInHandler>();
         services.AddScoped<CreateCustomerHandler>();

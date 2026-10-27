@@ -2,6 +2,7 @@ using System.Globalization;
 using ClosedXML.Excel;
 using Soro.Application.Export;
 using Soro.Domain.Common;
+using Soro.Domain.Sales;
 
 namespace Soro.Infrastructure.Export;
 
@@ -105,6 +106,22 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
                 Text(sheet, row, 8, item.Unit.Label());
             });
 
+        Table(workbook, "Retours", [("Date et heure", 18), ("Vente", 42), ("N° de ticket", 12), ("Type", 16), ("Motif", 30), ("Total rendu", 14), ("En espèces", 14), ("Dette effacée", 14), ("Mobile Money", 14), ("Fait par", 22), ("Validé par", 22)],
+            data.Returns ?? [], (sheet, row, item) =>
+            {
+                Date(sheet, row, 1, item.At);
+                Text(sheet, row, 2, item.SaleKey);
+                sheet.Cell(row, 3).SetValue(item.Ticket);
+                Text(sheet, row, 4, item.Kind == ReturnKind.Cancellation ? "Annulation" : "Retour");
+                Text(sheet, row, 5, item.Reason);
+                Money(sheet, row, 6, item.TotalFcfa);
+                Money(sheet, row, 7, item.CashFcfa);
+                Money(sheet, row, 8, item.CreditFcfa);
+                Money(sheet, row, 9, item.MobileMoneyFcfa);
+                Text(sheet, row, 10, item.By);
+                Text(sheet, row, 11, item.ApprovedBy);
+            });
+
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
@@ -128,6 +145,7 @@ public sealed class ClosedXmlDataExportWriter : IDataExportWriter
             $"  Ventes : {data.Sales.Count} lignes",
             $"  Lignes de vente : {data.SaleLines.Count} lignes",
             $"  Mouvements de stock : {data.Movements.Count} lignes",
+            $"  Retours et annulations : {(data.Returns ?? []).Count} lignes",
             string.Empty,
             "ATTENTION : ce fichier contient les numéros de téléphone de vos clients et vos prix d'achat. Gardez-le en lieu sûr.",
         };

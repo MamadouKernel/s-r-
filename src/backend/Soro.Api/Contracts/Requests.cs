@@ -91,4 +91,44 @@ public sealed record SyncSalesRequest
 public sealed record CancelSaleRequest
 {
     public required string Reason { get; init; }
+
+    /// <summary>Fixé par l'écran à son ouverture : un envoi répété ne rembourse jamais deux fois.</summary>
+    public Guid? OperationId { get; init; }
+
+    /// <summary>La caisse dont le tiroir rend les espèces ; sans elle, la session de la vente si elle est encore ouverte.</summary>
+    public Guid? RegisterId { get; init; }
+
+    /// <summary><c>false</c> : la marchandise est abîmée et ne revient pas en rayon.</summary>
+    public bool Resellable { get; init; } = true;
+
+    /// <summary>Le gérant qui valide, avec son PIN ; inutile quand l'appelant est lui-même gérant ou propriétaire.</summary>
+    public Guid? ApproverId { get; init; }
+
+    public string? ApproverPin { get; init; }
+}
+
+public sealed record ReturnLineRequest
+{
+    /// <summary>Position de la ligne dans la vente (0 pour la première).</summary>
+    public required int LineIndex { get; init; }
+
+    /// <summary>Pièces, ou millièmes (grammes, millilitres) pour un produit pesé.</summary>
+    public required int Quantity { get; init; }
+
+    public bool Resellable { get; init; } = true;
+}
+
+public sealed record ReturnSaleRequest
+{
+    public required Guid OperationId { get; init; }
+
+    public required string Reason { get; init; }
+
+    public required IReadOnlyList<ReturnLineRequest> Lines { get; init; }
+
+    public Guid? RegisterId { get; init; }
+
+    public Guid? ApproverId { get; init; }
+
+    public string? ApproverPin { get; init; }
 }

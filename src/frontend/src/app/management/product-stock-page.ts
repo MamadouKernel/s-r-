@@ -12,6 +12,7 @@ const KIND_LABEL: Record<MovementKind, string> = {
   Sale: 'Vente',
   Loss: 'Perte',
   SaleCancellation: 'Annulation de vente',
+  Return: 'Retour d’un client',
 };
 
 /** GES-03 à GES-05 : réception, perte ou casse, historique des mouvements d'un produit. */

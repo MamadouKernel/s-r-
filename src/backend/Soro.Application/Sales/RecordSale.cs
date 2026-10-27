@@ -343,40 +343,8 @@ public sealed class RecordSaleHandler(
         return null;
     }
 
-    /// <summary>
-    /// Un gérant qui vend lui-même n'a rien à prouver. Sinon l'approbation exige l'identifiant d'un gérant actif ET son PIN, vérifié comme à la
-    /// connexion (échecs comptés, compte verrouillé après cinq) : un identifiant seul ne prouve rien. Le propriétaire n'a pas de PIN : il approuve
-    /// en vendant lui-même sur la caisse.
-    /// </summary>
-    private async Task<bool> IsApprovedAsync(Approval? approval, CancellationToken cancellationToken)
-    {
-        if (RolePolicy.IsManager(user.Role))
-        {
-            return true;
-        }
-
-        if (approval is null)
-        {
-            return false;
-        }
-
-        var approver = await users.GetAsync(approval.Approver, user.Tenant, cancellationToken);
-        var now = clock.UtcNow;
-        if (approver is null || approver.Role != Role.Manager || approver.Status != UserStatus.Active || approver.IsLocked(now))
-        {
-            hasher.Verify(approval.Pin ?? string.Empty, null);
-            return false;
-        }
-
-        if (!hasher.Verify(approval.Pin ?? string.Empty, approver.PinHash))
-        {
-            approver.RecordFailedAttempt(now);
-            await users.UpdateAsync(approver, cancellationToken);
-            return false;
-        }
-
-        return true;
-    }
+    private Task<bool> IsApprovedAsync(Approval? approval, CancellationToken cancellationToken) =>
+        ApprovalCheck.IsApprovedAsync(user, users, hasher, clock, approval, cancellationToken);
 
     private async Task<ApplicationError?> CheckMobileMoneyReferencesAsync(SaleDraft draft, CancellationToken cancellationToken)
     {

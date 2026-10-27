@@ -14,9 +14,9 @@ public sealed record ExportPeriod(DateOnly From, DateOnly To)
     public DateTimeOffset EndExclusive => new(To.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 }
 
-public sealed record ExportCounts(int Products, int Customers, int Repayments, int Sales, int SaleLines, int Movements)
+public sealed record ExportCounts(int Products, int Customers, int Repayments, int Sales, int SaleLines, int Movements, int Returns = 0)
 {
-    public long Total => (long)Products + Customers + Repayments + Sales + SaleLines + Movements;
+    public long Total => (long)Products + Customers + Repayments + Sales + SaleLines + Movements + Returns;
 }
 
 public sealed record ProductExportRow(
@@ -43,6 +43,10 @@ public sealed record SaleExportRow(
 public sealed record SaleLineExportRow(string Key, DateTimeOffset At, long Ticket, string Product, int Quantity, long UnitPriceFcfa, long TotalFcfa, long? UnitCostFcfa,
     MeasureUnit Unit = MeasureUnit.Piece);
 
+/// <summary>Une annulation ou un retour : ce qui a été rendu, à qui, par quel moyen et qui l'a validé (docs/decisions/0020).</summary>
+public sealed record ReturnExportRow(
+    DateTimeOffset At, string SaleKey, long Ticket, ReturnKind Kind, string Reason, long TotalFcfa, long CashFcfa, long CreditFcfa, long MobileMoneyFcfa, string By, string? ApprovedBy);
+
 public sealed record MovementExportRow(DateTimeOffset At, string Product, StockMovementKind Kind, int QuantityDelta, string? Reason, long? UnitCostFcfa, string By,
     MeasureUnit Unit = MeasureUnit.Piece);
 
@@ -53,7 +57,8 @@ public sealed record DataExportData(
     IReadOnlyList<RepaymentExportRow> Repayments,
     IReadOnlyList<SaleExportRow> Sales,
     IReadOnlyList<SaleLineExportRow> SaleLines,
-    IReadOnlyList<MovementExportRow> Movements);
+    IReadOnlyList<MovementExportRow> Movements,
+    IReadOnlyList<ReturnExportRow>? Returns = null);
 
 public sealed record DataExport(
     string CommerceName,
@@ -64,7 +69,8 @@ public sealed record DataExport(
     IReadOnlyList<RepaymentExportRow> Repayments,
     IReadOnlyList<SaleExportRow> Sales,
     IReadOnlyList<SaleLineExportRow> SaleLines,
-    IReadOnlyList<MovementExportRow> Movements);
+    IReadOnlyList<MovementExportRow> Movements,
+    IReadOnlyList<ReturnExportRow>? Returns = null);
 
 /// <summary>Lecture des données du commerce pour l'export, en une seule lecture cohérente.</summary>
 public interface IDataExportQueries
@@ -104,6 +110,7 @@ public static class ExportLabels
         StockMovementKind.Reception => "Réception",
         StockMovementKind.Sale => "Vente",
         StockMovementKind.Loss => "Perte",
+        StockMovementKind.Return => "Retour d'un client",
         _ => "Annulation de vente",
     };
 

@@ -3,6 +3,8 @@ const ACTIONS: Record<string, string> = {
   'sale.discount.refused': 'Remise refusée',
   'sale.cancelled': 'Vente annulée',
   'sale.cancel.refused': 'Annulation refusée',
+  'sale.returned': 'Retour d’un client',
+  'sale.return.refused': 'Retour refusé',
   'product.created': 'Produit créé',
   'product.updated': 'Fiche produit modifiée',
   'product.deactivated': 'Produit désactivé',

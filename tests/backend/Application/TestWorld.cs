@@ -122,7 +122,13 @@ internal sealed class TestWorld
 
     public SyncSalesHandler SyncSales => new(RecordSale);
 
-    public CancelSaleHandler CancelSale => new(Current, Sales, Customers, Audit, Clock, UnitOfWork);
+    public InMemorySaleReturnRepository Returns { get; } = new();
+
+    public SaleReversal Reversal => new(Current, Sales, Returns, Sessions, Products, Movements, Customers, Users, Hasher, Audit, Clock, UnitOfWork);
+
+    public ReturnSaleHandler ReturnSale => new(Reversal);
+
+    public CancelSaleHandler CancelSale => new(Reversal);
 
     public CreateCustomerHandler CreateCustomer => new(Current, Customers, Settings, Clock, UnitOfWork);
 

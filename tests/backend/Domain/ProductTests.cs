@@ -155,4 +155,40 @@ public class ProductTests
         Assert.False(product.IsActive);
         Assert.Throws<DomainException>(() => product.Receive(1, null, Actor, At));
     }
+
+    [Fact]
+    public void A_returned_article_goes_back_on_the_shelf_with_its_exact_quantity()
+    {
+        var product = Given();
+        product.Receive(10, null, Actor, At);
+        var before = product.QuantityOnHand;
+
+        var movements = product.TakeBack(2, resellable: true, StockMovementKind.Return, "Retour", Guid.NewGuid(), Actor, At);
+
+        Assert.Equal(before + 2, product.QuantityOnHand);
+        Assert.Equal(StockMovementKind.Return, Assert.Single(movements).Kind);
+    }
+
+    [Fact]
+    public void A_damaged_article_comes_back_and_leaves_at_once_so_the_stock_does_not_rise()
+    {
+        var product = Given();
+        product.Receive(10, null, Actor, At);
+        var before = product.QuantityOnHand;
+
+        var movements = product.TakeBack(2, resellable: false, StockMovementKind.Return, "Abîmé", Guid.NewGuid(), Actor, At);
+
+        Assert.Equal(before, product.QuantityOnHand);
+        Assert.Equal([StockMovementKind.Return, StockMovementKind.Loss], movements.Select(movement => movement.Kind).ToArray());
+        Assert.Equal([2, -2], movements.Select(movement => movement.QuantityDelta).ToArray());
+    }
+
+    [Fact]
+    public void A_product_without_stock_tracking_is_not_touched_by_a_return_and_a_wrong_kind_is_refused()
+    {
+        var service = Given(tracksStock: false);
+
+        Assert.Empty(service.TakeBack(1, true, StockMovementKind.Return, "x", Guid.NewGuid(), Actor, At));
+        Assert.Throws<DomainException>(() => Given().TakeBack(1, true, StockMovementKind.Reception, "x", Guid.NewGuid(), Actor, At));
+    }
 }

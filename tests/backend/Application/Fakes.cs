@@ -434,3 +434,22 @@ internal sealed class FakeDataExportWriter : IDataExportWriter
         return Bytes;
     }
 }
+
+internal sealed class InMemorySaleReturnRepository : ISaleReturnRepository
+{
+    private readonly List<SaleReturn> _all = [];
+
+    public IReadOnlyList<SaleReturn> All => _all;
+
+    public Task<SaleReturn?> GetAsync(SaleReturnId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_all.FirstOrDefault(item => item.Tenant == tenant && item.Id == id));
+
+    public Task<IReadOnlyList<SaleReturn>> ListForSaleAsync(SaleId sale, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SaleReturn>>(_all.Where(item => item.Tenant == tenant && item.SaleId == sale).OrderBy(item => item.At).ToArray());
+
+    public Task AddAsync(SaleReturn saleReturn, CancellationToken cancellationToken)
+    {
+        _all.Add(saleReturn);
+        return Task.CompletedTask;
+    }
+}

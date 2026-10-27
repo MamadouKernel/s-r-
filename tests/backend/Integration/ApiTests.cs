@@ -209,7 +209,7 @@ public sealed class ApiTests(PostgresFixture fixture) : IDisposable
         var accepted = await manager.PostAsJsonAsync($"/api/v1/sales/{saleId}/cancel", cancellation);
 
         await AssertProblemAsync(refused, HttpStatusCode.Forbidden, "forbidden");
-        Assert.Equal(HttpStatusCode.NoContent, accepted.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
 
     [Fact]

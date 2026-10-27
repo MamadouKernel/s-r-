@@ -244,6 +244,36 @@ public sealed class Product
         return TracksStock ? Apply(null, StockMovementKind.Sale, -quantity, null, saleId, user, at) : null;
     }
 
+    /// <summary>
+    /// Une vente annulée ou un retour (docs/decisions/0020) : la marchandise revient en stock. Si elle est abîmée, elle revient puis part aussitôt en
+    /// perte (deux mouvements de même motif), pour que l'historique montre ce qui s'est passé sans que le stock monte. Sans effet pour un produit sans
+    /// suivi de stock ; un produit désactivé peut être rendu.
+    /// </summary>
+    public IReadOnlyList<StockMovement> TakeBack(
+        int quantity,
+        bool resellable,
+        StockMovementKind kind,
+        string reason,
+        Guid sourceId,
+        UserId user,
+        DateTimeOffset at)
+    {
+        Ensure.That(quantity > 0, "La quantité doit être strictement positive.");
+        Ensure.That(kind is StockMovementKind.Return or StockMovementKind.SaleCancellation, "Ce mouvement n'est pas un retour.");
+        if (!TracksStock)
+        {
+            return [];
+        }
+
+        var movements = new List<StockMovement> { Apply(null, kind, quantity, reason, sourceId, user, at) };
+        if (!resellable)
+        {
+            movements.Add(Apply(null, StockMovementKind.Loss, -quantity, reason, sourceId, user, at));
+        }
+
+        return movements;
+    }
+
     private void EnsureStockOperation(int quantity)
     {
         Ensure.That(IsActive, "Ce produit est désactivé.");

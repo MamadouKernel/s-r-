@@ -37,6 +37,7 @@ public static class DependencyInjection
 
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<ISaleReturnRepository, SaleReturnRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductFamilyRepository, ProductFamilyRepository>();
         services.AddScoped<IPhotoStore, PhotoStore>();

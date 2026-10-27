@@ -714,6 +714,131 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnLineRow", b =>
+                {
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("return_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("LineIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_index");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<bool>("Resellable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("resellable");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ReturnId", "Position");
+
+                    b.ToTable("sale_return_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sale_return_lines_values", "quantity > 0 AND line_index >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnRefundRow", b =>
+                {
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("return_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ReturnId", "Position");
+
+                    b.ToTable("sale_return_refunds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sale_return_refunds_amount", "amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid>("ByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("by_user_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("RefundSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_session_id");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sale_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("Total")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("TenantId", "SaleId");
+
+                    b.ToTable("sale_returns", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sale_returns_total", "total >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -811,6 +936,10 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.Property<long>("CashReceived")
                         .HasColumnType("bigint")
                         .HasColumnName("cash_received");
+
+                    b.Property<long>("CashRefunded")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_refunded");
 
                     b.Property<long?>("CashVariance")
                         .HasColumnType("bigint")
@@ -1181,6 +1310,33 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnLineRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.SaleReturnRow", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnRefundRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.SaleReturnRow", null)
+                        .WithMany("Refunds")
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.SaleRow", null)
+                        .WithMany()
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleRow", b =>
                 {
                     b.HasOne("Soro.Infrastructure.Persistence.SessionRow", null)
@@ -1197,6 +1353,13 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleReturnRow", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Refunds");
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.SaleRow", b =>

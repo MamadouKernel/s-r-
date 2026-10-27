@@ -67,7 +67,7 @@ public sealed class ExportDataHandler(
         var commerce = await commerces.GetAsync(user.Tenant, cancellationToken);
         var data = await queries.ReadAsync(user.Tenant, period, cancellationToken);
         var bytes = writer.Write(new DataExport(
-            commerce?.Name ?? "Boutique", period, now, data.Products, data.Customers, data.Repayments, data.Sales, data.SaleLines, data.Movements));
+            commerce?.Name ?? "Boutique", period, now, data.Products, data.Customers, data.Repayments, data.Sales, data.SaleLines, data.Movements, data.Returns));
 
         await audit.RecordAsync(
             new AuditEntry(
