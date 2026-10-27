@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Soro.Application.Sales;
 using Soro.Domain.Common;
 using Soro.Domain.Identity;
 using Soro.Infrastructure.Security;
@@ -20,7 +21,7 @@ public sealed class ApiApprovalTests(PostgresFixture fixture) : IDisposable
 
     private static async Task<JsonElement> JsonOf(HttpResponseMessage response) => await response.Content.ReadFromJsonAsync<JsonElement>();
 
-    private static object Grant(string identifier, string pin, Guid subject, string purpose = "reversal") => new { identifier, pin, subjectId = subject, purpose };
+    private static object Grant(string identifier, string pin, Guid subject, string purpose = "reversal", long amount = 0) => new { identifier, pin, subjectId = subject, purpose, amount };
 
     private async Task RegisterManagerAsync()
     {
@@ -105,7 +106,7 @@ public sealed class ApiApprovalTests(PostgresFixture fixture) : IDisposable
         var sale = Guid.NewGuid();
 
         var refused = await till.PostAsJsonAsync("/api/v1/sales", Sale(Guid.NewGuid(), null));
-        var granted = await till.PostAsJsonAsync("/api/v1/approvals", Grant("gerant", "482163", sale, "discount"));
+        var granted = await till.PostAsJsonAsync("/api/v1/approvals", Grant("gerant", "482163", sale, "discount", 300));
         var accepted = await till.PostAsJsonAsync("/api/v1/sales", Sale(sale, (await JsonOf(granted)).GetProperty("token").GetString()));
 
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
@@ -120,9 +121,9 @@ public sealed class ApiApprovalTests(PostgresFixture fixture) : IDisposable
         var approver = UserId.New();
         var subject = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        var token = seal.Issue(tenant, approver, subject, "reversal", now.AddMinutes(15));
+        var token = seal.Issue(tenant, approver, subject, "reversal", 250, now.AddMinutes(15));
 
-        Assert.Equal(approver, seal.Open(token, tenant, subject, "reversal", now));
+        Assert.Equal(new SealedApproval(approver, 250), seal.Open(token, tenant, subject, "reversal", now));
         Assert.Null(seal.Open(token, TenantId.New(), subject, "reversal", now));
         Assert.Null(seal.Open(token, tenant, Guid.NewGuid(), "reversal", now));
         Assert.Null(seal.Open(token, tenant, subject, "discount", now));

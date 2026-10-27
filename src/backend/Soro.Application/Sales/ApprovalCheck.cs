@@ -25,11 +25,14 @@ public static class ApprovalPurposes
 /// <summary>Signe et relit les approbations : un gérant tape son PIN une fois, la caisse garde seulement la preuve, liée à une vente et à un usage.</summary>
 public interface IApprovalSeal
 {
-    string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, DateTimeOffset expiresAt);
+    /// <param name="limit">Le montant que le gérant a vu et accepté (la remise, en FCFA) ; 0 pour un usage sans montant.</param>
+    string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, long limit, DateTimeOffset expiresAt);
 
-    /// <returns>Le gérant qui a approuvé, ou <c>null</c> si la preuve est fausse, périmée, d'un autre commerce, d'une autre vente ou d'un autre usage.</returns>
-    UserId? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now);
+    /// <returns>Le gérant qui a approuvé et le montant accepté, ou <c>null</c> si la preuve est fausse, périmée, d'un autre commerce, d'une autre vente ou d'un autre usage.</returns>
+    SealedApproval? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now);
 }
+
+public sealed record SealedApproval(UserId Approver, long Limit);
 
 public static class ApprovalCheck
 {
@@ -42,6 +45,7 @@ public static class ApprovalCheck
         Approval? approval,
         Guid subject,
         string purpose,
+        long amount,
         CancellationToken cancellationToken)
     {
         if (RolePolicy.IsManager(user.Role))
@@ -51,8 +55,9 @@ public static class ApprovalCheck
 
         if (approval?.Token is { } token)
         {
-            var approver = seal.Open(token, user.Tenant, subject, purpose, clock.UtcNow) is { } id
-                ? await users.GetAsync(id, user.Tenant, cancellationToken)
+            // La preuve vaut pour le montant que le gérant a vu : une remise plus grande que celle-là n'est pas approuvée.
+            var approver = seal.Open(token, user.Tenant, subject, purpose, clock.UtcNow) is { } opened && amount <= opened.Limit
+                ? await users.GetAsync(opened.Approver, user.Tenant, cancellationToken)
                 : null;
             // Un gérant désactivé depuis, ou devenu autre chose, n'approuve plus rien.
             return approver is { Role: Role.Manager, Status: UserStatus.Active } ? new(true, approver.Id) : new(false, null);

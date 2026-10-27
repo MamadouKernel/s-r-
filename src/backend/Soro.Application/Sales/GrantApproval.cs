@@ -5,7 +5,8 @@ using Soro.Domain.Identity;
 
 namespace Soro.Application.Sales;
 
-public sealed record GrantApprovalCommand(string Identifier, string Pin, Guid Subject, string Purpose);
+/// <param name="Amount">Pour une remise : le montant (FCFA) que le gérant voit et accepte ; la preuve ne vaut pas au-delà.</param>
+public sealed record GrantApprovalCommand(string Identifier, string Pin, Guid Subject, string Purpose, long Amount = 0);
 
 public sealed record ApprovalGranted(string Token, UserId Approver, string ApproverName, DateTimeOffset ExpiresAt);
 
@@ -42,6 +43,11 @@ public sealed class GrantApprovalHandler(
             return Result<ApprovalGranted>.Failure(ApplicationError.RuleViolation("Cette validation n'existe pas."));
         }
 
+        if (command.Purpose == ApprovalPurposes.Discount && command.Amount <= 0)
+        {
+            return Result<ApprovalGranted>.Failure(ApplicationError.RuleViolation("Indiquez le montant de la remise."));
+        }
+
         var approver = await users.FindByIdentifierAsync(user.Tenant, User.Normalize(command.Identifier ?? string.Empty), cancellationToken);
         if (approver is null)
         {
@@ -61,6 +67,6 @@ public sealed class GrantApprovalHandler(
 
         var expires = clock.UtcNow + (command.Purpose == ApprovalPurposes.Discount ? DiscountValidity : ReversalValidity);
         return Result<ApprovalGranted>.Success(new ApprovalGranted(
-            seal.Issue(user.Tenant, approver.Id, command.Subject, command.Purpose, expires), approver.Id, approver.DisplayName, expires));
+            seal.Issue(user.Tenant, approver.Id, command.Subject, command.Purpose, command.Purpose == ApprovalPurposes.Discount ? command.Amount : 0, expires), approver.Id, approver.DisplayName, expires));
     }
 }

@@ -57,7 +57,7 @@ internal static class SaleEndpoints
     /// <summary>Un gérant tape son identifiant et son PIN sur la caisse ; la caisse reçoit une approbation signée pour cette vente seulement.</summary>
     private static async Task<IResult> GrantApprovalAsync(GrantApprovalRequest request, GrantApprovalHandler handler, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(new GrantApprovalCommand(request.Identifier, request.Pin, request.SubjectId, request.Purpose), cancellationToken);
+        var result = await handler.HandleAsync(new GrantApprovalCommand(request.Identifier, request.Pin, request.SubjectId, request.Purpose, request.Amount), cancellationToken);
         return result.ToHttp(granted => Results.Ok(new ApprovalGrantedResponse(granted.Token, granted.Approver.Value, granted.ApproverName, granted.ExpiresAt)));
     }
 

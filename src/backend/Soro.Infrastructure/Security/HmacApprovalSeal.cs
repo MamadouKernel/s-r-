@@ -25,13 +25,13 @@ public sealed class HmacApprovalSeal : IApprovalSeal
         _key = HMACSHA256.HashData(pepper, Encoding.UTF8.GetBytes("soro:approval-seal:v1"));
     }
 
-    public string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, DateTimeOffset expiresAt)
+    public string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, long limit, DateTimeOffset expiresAt)
     {
-        var payload = Encoding.UTF8.GetBytes(string.Join('|', tenant.Value, approver.Value, subject, purpose, expiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)));
+        var payload = Encoding.UTF8.GetBytes(string.Join('|', tenant.Value, approver.Value, subject, purpose, expiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), limit.ToString(CultureInfo.InvariantCulture)));
         return Base64Url(payload) + "." + Base64Url(HMACSHA256.HashData(_key, payload));
     }
 
-    public UserId? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now)
+    public SealedApproval? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now)
     {
         var parts = token.Split('.');
         if (parts.Length != 2 || !TryDecode(parts[0], out var payload) || !TryDecode(parts[1], out var mac))
@@ -45,15 +45,16 @@ public sealed class HmacApprovalSeal : IApprovalSeal
         }
 
         var fields = Encoding.UTF8.GetString(payload).Split('|');
-        if (fields.Length != 5
+        if (fields.Length != 6
             || !Guid.TryParse(fields[0], out var tokenTenant) || !Guid.TryParse(fields[1], out var approver) || !Guid.TryParse(fields[2], out var tokenSubject)
-            || !long.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out var expires))
+            || !long.TryParse(fields[4], NumberStyles.None, CultureInfo.InvariantCulture, out var expires)
+            || !long.TryParse(fields[5], NumberStyles.None, CultureInfo.InvariantCulture, out var limit))
         {
             return null;
         }
 
         var valid = tokenTenant == tenant.Value && tokenSubject == subject && fields[3] == purpose && now.ToUnixTimeSeconds() <= expires;
-        return valid ? new UserId(approver) : null;
+        return valid ? new SealedApproval(new UserId(approver), limit) : null;
     }
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');

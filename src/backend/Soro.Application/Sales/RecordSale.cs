@@ -339,7 +339,7 @@ public sealed class RecordSaleHandler(
             return null;
         }
 
-        if (!(await ApprovalCheck.CheckAsync(user, users, hasher, seal, clock, command.DiscountApproval, command.Id.Value, ApprovalPurposes.Discount, cancellationToken)).Approved)
+        if (!(await ApprovalCheck.CheckAsync(user, users, hasher, seal, clock, command.DiscountApproval, command.Id.Value, ApprovalPurposes.Discount, draft.Discount.Amount, cancellationToken)).Approved)
         {
             await audit.RecordAsync(Entry(AuditActions.DiscountRefused, command, draft.Discount), cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);

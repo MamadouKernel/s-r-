@@ -152,4 +152,7 @@ public sealed record GrantApprovalRequest
 
     /// <summary><c>discount</c> ou <c>reversal</c>.</summary>
     public required string Purpose { get; init; }
+
+    /// <summary>Pour une remise : le montant en FCFA que le gérant a vu ; la preuve ne vaut pas au-delà.</summary>
+    public long Amount { get; init; }
 }

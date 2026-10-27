@@ -8,8 +8,8 @@ namespace Soro.Application.Tests;
 
 public class ApprovalGrantTests
 {
-    private static GrantApprovalCommand Ask(string identifier, string pin, Guid? subject = null, string purpose = ApprovalPurposes.Reversal) =>
-        new(identifier, pin, subject ?? Guid.NewGuid(), purpose);
+    private static GrantApprovalCommand Ask(string identifier, string pin, Guid? subject = null, string purpose = ApprovalPurposes.Reversal, long amount = 0) =>
+        new(identifier, pin, subject ?? Guid.NewGuid(), purpose, purpose == ApprovalPurposes.Discount && amount == 0 ? 200 : amount);
 
     [Fact]
     public async Task A_manager_identifier_and_pin_give_a_signed_approval_for_one_subject()
@@ -24,7 +24,7 @@ public class ApprovalGrantTests
         Assert.Equal(manager.Id, result.Value!.Approver);
         Assert.Equal("Awa Koné", result.Value.ApproverName);
         Assert.False(string.IsNullOrEmpty(result.Value.Token));
-        Assert.Equal(manager.Id, world.Seal.Open(result.Value.Token, world.Tenant, subject, ApprovalPurposes.Reversal, world.Clock.UtcNow));
+        Assert.Equal(manager.Id, world.Seal.Open(result.Value.Token, world.Tenant, subject, ApprovalPurposes.Reversal, world.Clock.UtcNow)!.Approver);
     }
 
     [Fact]
@@ -162,5 +162,33 @@ public class ApprovalGrantTests
 
         Assert.True(result.IsSuccess);
         Assert.Contains(world.Audit.Entries, entry => entry.Action == AuditActions.DiscountApproved);
+    }
+
+    [Fact]
+    public async Task A_discount_approval_covers_the_amount_the_manager_saw_and_no_more()
+    {
+        var world = new TestWorld();
+        var session = world.GivenOpenSession();
+        world.GivenUser("gerant", pin: "4321", role: Role.Manager);
+        var draft = world.CashSale(session, price: 1_000, discount: 300);
+        var tooLow = (await world.GrantApproval.HandleAsync(Ask("gerant", "4321", draft.Id.Value, ApprovalPurposes.Discount, amount: 200))).Value!;
+
+        var refused = await world.RecordSale.HandleAsync(draft with { DiscountApproval = Approval.FromToken(tooLow.Token) });
+        var enough = (await world.GrantApproval.HandleAsync(Ask("gerant", "4321", draft.Id.Value, ApprovalPurposes.Discount, amount: 300))).Value!;
+        var accepted = await world.RecordSale.HandleAsync(draft with { DiscountApproval = Approval.FromToken(enough.Token) });
+
+        Assert.Equal(ErrorCodes.Forbidden, refused.Error!.Code);
+        Assert.True(accepted.IsSuccess);
+    }
+
+    [Fact]
+    public async Task A_discount_approval_needs_an_amount()
+    {
+        var world = new TestWorld();
+        world.GivenUser("gerant", pin: "4321", role: Role.Manager);
+
+        var result = await world.GrantApproval.HandleAsync(new GrantApprovalCommand("gerant", "4321", Guid.NewGuid(), ApprovalPurposes.Discount, 0));
+
+        Assert.Equal(ErrorCodes.RuleViolation, result.Error!.Code);
     }
 }
