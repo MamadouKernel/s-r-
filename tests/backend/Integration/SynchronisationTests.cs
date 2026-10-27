@@ -36,6 +36,7 @@ public class SynchronisationTests(PostgresFixture fixture)
             new DefaultSettings(),
             new UserRepository(db),
             new Pbkdf2PinHasher(new byte[32]),
+            new HmacApprovalSeal(new byte[32]),
             new DebtRepaymentRepository(db),
             new AuditTrail(db),
             new FixedClock(),

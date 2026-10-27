@@ -36,13 +36,17 @@ public class ReportingTests
         var world = new TestWorld();
         world.ActAs(world.Cashier, role);
 
-        var results = new[]
+        // Un caissier retrouve ses propres tickets (TillSalesTests) ; tout le reste des rapports lui est fermé.
+        var results = new List<ApplicationError?>
         {
-            (await world.ListSales.HandleAsync(Sales())).Error,
-            (await world.GetSale.HandleAsync(SaleId.New())).Error,
             (await world.ListSessions.HandleAsync(new ListSessionsQuery(null, null, null, false, null, null))).Error,
             (await world.ActivityReport.HandleAsync(new GetActivityReportQuery(Start, Start.AddDays(1)))).Error,
         };
+        if (role != Role.Cashier)
+        {
+            results.Add((await world.ListSales.HandleAsync(Sales())).Error);
+            results.Add((await world.GetSale.HandleAsync(SaleId.New())).Error);
+        }
 
         Assert.All(results, error => Assert.Equal(ErrorCodes.Forbidden, error!.Code));
         Assert.Empty(world.Reporting.Calls);

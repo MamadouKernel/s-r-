@@ -17,7 +17,8 @@ public sealed record SaleSummary(
     SaleStatus Status,
     IReadOnlyList<PaymentMethod> PaymentMethods,
     int LineCount,
-    long ReturnedFcfa = 0);
+    long ReturnedFcfa = 0,
+    long Ticket = 0);
 
 public sealed record SaleLineView(Guid ProductId, string ProductName, int Quantity, long UnitPriceFcfa, long TotalFcfa, MeasureUnit Unit = MeasureUnit.Piece);
 
@@ -56,7 +57,8 @@ public sealed record SaleDetail(
     IReadOnlyList<SaleLineView> Lines,
     IReadOnlyList<PaymentView> Payments,
     CancellationView? Cancellation,
-    IReadOnlyList<ReturnView>? Returns = null);
+    IReadOnlyList<ReturnView>? Returns = null,
+    long Ticket = 0);
 
 public sealed record SessionSummary(
     Guid Id,

@@ -77,6 +77,9 @@ public sealed record RecordSaleRequest
     /// <summary>Le PIN du gérant qui valide la remise : l'identifiant seul ne prouve rien (docs/decisions/0018).</summary>
     public string? DiscountApproverPin { get; init; }
 
+    /// <summary>L'approbation signée donnée plus tôt par un gérant (<c>POST /approvals</c>) : elle remplace son PIN, qui ne reste jamais dans la file de la caisse.</summary>
+    public string? DiscountApprovalToken { get; init; }
+
     /// <summary>Le gérant qui a validé un dépassement du plafond de crédit du client (CRD-04), comme pour une remise.</summary>
     public Guid? CreditApproverId { get; init; }
 
@@ -105,6 +108,9 @@ public sealed record CancelSaleRequest
     public Guid? ApproverId { get; init; }
 
     public string? ApproverPin { get; init; }
+
+    /// <summary>L'approbation signée d'un gérant (<c>POST /approvals</c>), à la place de son identifiant et de son PIN.</summary>
+    public string? ApprovalToken { get; init; }
 }
 
 public sealed record ReturnLineRequest
@@ -131,4 +137,19 @@ public sealed record ReturnSaleRequest
     public Guid? ApproverId { get; init; }
 
     public string? ApproverPin { get; init; }
+
+    public string? ApprovalToken { get; init; }
+}
+
+public sealed record GrantApprovalRequest
+{
+    public required string Identifier { get; init; }
+
+    public required string Pin { get; init; }
+
+    /// <summary>La vente concernée : l'approbation ne vaut que pour elle.</summary>
+    public required Guid SubjectId { get; init; }
+
+    /// <summary><c>discount</c> ou <c>reversal</c>.</summary>
+    public required string Purpose { get; init; }
 }

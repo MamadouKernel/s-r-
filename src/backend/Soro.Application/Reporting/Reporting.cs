@@ -2,6 +2,7 @@ using Soro.Application.Common;
 using Soro.Application.Identity;
 using Soro.Domain.Cash;
 using Soro.Domain.Common;
+using Soro.Domain.Identity;
 using Soro.Domain.Sales;
 
 namespace Soro.Application.Reporting;
@@ -47,13 +48,17 @@ public sealed record ListSalesQuery(
     int? Offset);
 
 /// <summary>Liste des ventes du commerce (REP-01).</summary>
-public sealed class ListSalesHandler(ICurrentUser user, IReportingQueries queries)
+public sealed class ListSalesHandler(ICurrentUser user, IReportingQueries queries, IClock clock)
 {
+    /// <summary>Un caissier retrouve ses ventes récentes pour annuler ou reprendre un article (docs/decisions/0020) : pas l'historique entier du commerce.</summary>
+    public static readonly TimeSpan CashierWindow = TimeSpan.FromDays(7);
+
     public async Task<Result<IReadOnlyList<SaleSummary>>> HandleAsync(
         ListSalesQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (!RolePolicy.CanViewReports(user.Role))
+        var cashier = user.Role == Role.Cashier;
+        if (!RolePolicy.CanViewReports(user.Role) && !cashier)
         {
             return Result<IReadOnlyList<SaleSummary>>.Failure(ReportingRules.Forbidden);
         }
@@ -63,8 +68,11 @@ public sealed class ListSalesHandler(ICurrentUser user, IReportingQueries querie
             return Result<IReadOnlyList<SaleSummary>>.Failure(invalid);
         }
 
+        // Un caissier ne voit que ses ventes des sept derniers jours, quoi qu'il demande.
+        var earliest = clock.UtcNow - CashierWindow;
+        var from = cashier && (query.From is null || query.From < earliest) ? earliest : query.From;
         var filter = new SalesFilter(
-            query.From, query.To, query.Session, query.Cashier, query.IncludeCancelled,
+            from, query.To, query.Session, cashier ? user.User : query.Cashier, query.IncludeCancelled,
             ReportingRules.Limit(query.Limit), ReportingRules.Offset(query.Offset));
         return Result<IReadOnlyList<SaleSummary>>.Success(
             await queries.ListSalesAsync(user.Tenant, filter, cancellationToken));
@@ -76,13 +84,15 @@ public sealed class GetSaleHandler(ICurrentUser user, IReportingQueries queries)
 {
     public async Task<Result<SaleDetail>> HandleAsync(SaleId id, CancellationToken cancellationToken = default)
     {
-        if (!RolePolicy.CanViewReports(user.Role))
+        var cashier = user.Role == Role.Cashier;
+        if (!RolePolicy.CanViewReports(user.Role) && !cashier)
         {
             return Result<SaleDetail>.Failure(ReportingRules.Forbidden);
         }
 
         var sale = await queries.GetSaleAsync(user.Tenant, id, cancellationToken);
-        return sale is null
+        // La vente d'un collègue n'existe pas pour un caissier.
+        return sale is null || (cashier && sale.CashierId != user.User.Value)
             ? Result<SaleDetail>.Failure(ApplicationError.NotFound("Vente introuvable."))
             : Result<SaleDetail>.Success(sale);
     }

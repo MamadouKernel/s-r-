@@ -14,7 +14,14 @@ using Soro.Domain.Stock;
 namespace Soro.Application.Sales;
 
 /// <summary>Approbation d'un gérant : son identifiant ET son PIN, que le serveur vérifie (docs/decisions/0018).</summary>
-public sealed record Approval(UserId Approver, string Pin);
+/// <summary>
+/// La validation d'un gérant : soit son identifiant (déjà résolu) et son PIN, soit l'approbation signée qu'il a donnée plus tôt (<see cref="Token"/>,
+/// docs/decisions/0020) : la caisse ne garde ainsi jamais un PIN.
+/// </summary>
+public sealed record Approval(UserId Approver, string Pin, string? Token = null)
+{
+    public static Approval FromToken(string token) => new(default, string.Empty, token);
+}
 
 public sealed record SaleLineInput(ProductId Product, string Name, int Quantity, long UnitPriceFcfa)
 {
@@ -62,6 +69,7 @@ public sealed class RecordSaleHandler(
     IShopSettings settings,
     IUserRepository users,
     IPinHasher hasher,
+    IApprovalSeal seal,
     IDebtRepaymentRepository repayments,
     IAuditTrail audit,
     IClock clock,
@@ -331,7 +339,7 @@ public sealed class RecordSaleHandler(
             return null;
         }
 
-        if (!await IsApprovedAsync(command.DiscountApproval, cancellationToken))
+        if (!(await ApprovalCheck.CheckAsync(user, users, hasher, seal, clock, command.DiscountApproval, command.Id.Value, ApprovalPurposes.Discount, cancellationToken)).Approved)
         {
             await audit.RecordAsync(Entry(AuditActions.DiscountRefused, command, draft.Discount), cancellationToken);
             await unitOfWork.CommitAsync(cancellationToken);

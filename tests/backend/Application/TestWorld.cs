@@ -108,6 +108,10 @@ internal sealed class TestWorld
 
     public FakePinHasher Hasher { get; } = new();
 
+    public FakeApprovalSeal Seal { get; } = new();
+
+    public GrantApprovalHandler GrantApproval => new(Current, Users, Hasher, Seal, Audit, Clock, UnitOfWork);
+
     public FakeTenantScope Scope { get; } = new();
 
     private FakeTokenIssuer Tokens { get; } = new();
@@ -118,13 +122,13 @@ internal sealed class TestWorld
 
     public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, UnitOfWork);
 
-    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Users, Hasher, Repayments, Audit, Clock, UnitOfWork);
+    public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Users, Hasher, Seal, Repayments, Audit, Clock, UnitOfWork);
 
     public SyncSalesHandler SyncSales => new(RecordSale);
 
     public InMemorySaleReturnRepository Returns { get; } = new();
 
-    public SaleReversal Reversal => new(Current, Sales, Returns, Sessions, Products, Movements, Customers, Users, Hasher, Audit, Clock, UnitOfWork);
+    public SaleReversal Reversal => new(Current, Sales, Returns, Sessions, Products, Movements, Customers, Users, Hasher, Seal, Audit, Clock, UnitOfWork);
 
     public ReturnSaleHandler ReturnSale => new(Reversal);
 
@@ -246,7 +250,7 @@ internal sealed class TestWorld
 
     public ListStockMovementsHandler ListStockMovements => new(Current, Products, Movements);
 
-    public ListSalesHandler ListSales => new(Current, Reporting);
+    public ListSalesHandler ListSales => new(Current, Reporting, Clock);
 
     public GetSaleHandler GetSale => new(Current, Reporting);
 
@@ -322,6 +326,23 @@ internal sealed class TestWorld
         var session = CashRegisterSession.Open(SessionId.New(), assignment, Money.Fcfa(openingFloat), Morning);
         Sessions.Put(session);
         return session;
+    }
+
+    /// <summary>Une vente de <paramref name="quantity"/> fois ce produit, payée en espèces dans cette session, déjà présente dans le dépôt.</summary>
+    public Sale GivenSale(CashRegisterSession session, Product product, int quantity, long price)
+    {
+        var total = quantity * price;
+        var sale = session.RecordSale(new SaleDraft(
+            SaleId.New(),
+            1,
+            Morning.AddMinutes(5),
+            [SaleLine.Create(product.Id, product.Name, quantity, Money.Fcfa(price))],
+            Money.Zero,
+            [Payment.Cash(PaymentId.New(), Money.Fcfa(total), Money.Fcfa(total))],
+            null));
+        Sales.Put(sale);
+        Sessions.Put(session);
+        return sale;
     }
 
     /// <summary>Vente validée directement par le domaine, déjà présente dans le dépôt.</summary>

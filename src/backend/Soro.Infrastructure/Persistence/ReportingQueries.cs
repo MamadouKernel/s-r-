@@ -60,6 +60,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 sale.Status,
                 Methods = sale.Payments.OrderBy(payment => payment.Position).Select(payment => payment.Method).ToList(),
                 LineCount = sale.Lines.Count,
+                sale.LocalSequence,
                 Returned = db.SaleReturns.Where(item => item.SaleId == sale.Id && item.Kind == ReturnKind.Return).Sum(item => (long?)item.Total) ?? 0L,
             })
             .ToListAsync(cancellationToken);
@@ -67,7 +68,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         return rows
             .Select(row => new SaleSummary(
                 row.Id, row.RecordedAt, row.CashierId, row.RegisterId, row.SessionId,
-                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount, row.Returned))
+                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount, row.Returned, row.LocalSequence))
             .ToArray();
     }
 
@@ -120,7 +121,8 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 item.Total,
                 item.Refunds.Where(part => part.Method == PaymentMethod.Cash).Sum(part => part.Amount),
                 item.Lines.OrderBy(line => line.Position).Select(line => new ReturnLineView(line.LineIndex, line.Quantity, line.Resellable)).ToArray(),
-                item.Refunds.OrderBy(part => part.Position).Select(part => new ReturnRefundView(part.Method, part.Amount)).ToArray())).ToArray());
+                item.Refunds.OrderBy(part => part.Position).Select(part => new ReturnRefundView(part.Method, part.Amount)).ToArray())).ToArray(),
+            row.LocalSequence);
     }
 
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(

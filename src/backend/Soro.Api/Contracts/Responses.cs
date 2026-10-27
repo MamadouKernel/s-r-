@@ -21,3 +21,5 @@ public sealed record RefundPartResponse(PaymentMethod Method, long AmountFcfa);
 
 /// <summary>Ce que le serveur a calculé pour une annulation ou un retour : de quoi dire « rendez X en espèces », « remboursez Y par Wave ».</summary>
 public sealed record ReversalResponse(Guid ReturnId, long TotalFcfa, long CashFcfa, long CreditFcfa, IReadOnlyList<RefundPartResponse> Refund, bool AlreadyProcessed);
+
+public sealed record ApprovalGrantedResponse(string Token, Guid ApproverId, string ApproverName, DateTimeOffset ExpiresAt);

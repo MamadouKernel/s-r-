@@ -305,6 +305,8 @@ internal sealed class FakeReportingQueries : IReportingQueries
 
     public SalesFilter? LastSalesFilter { get; private set; }
 
+    public SaleDetail? Detail { get; set; }
+
     public Task<IReadOnlyList<SaleSummary>> ListSalesAsync(
         TenantId tenant, SalesFilter filter, CancellationToken cancellationToken)
     {
@@ -316,7 +318,7 @@ internal sealed class FakeReportingQueries : IReportingQueries
     public Task<SaleDetail?> GetSaleAsync(TenantId tenant, SaleId id, CancellationToken cancellationToken)
     {
         Record(nameof(GetSaleAsync), tenant);
-        return Task.FromResult<SaleDetail?>(null);
+        return Task.FromResult(Detail);
     }
 
     public Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
@@ -452,4 +454,22 @@ internal sealed class InMemorySaleReturnRepository : ISaleReturnRepository
         _all.Add(saleReturn);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>Une approbation « signée » en mémoire : se reconnaît, se périme, ne vaut que pour sa vente et son usage.</summary>
+internal sealed class FakeApprovalSeal : IApprovalSeal
+{
+    private readonly Dictionary<string, (TenantId Tenant, UserId Approver, Guid Subject, string Purpose, DateTimeOffset Expires)> _issued = [];
+
+    public string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, DateTimeOffset expiresAt)
+    {
+        var token = $"sceau:{Guid.NewGuid():N}";
+        _issued[token] = (tenant, approver, subject, purpose, expiresAt);
+        return token;
+    }
+
+    public UserId? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now) =>
+        _issued.TryGetValue(token, out var found) && found.Tenant == tenant && found.Subject == subject && found.Purpose == purpose && now <= found.Expires
+            ? found.Approver
+            : null;
 }

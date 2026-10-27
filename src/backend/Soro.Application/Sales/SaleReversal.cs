@@ -33,6 +33,7 @@ public sealed class SaleReversal(
     ICustomerRepository customers,
     IUserRepository users,
     IPinHasher hasher,
+    IApprovalSeal seal,
     IAuditTrail audit,
     IClock clock,
     IUnitOfWork unitOfWork)
@@ -68,14 +69,15 @@ public sealed class SaleReversal(
             return Result<ReversalResult>.Success(ToResult(done, alreadyProcessed: true));
         }
 
-        if (!await ApprovalCheck.IsApprovedAsync(user, users, hasher, clock, request.Approval, cancellationToken))
+        var approval = await ApprovalCheck.CheckAsync(user, users, hasher, seal, clock, request.Approval, request.SaleId.Value, ApprovalPurposes.Reversal, cancellationToken);
+        if (!approval.Approved)
         {
             return await RefuseAsync(request, refusedAction, "Un gérant doit valider : son identifiant et son code PIN sont nécessaires.", cancellationToken);
         }
 
         try
         {
-            var result = await ReverseAsync(request, sale, doneAction, cancellationToken);
+            var result = await ReverseAsync(request, sale, doneAction, approval.ApprovedBy, cancellationToken);
             return result;
         }
         catch (DomainException exception)
@@ -91,7 +93,7 @@ public sealed class SaleReversal(
         }
     }
 
-    private async Task<Result<ReversalResult>> ReverseAsync(Request request, Sale sale, string doneAction, CancellationToken cancellationToken)
+    private async Task<Result<ReversalResult>> ReverseAsync(Request request, Sale sale, string doneAction, UserId? approvedBy, CancellationToken cancellationToken)
     {
         var history = await returns.ListForSaleAsync(sale.Id, user.Tenant, cancellationToken);
         var plan = request.Kind == ReturnKind.Cancellation
@@ -105,7 +107,6 @@ public sealed class SaleReversal(
         }
 
         var now = clock.UtcNow;
-        var approvedBy = RolePolicy.IsManager(user.Role) ? (UserId?)null : request.Approval!.Approver;
         var saleReturn = SaleReturn.Record(request.OperationId, sale, request.Kind, now, user.User, approvedBy, request.Reason, plan, session?.Id);
 
         await TakeBackStockAsync(sale, plan, request, now, cancellationToken);

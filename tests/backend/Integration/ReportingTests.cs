@@ -203,8 +203,11 @@ public sealed class ReportingTests(PostgresFixture fixture) : IDisposable
         Assert.Equal(2, sales.GetArrayLength());
         Assert.Equal("Cash", detail.GetProperty("payments")[0].GetProperty("method").GetString());
         Assert.Equal(1, sessions.GetArrayLength());
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/api/v1/sales")).StatusCode);
+        // Le caissier retrouve ses propres tickets, pas ceux des autres, et aucun rapport.
+        Assert.Equal(0, (await cashier.GetFromJsonAsync<JsonElement>("/api/v1/sales")).GetArrayLength());
+        Assert.Equal(HttpStatusCode.NotFound, (await cashier.GetAsync($"/api/v1/sales/{cash.Id.Value}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync($"/api/v1/reports/activity?from={from}&to={to}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/api/v1/register-sessions")).StatusCode);
     }
 
     [Fact]
