@@ -1,6 +1,6 @@
 # Spécification — Clôture à l'aveugle, sorties d'espèces et rapport du soir
 
-**Statut :** brouillon à valider ; décisions de `docs/decisions/0021-cloture-a-l-aveugle-sorties-d-especes-et-rapport-du-soir.md`.
+**Statut :** brouillon à valider, **réécrit le 27/10/2026 à partir des pratiques documentées du commerce de détail** (voir la décision 0021, qui cite les sources et dit ce qui n'a pas pu être établi) ; décisions de `docs/decisions/0021-cloture-a-l-aveugle-sorties-d-especes-et-rapport-du-soir.md`.
 **Lots :** (1) serveur : mouvements de caisse, clôture à deux comptages, signalement des écarts et des caisses ouvertes, rapport du jour, e-mail du soir ; (2) caisse : mouvements, clôture à l'aveugle avec aide au comptage, page « Rapport du jour ».
 
 ## Objectif
@@ -37,7 +37,7 @@ Une `Expense` ou un `Drop` de plus de **5 000 FCFA** exige l'approbation d'un g�
 `GET /api/v1/reports/day?date=YYYY-MM-DD` (propriétaire, gérant, comptable ; défaut : aujourd'hui) :
 - **Ventes** : total net, nombre de tickets, panier moyen, par moyen de paiement.
 - **Par caissier** : ventes (nombre, total), annulations (nombre, montant rendu), retours (nombre, montant), remises (nombre, montant), écart de caisse de ses sessions closes.
-- **Sorties d'espèces** : total par type et par motif, avec qui et quand.
+- **Sorties d'espèces** : total par type et par motif, avec qui et quand. **Mobile Money** : total par opérateur (à retrouver sur le téléphone du patron : cet argent n'est pas dans le tiroir).
 - **Sessions** : fond, attendu, compté, écart, état ; les non clôturées en tête.
 - **Crédit** : dettes créées, versements encaissés. **Stock** : produits en rupture ou sous le seuil (pour qui lit le stock).
 La journée est le jour UTC (Côte d'Ivoire : même chose). Le rapport ne contient aucun prix d'achat ni marge pour le comptable.
@@ -46,7 +46,7 @@ La journée est le jour UTC (Côte d'Ivoire : même chose). Le rapport ne contie
 `soro-ops rapport-du-soir [--date]` (à planifier chaque jour à 20 h) envoie à chaque commerce actif un e-mail au propriétaire (et au comptable) avec le contenu du rapport en texte simple, en français, montants en FCFA, **un seul e-mail par commerce et par jour** (rejouable sans doublon). Aucun envoi pour un commerce sans vente ni caisse ouverte ce jour-là, ou en lecture seule. Échec d'envoi : compté et journalisé, jamais bloquant.
 
 ### CLO-09 Caisse : clôture à l'aveugle
-Écran « Clôturer la caisse » : le caissier voit seulement « Comptez les espèces du tiroir », un champ de montant et « Compter par billets » (aide facultative : une ligne par coupure, somme en direct). **Ni le montant attendu, ni l'écart, ni les ventes en espèces ne s'affichent**. Gérant et propriétaire voient l'attendu **après** avoir saisi leur comptage. Si le serveur demande un recomptage : « Votre comptage ne correspond pas à ce qui est attendu. Recomptez, billet par billet, puis confirmez. » (aucun montant). Après la clôture : « Caisse clôturée. Montant compté : X FCFA. » Hors réseau : le comptage est gardé ; au retour du réseau, si un recomptage est demandé, la caisse affiche l'invite « Recomptez la caisse de {jour} » (la session reste ouverte côté serveur) et envoie le second comptage.
+Écran « Clôturer la caisse » : le caissier voit seulement « Comptez les espèces du tiroir », un champ de montant et « Compter par billets » (aide facultative : une ligne par coupure, somme en direct). **Ni le montant attendu, ni l'écart, ni les ventes en espèces ne s'affichent**. Gérant et propriétaire voient l'attendu **après** avoir saisi leur comptage ; un gérant peut compter à la place du caissier. Si le serveur demande un recomptage : « Votre comptage ne correspond pas à ce qui est attendu. Recomptez, billet par billet, puis confirmez. » (aucun montant). Après la clôture : « Caisse clôturée. Montant compté : X FCFA. » Hors réseau : le comptage est gardé ; au retour du réseau, si un recomptage est demandé, la caisse affiche l'invite « Recomptez la caisse de {jour} » (la session reste ouverte côté serveur) et envoie le second comptage.
 
 ### CLO-10 Caisse : mouvements
 Bouton « Mouvements » dans la caisse : choix Dépense / Versement au coffre / Apport, montant, motif (liste), enregistrement. Au-delà de 5 000 FCFA : fenêtre « Validation du gérant » (réseau obligatoire). Les mouvements du jour s'affichent (heure, type, montant, motif) ; un mouvement erroné s'annule par un mouvement inverse motivé. Hors réseau : les petites sorties sont gardées dans la file et envoyées **avant** la clôture, dans l'ordre. Le ticket de clôture ne montre pas l'attendu.
@@ -54,21 +54,29 @@ Bouton « Mouvements » dans la caisse : choix Dépense / Versement au coffre / 
 ### CLO-11 Page « Rapport du jour »
 Dans l'application (propriétaire, gérant, comptable) : la même matière que l'e-mail, avec choix de la date, dates précédentes en lecture seule, « besoin du réseau » sinon. Vocabulaire simple : jamais « variance », « session » : « écart de caisse », « caisse de Awa ».
 
+### CLO-13 Avertissement « trop d'argent dans le tiroir »
+Quand l'attendu de la session dépasse **100 000 FCFA** (valeur de départ), la caisse affiche « Faites un versement au coffre » avec un bouton vers « Mouvements ». Aucun blocage dans ce lot. Le dépassement figure dans le rapport du soir.
+
+### CLO-14 Écart sans retenue
+Aucun écran, aucun rapport ni aucun e-mail ne calcule une retenue, une dette ou un remboursement du caissier ; l'écart est un fait à examiner.
+
 ### CLO-12 Sécurité et intégrité
 - Aucun montant attendu, écart ni détail d'un autre commerce n'est lisible ; le commerce vient du jeton.
 - Un caissier ne peut lire ni l'attendu ni l'écart par aucune route (liste de sessions, détail, rapport).
 - Tout mouvement et tout comptage sont rejouables par identifiant ; deux requêtes simultanées sur la même session : une seule réussit (jeton de version).
 - Chaque refus et chaque écart sont journalisés avec l'auteur.
 
-## Scénarios
+## Situations types
 
-1. **Soir ordinaire.** Awa compte 14 350 FCFA, sans rien voir ; la caisse est close ; le patron reçoit le rapport à 20 h : « Awa : écart 0 ».
-2. **Dépense honnête.** Awa paie 1 500 FCFA de transport au livreur : « Dépense · Transport · 1 500 ». À la clôture, l'attendu en tient compte : pas de faux manque.
-3. **Grosse sortie.** Le patron prend 20 000 FCFA : un gérant valide avec son PIN ; « Versement au coffre » est enregistré.
-4. **Erreur de comptage.** Awa compte 12 000 au lieu de 13 000 : « Recomptez… » (sans dire de combien) ; elle recompte 13 000 : clôture, aucun signalement.
-5. **Vrai manque.** Awa compte 10 500, recompte 10 500 : clôture ; journal : « Écart de caisse de −2 500 FCFA (Awa) » ; le rapport du soir le met en tête.
-6. **Caisse oubliée.** Kofi n'a pas clôturé : le rapport du soir et le tableau de bord le disent.
-7. **Coupure du réseau à la clôture.** Awa clôture sans réseau ; au retour du réseau, un recomptage est demandé : la caisse l'invite à recompter.
+Elles viennent des pratiques documentées, pas d'une boutique observée : les montants sont des **ordres de grandeur**, à remplacer par ceux du pilote.
+
+1. **Soir ordinaire.** Le caissier compte les coupures sans rien voir ; la caisse est close ; le rapport du soir dit « écart 0 » pour sa caisse.
+2. **Dépense honnête.** Une petite dépense payée du tiroir (transport, sachets) est saisie avec son motif : à la clôture l'attendu en tient compte, elle n'apparaît pas comme un manque.
+3. **Trop d'argent dans le tiroir.** Passé le seuil, la caisse avertit « Faites un versement au coffre » ; le gérant prend l'argent, valide avec son PIN, et le versement est noté à part d'une dépense.
+4. **Erreur de comptage.** Un billet oublié : « Recomptez… » (sans dire de combien ni dans quel sens) ; au second comptage, le compte est juste : clôture, aucun signalement.
+5. **Vrai écart.** Le second comptage donne le même résultat, hors tolérance : clôture ; le journal note l'écart, **manque ou excédent**, avec le caissier et le jour ; le rapport du soir le met en tête. Aucune retenue n'est calculée.
+6. **Caisse oubliée.** Un caissier n'a pas clôturé : le rapport du soir et le tableau de bord le disent.
+7. **Coupure du réseau à la clôture.** Le caissier clôture sans réseau ; au retour du réseau, un recomptage est demandé : la caisse l'invite à recompter.
 8. **Caissier curieux.** Aucune route ne lui rend l'attendu ; l'écran n'affiche rien d'autre que ce qu'il a compté.
 9. **Rejeu.** Le même mouvement envoyé deux fois : une seule dépense.
 10. **Sortie trop grosse pour le tiroir.** Refusée avec un message qui dit quoi faire.
