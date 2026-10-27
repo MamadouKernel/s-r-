@@ -489,7 +489,7 @@ describe('PaymentPanel: remise (ARR-08)', () => {
 
     await context.typeId('remise-valeur', '300');
 
-    expect(context.root.textContent).toContain('il faut du réseau');
+    expect(context.root.textContent).toContain('Il faut du réseau');
     expect([...context.root.querySelectorAll('button')].some((button) => button.textContent?.includes('Demander l’accord'))).toBe(false);
     await context.click('Valider la vente');
     expect(context.confirmSale).not.toHaveBeenCalled();
