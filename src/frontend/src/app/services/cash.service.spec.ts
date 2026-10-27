@@ -102,11 +102,45 @@ describe('CashService', () => {
     expect((await journal.operations()).filter((op) => op.kind === 'sale')).toHaveLength(1);
   });
 
+  it('records a discount with the approval of a manager, on the sale id that was announced to the server', async () => {
+    const { cash, journal } = await setup();
+    cash.add(jus, 3);
+    const announced = cash.checkoutSaleId();
+
+    const sale = await cash.confirmSale(
+      [{ id: 'pay-1', method: 'Cash', amountFcfa: 1500, tenderedFcfa: 1500 }],
+      null,
+      { amountFcfa: 300, approvalToken: 'sceau' },
+    );
+
+    expect(sale.saleId).toBe(announced);
+    expect(sale).toMatchObject({ discountFcfa: 300, netTotalFcfa: 1500, discountApprovalToken: 'sceau' });
+    expect(cash.checkoutSaleId()).not.toBe(announced);
+    expect((await journal.pendingOperations()).filter((op) => op.kind === 'sale')).toHaveLength(1);
+  });
+
+  it('gives the same sale id to the approval and to the sale until the sale is recorded', async () => {
+    const { cash } = await setup();
+    cash.add(jus);
+
+    expect(cash.checkoutSaleId()).toBe(cash.checkoutSaleId());
+  });
+
+  it('notes the cash given back to a customer so that the closing expects the right amount', async () => {
+    const { cash } = await setup();
+    cash.add(jus);
+    await cash.confirmSale([{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }]);
+
+    await cash.recordCashRefund('r-1', 600);
+
+    expect(await cash.summary()).toMatchObject({ expectedCashFcfa: 10000, refundsFcfa: 600 });
+  });
+
   it('closes the session, empties the cart and queues the closing', async () => {
     const { cash, journal } = await setup();
     cash.add(jus);
     await cash.confirmSale([{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }]);
-    expect(await cash.summary()).toEqual({ salesCount: 1, netTotalFcfa: 600, expectedCashFcfa: 10600 });
+    expect(await cash.summary()).toEqual({ salesCount: 1, netTotalFcfa: 600, expectedCashFcfa: 10600, refundsFcfa: 0 });
 
     const closing = await cash.closeSession(10600);
 

@@ -27,6 +27,9 @@
         @if (showManagement()) {
           <a class="btn" routerLink="/gestion" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Gestion</a>
         }
+        @if (showSales()) {
+          <a class="btn" routerLink="/ventes" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Ventes</a>
+        }
         @if (showCustomers()) {
           <a class="btn" routerLink="/clients" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Clients</a>
         }

@@ -11,7 +11,34 @@ import { NetworkService } from '../services/network.service';
 import { ReceiptService } from '../services/receipt.service';
 import { SyncService } from '../services/sync.service';
 import { Receipt } from '../core/receipt';
+import { ApprovalDialog } from '../sales/approval-dialog';
+import { ApprovalGranted } from '../sales/sales-api';
 import { TicketActions } from './ticket-actions';
+
+/** Au-delà de cette part du total, la remise d'un caissier demande l'accord d'un gérant (seuil du commerce, 10 % par défaut ; le serveur tranche). */
+const FREE_DISCOUNT_PERCENT = 10;
+
+/** Lit la remise tapée : en FCFA ou en pourcentage (virgule ou point), arrondie au franc le plus proche, demi vers le haut ; toujours inférieure au total. */
+function parseDiscount(text: string, mode: 'fcfa' | 'percent', total: number): { amount: number; error: string } {
+  const cleaned = text.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+  if (cleaned === '') {
+    return { amount: 0, error: '' };
+  }
+  if (mode === 'fcfa') {
+    const value = parseFcfa(cleaned);
+    if (value === null) {
+      return { amount: 0, error: 'Tapez la remise en francs, en chiffres entiers.' };
+    }
+    return value >= total ? { amount: 0, error: 'La remise doit rester inférieure au total.' } : { amount: value, error: '' };
+  }
+  const match = /^(\d{1,2})(?:\.(\d{1,2}))?$/.exec(cleaned);
+  if (!match) {
+    return { amount: 0, error: 'Tapez un pourcentage entre 0 et 99, par exemple 5 ou 7,5.' };
+  }
+  const hundredths = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+  const amount = Math.floor((total * hundredths + 5000) / 10000);
+  return amount >= total ? { amount: 0, error: 'La remise doit rester inférieure au total.' } : { amount, error: '' };
+}
 
 interface Row {
   id: string;
@@ -24,7 +51,7 @@ interface Row {
 /** S5 : espèces, Mobile Money et paiement mixte, avec récapitulatif avant validation (PWA-05). */
 @Component({
   selector: 'app-payment-panel',
-  imports: [TicketActions],
+  imports: [TicketActions, ApprovalDialog],
   template: `
     @if (confirmed(); as sale) {
       <section class="panel" aria-labelledby="paiement-titre" role="status">
@@ -56,7 +83,55 @@ interface Row {
     } @else {
       <section class="panel" aria-labelledby="paiement-titre">
         <h2 id="paiement-titre" class="text-xl font-bold">Paiement</h2>
-        <p class="amount mt-1 text-2xl font-bold">À payer : {{ format(total()) }}</p>
+        @if (discount() > 0) {
+          <p class="amount mt-1 text-base text-ardoise">Total : {{ format(total()) }}</p>
+          <p class="amount text-base text-ardoise">Remise : -{{ format(discount()) }}</p>
+        }
+        <p class="amount mt-1 text-2xl font-bold">À payer : {{ format(net()) }}</p>
+
+        @if (!discountOpen()) {
+          <button type="button" class="btn mt-3" (click)="discountOpen.set(true)">Remise</button>
+        } @else {
+          <fieldset class="mt-3 rounded border border-sauge p-3">
+            <legend class="field-label px-1">Remise</legend>
+            <div class="grid grid-cols-[1fr_auto] gap-2">
+              <div>
+                <label class="field-label" for="remise-valeur">{{ discountMode() === 'percent' ? 'Pourcentage de remise' : 'Montant de la remise (FCFA)' }}</label>
+                <input id="remise-valeur" class="field amount text-right" type="text" inputmode="decimal" autocomplete="off" [value]="discountText()" (input)="setDiscountText($any($event.target).value)" aria-describedby="remise-erreur" />
+              </div>
+              <div>
+                <label class="field-label" for="remise-mode">En</label>
+                <select id="remise-mode" class="field" (change)="setDiscountMode($any($event.target).value)">
+                  <option value="fcfa" [selected]="discountMode() === 'fcfa'">FCFA</option>
+                  <option value="percent" [selected]="discountMode() === 'percent'">%</option>
+                </select>
+              </div>
+            </div>
+            <p id="remise-erreur" class="field-error" role="alert">{{ discountError() }}</p>
+            @if (needsApproval()) {
+              <p class="mt-2 text-base font-semibold text-avertissement" role="note">
+                Cette remise dépasse {{ freePercent }} % du total : l’accord d’un gérant est nécessaire.
+                @if (!network.online()) {
+                  Il faut du réseau pour qu’un gérant valide : baissez la remise ou attendez le retour du réseau.
+                }
+              </p>
+              @if (network.online() && !asking()) {
+                <button type="button" class="btn mt-2" (click)="asking.set(true)">Demander l’accord d’un gérant</button>
+              }
+              @if (asking()) {
+                <div class="mt-2">
+                  <app-approval-dialog
+                    [saleId]="saleId()" purpose="discount" [amountFcfa]="discount()"
+                    reason="Une remise de plus de 10 % demande l’accord d’un gérant."
+                    (granted)="approved($event)" (cancelled)="asking.set(false)"
+                  />
+                </div>
+              }
+            } @else if (approval() && discount() > 0 && exceedsFree()) {
+              <p class="mt-2 text-base font-semibold text-succes" role="status">Remise validée par {{ approval()?.name }}.</p>
+            }
+          </fieldset>
+        }
 
         @for (row of rows(); track row.id; let index = $index) {
           <fieldset class="mt-4 border-t border-sauge pt-4">
@@ -239,7 +314,7 @@ export class PaymentPanel implements OnInit {
   private readonly used = signal<ReadonlySet<string>>(new Set());
 
   protected readonly drafts = computed<PaymentDraft[]>(() => this.rows().map((row) => this.toDraft(row)));
-  protected readonly remaining = computed(() => this.total() - this.drafts().reduce((sum, d) => sum + d.amountFcfa, 0));
+  protected readonly remaining = computed(() => this.net() - this.drafts().reduce((sum, d) => sum + d.amountFcfa, 0));
   protected readonly hasCredit = computed(() => this.rows().some((row) => row.method === 'Credit'));
   protected readonly customer = signal<CustomerSnapshot | null>(null);
   protected readonly search = signal('');
@@ -260,10 +335,37 @@ export class PaymentPanel implements OnInit {
   });
   protected readonly errors = computed(() => {
     const chosen = this.customer();
-    const problems = validatePayments(this.total(), this.drafts(), this.used(), this.hasCredit() ? chosen?.id : null);
+    const problems = validatePayments(this.net(), this.drafts(), this.used(), this.hasCredit() ? chosen?.id : null);
     const ceiling = this.hasCredit() && chosen ? creditProblem(chosen, this.creditTotal(), this.canExceed()) : null;
-    return ceiling ? [...problems, ceiling] : problems;
+    const base = ceiling ? [...problems, ceiling] : problems;
+    const approvalProblem = this.needsApproval()
+      ? [this.network.online() ? `La remise dépasse ${FREE_DISCOUNT_PERCENT} % : l’accord d’un gérant est nécessaire.` : 'Cette remise demande l’accord d’un gérant : il faut du réseau.']
+      : [];
+    return this.discountError() ? [this.discountError(), ...approvalProblem, ...base] : [...approvalProblem, ...base];
   });
+
+  // ---- Remise (docs/specs/annulations-remises-retours ARR-08) ----------------------------------------------------------------------------
+
+  protected readonly freePercent = FREE_DISCOUNT_PERCENT;
+  protected readonly discountOpen = signal(false);
+  protected readonly discountMode = signal<'fcfa' | 'percent'>('fcfa');
+  protected readonly discountText = signal('');
+  protected readonly asking = signal(false);
+  protected readonly approval = signal<{ token: string; name: string; amountFcfa: number } | null>(null);
+
+  private readonly parsedDiscount = computed(() => parseDiscount(this.discountText(), this.discountMode(), this.total()));
+  protected readonly discount = computed(() => this.parsedDiscount().amount);
+  protected readonly discountError = computed(() => this.parsedDiscount().error);
+  protected readonly net = computed(() => this.total() - this.discount());
+  protected readonly exceedsFree = computed(() => this.discount() * 100 > this.total() * FREE_DISCOUNT_PERCENT);
+  /** Le gérant et le propriétaire vendent à leur propre risque ; un caissier doit avoir l'accord d'un gérant au-delà du seuil. */
+  protected readonly needsApproval = computed(() => !this.canExceed() && this.exceedsFree() && !this.isApproved());
+  private readonly isApproved = computed(() => {
+    const given = this.approval();
+    return given !== null && given.amountFcfa >= this.discount();
+  });
+  /** L'identifiant de la vente que l'accord d'un gérant va couvrir : le même que celui de l'enregistrement. */
+  protected readonly saleId = computed(() => this.cash.checkoutSaleId());
 
   /** Récapitulatif d'une vente à crédit confirmée : combien, pour qui, et la nouvelle dette. */
   protected readonly soldOnCredit = computed(() => {
@@ -275,6 +377,28 @@ export class PaymentPanel implements OnInit {
     const amount = sale.payments.filter((payment) => payment.method === 'Credit').reduce((sum, payment) => sum + payment.amountFcfa, 0);
     return { name: chosen.name, amount, newDebt: chosen.debtFcfa + amount };
   });
+
+  protected setDiscountText(text: string): void {
+    this.discountText.set(text);
+    this.followNet();
+  }
+
+  protected setDiscountMode(mode: 'fcfa' | 'percent'): void {
+    this.discountMode.set(mode);
+    this.followNet();
+  }
+
+  protected approved(granted: ApprovalGranted): void {
+    this.approval.set({ token: granted.token, name: granted.approverName, amountFcfa: this.discount() });
+    this.asking.set(false);
+  }
+
+  /** Un seul paiement en espèces suit le net à payer : c'est le cas courant, et le caissier ne retape rien. Plusieurs paiements : on ne touche à rien. */
+  private followNet(): void {
+    if (this.rows().length === 1 && this.rows()[0].method === 'Cash') {
+      this.rows.set([{ ...this.rows()[0], amount: String(this.net()), tendered: String(this.net()) }]);
+    }
+  }
 
   async ngOnInit(): Promise<void> {
     this.rows.set([this.newRow('Cash', this.total())]);
@@ -359,7 +483,11 @@ export class PaymentPanel implements OnInit {
       return;
     }
     try {
-      const sale = await this.cash.confirmSale(this.drafts(), this.hasCredit() ? (this.customer()?.id ?? null) : null);
+      const sale = await this.cash.confirmSale(
+        this.drafts(),
+        this.hasCredit() ? (this.customer()?.id ?? null) : null,
+        this.discount() > 0 ? { amountFcfa: this.discount(), approvalToken: this.exceedsFree() && !this.canExceed() ? (this.approval()?.token ?? null) : null } : null,
+      );
       this.confirmed.set(sale);
       await this.prepareTicket(sale);
     } catch (error) {

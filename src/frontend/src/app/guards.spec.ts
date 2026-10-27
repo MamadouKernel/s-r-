@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, scannerGuard, teamGuard, userGuard, welcomeGuard, labelsGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, managementGuard, reportsGuard, scannerGuard, teamGuard, userGuard, welcomeGuard, labelsGuard, salesGuard } from './guards';
 import { CashService } from './services/cash.service';
 import { AuthService } from './services/auth.service';
 
@@ -164,6 +164,17 @@ describe('customersGuard', () => {
   it('sends a stock keeper back to the products and a signed out visitor to the login', () => {
     expect(run(true, 'StockKeeper', customersGuard)).toBe('/gestion/produits');
     expect(run(false, undefined, customersGuard)).toBe('/connexion');
+  });
+});
+
+describe('salesGuard', () => {
+  it('lets the till profiles find, cancel and take back sales', () => {
+    expect(['Owner', 'Manager', 'Cashier'].map((role) => run(true, role, salesGuard))).toEqual([true, true, true]);
+  });
+
+  it('sends the others back to the till and a signed out visitor to the login', () => {
+    expect(['StockKeeper', 'Accountant'].map((role) => run(true, role, salesGuard))).toEqual(['/vente', '/vente']);
+    expect(run(false, undefined, salesGuard)).toBe('/connexion');
   });
 });
 

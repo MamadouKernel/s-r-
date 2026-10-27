@@ -10,6 +10,7 @@ import { NetworkService } from '../services/network.service';
 import { SyncService } from '../services/sync.service';
 import { Receipt } from '../core/receipt';
 import { ReceiptService } from '../services/receipt.service';
+import { SalesApi } from '../sales/sales-api';
 import { PaymentPanel } from './payment-panel';
 
 const sale = (draft: PaymentDraft[]): SaleOperation => ({
@@ -28,12 +29,14 @@ interface Options {
   role?: string;
   online?: boolean;
   created?: CustomerSnapshot;
+  grant?: ReturnType<typeof vi.fn>;
 }
 
 async function render(used: string[] = [], pending = 1, options: Omit<Options, 'used' | 'pending'> = {}) {
-  const confirmSale = vi.fn(async (drafts: PaymentDraft[], customerId?: string | null) => ({
+  const confirmSale = vi.fn(async (drafts: PaymentDraft[], customerId?: string | null, _discount?: { amountFcfa: number; approvalToken: string | null } | null) => ({
     ...sale(drafts), ...(customerId ? { customerId } : {}),
   }));
+  const grant = options.grant ?? vi.fn().mockResolvedValue({ token: 'sceau', approverId: 'm-1', approverName: 'Kofi Diaby', expiresAt: 'x' });
   const receipts = { remember: vi.fn(async (_sale: SaleOperation, _customer: string | null) => ({ commerce: 'Supérette' }) as Receipt), last: signal<Receipt | null>(null) };
   const customersSignal = signal(options.customers ?? []);
   const customerService = {
@@ -52,9 +55,10 @@ async function render(used: string[] = [], pending = 1, options: Omit<Options, '
       { provide: CustomerService, useValue: customerService },
       { provide: AuthService, useValue: { user: signal({ id: 'u', displayName: 'Awa', role: options.role ?? 'Cashier' }) } },
       { provide: NetworkService, useValue: { online: signal(options.online ?? true) } },
+      { provide: SalesApi, useValue: { grant } },
       {
         provide: CashService,
-        useValue: { confirmSale, usedReferences: async () => new Set(used), submitting: signal(false) },
+        useValue: { confirmSale, usedReferences: async () => new Set(used), submitting: signal(false), checkoutSaleId: () => 'sale-id' },
       },
     ],
   });
@@ -78,7 +82,8 @@ async function render(used: string[] = [], pending = 1, options: Omit<Options, '
     element.dispatchEvent(new Event('change'));
     await fixture.whenStable();
   };
-  return { fixture, root, confirmSale, customerService, receipts, type, click, choose };
+  const typeId = async (id: string, value: string) => type(root.querySelector<HTMLInputElement>('#' + id)!, value);
+  return { fixture, root, confirmSale, customerService, receipts, type, typeId, click, choose, grant };
 }
 
 describe('PaymentPanel', () => {
@@ -378,5 +383,115 @@ describe('PaymentPanel: ticket (docs/specs/etiquettes-tickets TKT-01)', () => {
     expect(root.textContent).toContain('Vente enregistrée');
     expect(root.textContent).toContain('Nouvelle vente');
     expect(root.textContent).not.toContain('Imprimer le ticket');
+  });
+});
+
+describe('PaymentPanel: remise (ARR-08)', () => {
+  const openDiscount = async (context: Awaited<ReturnType<typeof render>>) => context.click('Remise');
+
+  it('keeps the discount hidden until it is asked for', async () => {
+    const { root } = await render();
+    expect(root.querySelector('#remise-valeur')).toBeNull();
+    expect(root.textContent).toContain('À payer : 1\u00a0450\u00a0FCFA');
+  });
+
+  it('takes a discount in francs, shows what remains to pay and sends it with the sale', async () => {
+    const context = await render();
+    await openDiscount(context);
+
+    await context.typeId('remise-valeur', '50');
+
+    expect(context.root.textContent).toContain('Remise : -50\u00a0FCFA');
+    expect(context.root.textContent).toContain('À payer : 1\u00a0400\u00a0FCFA');
+    expect(context.root.querySelector<HTMLInputElement>('input[id^="montant-"]')!.value).toBe('1400');
+    await context.click('Valider la vente');
+    expect(context.confirmSale).toHaveBeenCalledWith(expect.anything(), null, { amountFcfa: 50, approvalToken: null });
+  });
+
+  it('takes a discount in percent, rounded to the franc (half up)', async () => {
+    const context = await render();
+    await openDiscount(context);
+    await context.choose('#remise-mode', 'percent');
+
+    await context.typeId('remise-valeur', '5');
+
+    // 5 % de 1 450 = 72,5 -> 73
+    expect(context.root.textContent).toContain('Remise : -73\u00a0FCFA');
+    expect(context.root.textContent).toContain('À payer : 1\u00a0377\u00a0FCFA');
+  });
+
+  it.each(['abc', '-5', '0,5,2', '100', '1450'])('refuses « %s » as a discount with a message that says what to type', async (text) => {
+    const context = await render();
+    await openDiscount(context);
+    await context.choose('#remise-mode', text === '1450' ? 'fcfa' : 'percent');
+
+    await context.typeId('remise-valeur', text);
+
+    expect(context.root.querySelector('#remise-erreur')?.textContent?.trim()).not.toBe('');
+    await context.click('Valider la vente');
+    expect(context.confirmSale).not.toHaveBeenCalled();
+  });
+
+  it('stops a cashier above ten percent and asks for a manager, who validates with his code', async () => {
+    const context = await render();
+    await openDiscount(context);
+    await context.typeId('remise-valeur', '300');
+
+    expect(context.root.textContent).toContain('dépasse 10 %');
+    await context.click('Valider la vente');
+    expect(context.confirmSale).not.toHaveBeenCalled();
+
+    await context.click('Demander l’accord d’un gérant');
+    await context.typeId('validation-identifiant', 'gerant');
+    await context.typeId('validation-pin', '482163');
+    context.root.querySelector('#validation-pin')!.closest('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await context.fixture.whenStable();
+
+    expect(context.grant).toHaveBeenCalledWith({ identifier: 'gerant', pin: '482163', saleId: 'sale-id', purpose: 'discount', amountFcfa: 300 });
+    expect(context.root.textContent).toContain('Remise validée par Kofi Diaby');
+    await context.click('Valider la vente');
+    expect(context.confirmSale).toHaveBeenCalledWith(expect.anything(), null, { amountFcfa: 300, approvalToken: 'sceau' });
+  });
+
+  it('asks again when the discount grows beyond what the manager saw, but not when it shrinks', async () => {
+    const context = await render();
+    await openDiscount(context);
+    await context.typeId('remise-valeur', '300');
+    await context.click('Demander l’accord d’un gérant');
+    await context.typeId('validation-identifiant', 'gerant');
+    await context.typeId('validation-pin', '482163');
+    context.root.querySelector('#validation-pin')!.closest('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await context.fixture.whenStable();
+
+    await context.typeId('remise-valeur', '400');
+    expect(context.root.textContent).toContain('dépasse 10 %');
+    await context.typeId('remise-valeur', '250');
+    expect(context.root.textContent).toContain('Remise validée par Kofi Diaby');
+  });
+
+  it('needs no approval from a manager or for a discount within ten percent', async () => {
+    const manager = await render([], 1, { role: 'Manager' });
+    await openDiscount(manager);
+    await manager.typeId('remise-valeur', '600');
+    await manager.click('Valider la vente');
+    expect(manager.confirmSale).toHaveBeenCalledWith(expect.anything(), null, { amountFcfa: 600, approvalToken: null });
+
+    TestBed.resetTestingModule();
+    const cashier = await render();
+    await openDiscount(cashier);
+    await cashier.typeId('remise-valeur', '145');
+    expect(cashier.root.textContent).not.toContain('dépasse 10 %');
+  });
+
+  it('says a discount above ten percent needs the network, and does not offer the manager dialog without it', async () => {
+    const context = await render([], 1, { online: false });
+    await openDiscount(context);
+
+    await context.typeId('remise-valeur', '300');
+
+    expect(context.root.textContent).toContain('il faut du réseau');
+    expect([...context.root.querySelectorAll('button')].some((button) => button.textContent?.includes('Demander l’accord'))).toBe(false);
+    await context.click('Valider la vente');
+    expect(context.confirmSale).not.toHaveBeenCalled();
   });
 });

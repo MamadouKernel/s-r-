@@ -153,4 +153,27 @@ describe('ApiService', () => {
     expect(products[0].unit).toBe('Kilogram');
     expect(products[1]).not.toHaveProperty('unit');
   });
+
+  it('sends the discount with the signed approval of the manager, never a PIN', async () => {
+    const approved = { ...sale, discountFcfa: 300, discountApprovalToken: 'sceau' };
+
+    const result = api.syncSales([approved]);
+    const request = http.expectOne('/api/v1/sales/sync');
+    const body = request.request.body.sales[0];
+    request.flush({ statuses: [] });
+    await result;
+
+    expect(body).toMatchObject({ discountFcfa: 300, discountApprovalToken: 'sceau' });
+    expect(JSON.stringify(body)).not.toMatch(/pin/i);
+  });
+
+  it('leaves the approval out when there is none', async () => {
+    const result = api.syncSales([sale]);
+    const request = http.expectOne('/api/v1/sales/sync');
+    const body = request.request.body.sales[0];
+    request.flush({ statuses: [] });
+    await result;
+
+    expect(body).not.toHaveProperty('discountApprovalToken');
+  });
 });

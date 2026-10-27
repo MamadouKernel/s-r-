@@ -21,6 +21,23 @@ export interface Receipt {
   changeFcfa: number;
   /** Vente à crédit : le client et ce qu'il reste à payer. */
   customer: { name: string; creditFcfa: number } | null;
+  /** Présent sur un ticket de retour ou d'annulation : le ticket d'origine et ce qui est rendu au client (docs/decisions/0020). */
+  reversal?: { title: string; originalTicket: number; reason: string };
+}
+
+export interface ReversalReceiptInput {
+  commerce: string;
+  cashier: string;
+  register: string;
+  at: string;
+  /** Le numéro du ticket de la vente d'origine. */
+  saleTicket: number;
+  kind: 'Return' | 'Cancellation';
+  reason: string;
+  /** Les articles rendus, avec le montant payé pour eux. */
+  lines: Receipt['lines'];
+  /** Ce qui est rendu au client, par moyen de paiement d'origine. */
+  refund: { method: PaymentMethod; amountFcfa: number }[];
 }
 
 export interface ReceiptContext {
@@ -70,6 +87,32 @@ export function buildReceipt(sale: SaleOperation, context: ReceiptContext): Rece
     tenderedFcfa: cash.length > 0 ? cash.reduce((sum, payment) => sum + (payment.tenderedFcfa ?? 0), 0) : null,
     changeFcfa: sale.changeFcfa,
     customer: context.customer && credit > 0 ? { name: context.customer.name, creditFcfa: credit } : null,
+  };
+}
+
+function refundLabel(method: PaymentMethod): string {
+  if (method === 'Cash') {
+    return 'Rendu en espèces';
+  }
+  return method === 'Credit' ? 'Dette effacée' : `À rembourser par ${methodLabel(method)}`;
+}
+
+/** Le ticket de retour ou d'annulation : fabriqué avec ce que le serveur a calculé, imprimé comme un ticket de caisse. */
+export function buildReversalReceipt(input: ReversalReceiptInput): Receipt {
+  return {
+    commerce: input.commerce,
+    at: input.at,
+    cashier: input.cashier,
+    register: input.register,
+    rank: input.saleTicket,
+    lines: input.lines,
+    discountFcfa: 0,
+    totalFcfa: input.refund.reduce((sum, part) => sum + part.amountFcfa, 0),
+    payments: input.refund.map((part) => ({ label: refundLabel(part.method), amountFcfa: part.amountFcfa })),
+    tenderedFcfa: null,
+    changeFcfa: 0,
+    customer: null,
+    reversal: { title: input.kind === 'Cancellation' ? 'VENTE ANNULÉE' : 'TICKET DE RETOUR', originalTicket: input.saleTicket, reason: input.reason },
   };
 }
 
@@ -139,7 +182,8 @@ export function receiptText(receipt: Receipt, columns: number): string {
     ...center(receipt.commerce, columns),
     dateTime(receipt.at),
     ...wrap(`Caissier : ${receipt.cashier}`, columns),
-    ...wrap(`${receipt.register} · n° ${receipt.rank}`, columns),
+    ...wrap(receipt.reversal ? receipt.register : `${receipt.register} · n° ${receipt.rank}`, columns),
+    ...(receipt.reversal ? [...center(receipt.reversal.title, columns), ...wrap(`Ticket d'origine n° ${receipt.reversal.originalTicket}`, columns)] : []),
     rule,
   ];
   for (const line of receipt.lines) {
@@ -149,7 +193,7 @@ export function receiptText(receipt: Receipt, columns: number): string {
   if (receipt.discountFcfa > 0) {
     out.push(...row('Remise', `-${amount(receipt.discountFcfa)}`, columns));
   }
-  out.push(...row('TOTAL', amount(receipt.totalFcfa), columns));
+  out.push(...row(receipt.reversal ? 'TOTAL RENDU' : 'TOTAL', amount(receipt.totalFcfa), columns));
   for (const payment of receipt.payments) {
     out.push(...row(payment.label, amount(payment.amountFcfa), columns));
   }
@@ -161,6 +205,10 @@ export function receiptText(receipt: Receipt, columns: number): string {
   }
   if (receipt.customer) {
     out.push(...wrap(`Client : ${receipt.customer.name}`, columns), ...row('Reste à payer', amount(receipt.customer.creditFcfa), columns));
+  }
+  if (receipt.reversal) {
+    out.push(...wrap(`Motif : ${receipt.reversal.reason}`, columns), rule, ...center('Ticket de retour', columns), ...center('ne vaut pas facture', columns));
+    return out.join('\n');
   }
   out.push(rule, ...center('Merci de votre visite', columns), ...center('Ticket de caisse', columns), ...center('ne vaut pas facture', columns));
   return out.join('\n');
