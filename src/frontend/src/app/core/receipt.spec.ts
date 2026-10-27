@@ -1,5 +1,5 @@
 import { SaleOperation } from '../data/journal';
-import { buildReceipt, daySaleRank, Receipt, receiptDocument, receiptText } from './receipt';
+import { buildReceipt, buildReversalReceipt, daySaleRank, Receipt, receiptDocument, receiptText } from './receipt';
 
 const sale = (overrides: Partial<SaleOperation> = {}): SaleOperation =>
   ({
@@ -194,5 +194,43 @@ describe('receiptDocument', () => {
 
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');
+  });
+});
+
+describe('ticket de retour (docs/specs/annulations-remises-retours ARR-11)', () => {
+  const reversal = (kind: 'Return' | 'Cancellation' = 'Return') =>
+    buildReversalReceipt({
+      commerce: 'Supérette du Carrefour', cashier: 'Awa Koné', register: 'Caisse 1', at: '2026-10-25T16:05:00.000Z', saleTicket: 12, kind,
+      reason: 'Article en trop',
+      lines: [{ name: "Jus d'orange 1L", quantity: 1, unitPriceFcfa: 600, totalFcfa: 600 }],
+      refund: [{ method: 'Cash', amountFcfa: 400 }, { method: 'Credit', amountFcfa: 100 }, { method: 'Wave', amountFcfa: 100 }],
+    });
+
+  it('says what it is, which ticket it belongs to, what comes back and how it is paid back', () => {
+    const lines = receiptText(reversal(), 32).split('\n');
+
+    expect(lines.some((line) => line.trim() === 'TICKET DE RETOUR')).toBe(true);
+    expect(lines).toContain("Ticket d'origine n° 12");
+    expect(lines.some((line) => line.includes("Jus d'orange 1L"))).toBe(true);
+    expect(lines.find((line) => line.startsWith('TOTAL RENDU'))).toMatch(/600 FCFA$/);
+    expect(lines.find((line) => line.startsWith('Rendu en espèces'))).toMatch(/400 FCFA$/);
+    expect(lines.find((line) => line.startsWith('Dette effacée'))).toMatch(/100 FCFA$/);
+    expect(lines.find((line) => line.startsWith('À rembourser par Wave'))).toMatch(/100 FCFA$/);
+    expect(lines.some((line) => line.includes('Motif : Article en trop'))).toBe(true);
+  });
+
+  it('is a cancellation notice when the whole sale is cancelled, and never overflows the paper', () => {
+    const text = receiptText(reversal('Cancellation'), 32);
+
+    expect(text).toContain('VENTE ANNULÉE');
+    expect(text.split('\n').every((line) => line.length <= 32)).toBe(true);
+    expect(text).not.toContain('Merci de votre visite');
+    expect(text).not.toMatch(/\u00a0/);
+  });
+
+  it('leaves an ordinary ticket exactly as it was', () => {
+    const text = receiptText(receiptOf(), 32);
+    expect(text).not.toContain('TICKET DE RETOUR');
+    expect(text).toContain('Merci de votre visite');
   });
 });

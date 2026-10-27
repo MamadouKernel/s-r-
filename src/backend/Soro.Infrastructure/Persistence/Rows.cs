@@ -31,6 +31,9 @@ internal sealed class SessionRow
 
     public long CashReceived { get; set; }
 
+    /// <summary>Espèces rendues aux clients pendant la session (annulations et retours).</summary>
+    public long CashRefunded { get; set; }
+
     public long? CountedCash { get; set; }
 
     public DateTimeOffset? ClosedAt { get; set; }
@@ -451,4 +454,61 @@ internal sealed class SubscriptionReminderRow
     public string Kind { get; set; } = string.Empty;
 
     public DateTimeOffset SentAt { get; set; }
+}
+
+internal sealed class SaleReturnRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid SaleId { get; set; }
+
+    /// <summary>La session dont le tiroir a rendu les espèces ; <c>null</c> quand rien n'est sorti du tiroir.</summary>
+    public Guid? RefundSessionId { get; set; }
+
+    public ReturnKind Kind { get; set; }
+
+    public DateTimeOffset At { get; set; }
+
+    public Guid ByUserId { get; set; }
+
+    public Guid? ApprovedBy { get; set; }
+
+    public string Reason { get; set; } = string.Empty;
+
+    public long Total { get; set; }
+
+    public List<SaleReturnLineRow> Lines { get; set; } = [];
+
+    public List<SaleReturnRefundRow> Refunds { get; set; } = [];
+}
+
+internal sealed class SaleReturnLineRow
+{
+    public Guid ReturnId { get; set; }
+
+    public int Position { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    /// <summary>Position de la ligne dans la vente d'origine.</summary>
+    public int LineIndex { get; set; }
+
+    public int Quantity { get; set; }
+
+    public bool Resellable { get; set; }
+}
+
+internal sealed class SaleReturnRefundRow
+{
+    public Guid ReturnId { get; set; }
+
+    public int Position { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public PaymentMethod Method { get; set; }
+
+    public long Amount { get; set; }
 }

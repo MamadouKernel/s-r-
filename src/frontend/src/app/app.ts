@@ -2,7 +2,7 @@ import { Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NetworkBanner } from './shell/network-banner';
 import { ReconnectPrompt } from './shell/reconnect-prompt';
-import { canManageStock, canReadAuditLog, canReadCustomers, canViewReports } from './management/roles';
+import { canManageStock, canReadAuditLog, canReadCustomers, canReverseSales, canViewReports } from './management/roles';
 import { AuthService } from './services/auth.service';
 import { CashService } from './services/cash.service';
 import { SyncService } from './services/sync.service';
@@ -24,6 +24,7 @@ export class App {
   protected readonly user = this.auth.user;
   protected readonly hasSession = computed(() => this.cash.session() !== null);
   protected readonly showDashboard = computed(() => this.auth.signedIn() && canViewReports(this.auth.user()?.role));
+  protected readonly showSales = computed(() => this.auth.signedIn() && canReverseSales(this.auth.user()?.role));
   protected readonly showCustomers = computed(() => this.auth.signedIn() && canReadCustomers(this.auth.user()?.role));
   protected readonly showJournal = computed(() => this.auth.signedIn() && canReadAuditLog(this.auth.user()?.role));
   protected readonly showManagement = computed(() => this.auth.signedIn() && canManageStock(this.auth.user()?.role));

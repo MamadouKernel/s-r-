@@ -32,6 +32,8 @@ public static class ApplicationRegistration
         services.AddSingleton<IPasswordHasher>(hasher);
         services.AddSingleton<IVerificationCodes>(new VerificationCodes(pepper));
         services.AddSingleton<IDeviceSecrets>(new DeviceSecrets(pepper));
+        services.AddSingleton<IApprovalSeal>(new HmacApprovalSeal(pepper));
+        services.AddScoped<GrantApprovalHandler>();
         services.AddSingleton<IDevicePolicy>(new DevicePolicy(configuration.GetValue("Devices:Required", true)));
         services.AddSingleton<ISignupSettings>(new SignupSettings(
             configuration["Signup:TermsVersion"] ?? DefaultTermsVersion,
@@ -51,6 +53,8 @@ public static class ApplicationRegistration
         services.AddScoped<CloseRegisterSessionHandler>();
         services.AddScoped<RecordSaleHandler>();
         services.AddScoped<SyncSalesHandler>();
+        services.AddScoped<SaleReversal>();
+        services.AddScoped<ReturnSaleHandler>();
         services.AddScoped<CancelSaleHandler>();
         services.AddScoped<LogInHandler>();
         services.AddScoped<CreateCustomerHandler>();

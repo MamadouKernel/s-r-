@@ -28,6 +28,9 @@ import { SyncService } from '../services/sync.service';
           <dl class="space-y-1">
             <div class="flex justify-between"><dt>Ventes de la session</dt><dd class="amount font-bold">{{ data.salesCount }}</dd></div>
             <div class="flex justify-between"><dt>Total des ventes</dt><dd class="amount font-bold">{{ format(data.netTotalFcfa) }}</dd></div>
+            @if (data.refundsFcfa > 0) {
+              <div class="flex justify-between"><dt>Remboursements en espèces</dt><dd class="amount font-bold">-{{ format(data.refundsFcfa) }}</dd></div>
+            }
             <div class="flex justify-between"><dt>Espèces attendues en caisse</dt><dd class="amount font-bold">{{ format(data.expectedCashFcfa) }}</dd></div>
           </dl>
         }

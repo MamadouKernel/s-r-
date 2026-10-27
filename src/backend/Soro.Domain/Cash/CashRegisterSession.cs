@@ -35,6 +35,9 @@ public sealed class CashRegisterSession
     /// <summary>Espèces encaissées pendant la session, monnaie rendue déduite.</summary>
     public Money CashReceived { get; private set; }
 
+    /// <summary>Espèces rendues aux clients pendant la session (annulations et retours, docs/decisions/0020).</summary>
+    public Money CashRefunded { get; private set; }
+
     public Money? CountedCash { get; private set; }
 
     public DateTimeOffset? ClosedAt { get; private set; }
@@ -42,8 +45,8 @@ public sealed class CashRegisterSession
     /// <summary>Écart de clôture en FCFA : négatif = manque, positif = excédent (RG-07).</summary>
     public long? CashVariance { get; private set; }
 
-    /// <summary>Montant attendu en caisse : fond + espèces encaissées (RG-24, hors dépenses pour l'instant).</summary>
-    public Money ExpectedCash => OpeningFloat + CashReceived;
+    /// <summary>Montant attendu en caisse : fond + espèces encaissées − espèces rendues (RG-24, hors dépenses pour l'instant).</summary>
+    public Money ExpectedCash => OpeningFloat + CashReceived - CashRefunded;
 
     public static CashRegisterSession Open(
         SessionId id,
@@ -60,6 +63,14 @@ public sealed class CashRegisterSession
         var sale = Sale.Record(Id, Assignment, draft);
         CashReceived += sale.CashReceived;
         return sale;
+    }
+
+    /// <summary>Des espèces sortent du tiroir pour rembourser un client : la session ouverte les déduit de ce qui est attendu.</summary>
+    public void RecordCashRefund(Money amount)
+    {
+        EnsureOpen();
+        Ensure.That(amount > Money.Zero, "Le montant remboursé doit être supérieur à zéro.");
+        CashRefunded += amount;
     }
 
     public void Close(Money countedCash, DateTimeOffset at)
@@ -83,9 +94,11 @@ public sealed class CashRegisterSession
         Money cashReceived,
         Money? countedCash,
         DateTimeOffset? closedAt,
-        long? cashVariance) =>
+        long? cashVariance,
+        Money cashRefunded = default) =>
         new(id, assignment, openingFloat, openedAt)
         {
+            CashRefunded = cashRefunded,
             Status = status,
             CashReceived = cashReceived,
             CountedCash = countedCash,

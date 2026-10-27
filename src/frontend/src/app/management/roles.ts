@@ -71,3 +71,8 @@ export function canTestScanner(role: string | undefined): boolean {
 export function canPrintLabels(role: string | undefined): boolean {
   return role === 'Owner' || role === 'Manager' || role === 'StockKeeper';
 }
+
+/** Retrouver un ticket, annuler une vente, reprendre des articles : les profils de caisse (propriétaire, gérant, caissier), comme le serveur. */
+export function canReverseSales(role: string | undefined): boolean {
+  return role === 'Owner' || role === 'Manager' || role === 'Cashier';
+}

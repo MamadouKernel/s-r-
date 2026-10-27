@@ -26,7 +26,8 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
             await db.DebtRepayments.CountAsync(repayment => repayment.TenantId == id && repayment.At >= from && repayment.At < to, cancellationToken),
             await sales.CountAsync(cancellationToken),
             await db.SaleLines.Where(line => line.TenantId == id).Join(sales, line => line.SaleId, sale => sale.Id, (line, _) => line).CountAsync(cancellationToken),
-            await db.StockMovements.CountAsync(movement => movement.TenantId == id && movement.At >= from && movement.At < to, cancellationToken));
+            await db.StockMovements.CountAsync(movement => movement.TenantId == id && movement.At >= from && movement.At < to, cancellationToken),
+            await db.SaleReturns.CountAsync(item => item.TenantId == id && item.At >= from && item.At < to, cancellationToken));
     }
 
     public async Task<DataExportData> ReadAsync(TenantId tenant, ExportPeriod period, CancellationToken cancellationToken)
@@ -112,7 +113,37 @@ public sealed class DataExportQueries(SoroDbContext db) : IDataExportQueries
             .Select(customer => new CustomerExportRow(customer.Name, customer.Phone, customer.CreditCeiling, customer.Debt, customer.IsActive))
             .ToArray();
 
+        var returnRows = await db.SaleReturns.AsNoTracking()
+            .Include(item => item.Refunds)
+            .Where(item => item.TenantId == id && item.At >= from && item.At < to)
+            .OrderBy(item => item.At)
+            .ToListAsync(cancellationToken);
+        var saleInfo = await db.Sales.AsNoTracking()
+            .Where(sale => sale.TenantId == id && returnRows.Select(item => item.SaleId).Contains(sale.Id))
+            .Select(sale => new { sale.Id, sale.RecordedAt, sale.LocalSequence, sale.CashierId })
+            .ToDictionaryAsync(sale => sale.Id, cancellationToken);
+        var returnExport = returnRows
+            .Where(item => saleInfo.ContainsKey(item.SaleId))
+            .Select(item =>
+            {
+                var sale = saleInfo[item.SaleId];
+                long Part(Func<PaymentMethod, bool> pick) => item.Refunds.Where(part => pick(part.Method)).Sum(part => part.Amount);
+                return new ReturnExportRow(
+                    item.At,
+                    ExportKeys.SaleKey(sale.RecordedAt, sale.LocalSequence, User(sale.CashierId)),
+                    sale.LocalSequence,
+                    item.Kind,
+                    item.Reason,
+                    item.Total,
+                    Part(method => method == PaymentMethod.Cash),
+                    Part(method => method == PaymentMethod.Credit),
+                    Part(method => method.IsMobileMoney()),
+                    User(item.ByUserId),
+                    item.ApprovedBy is { } approver ? User(approver) : null);
+            })
+            .ToArray();
+
         await transaction.CommitAsync(cancellationToken);
-        return new DataExportData(products, customerExport, repayments, saleExport, lineExport, movements);
+        return new DataExportData(products, customerExport, repayments, saleExport, lineExport, movements, returnExport);
     }
 }

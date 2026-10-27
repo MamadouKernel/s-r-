@@ -28,7 +28,7 @@ export interface ManagedProduct {
   unit?: MeasureUnit;
 }
 
-export type MovementKind = 'Reception' | 'Sale' | 'Loss' | 'SaleCancellation';
+export type MovementKind = 'Reception' | 'Sale' | 'Loss' | 'SaleCancellation' | 'Return';
 
 export interface StockMovement {
   id: string;

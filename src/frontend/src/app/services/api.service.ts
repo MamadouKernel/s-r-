@@ -114,6 +114,7 @@ export class ApiService implements SyncApi {
             ...(line.unit && line.unit !== 'Piece' ? { unit: line.unit } : {}),
           })),
           discountFcfa: sale.discountFcfa,
+          ...(sale.discountApprovalToken ? { discountApprovalToken: sale.discountApprovalToken } : {}),
           customerId: sale.customerId ?? null,
           payments: sale.payments.map((payment) => ({
             paymentId: payment.id,

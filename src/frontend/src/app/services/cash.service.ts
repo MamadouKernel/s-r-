@@ -150,12 +150,25 @@ export class CashService {
    * Enregistre la vente. L'identifiant est créé une fois par encaissement et conservé en cas de nouvel essai : un double appui, ou
    * un nouvel appui après une erreur, ne peut donc jamais produire deux ventes (SC-P4).
    */
-  confirmSale(payments: PaymentDraft[], customerId: string | null = null): Promise<SaleOperation> {
+  confirmSale(
+    payments: PaymentDraft[],
+    customerId: string | null = null,
+    discount: { amountFcfa: number; approvalToken: string | null } | null = null,
+  ): Promise<SaleOperation> {
     if (this.inFlight) {
       return this.inFlight;
     }
     this.checkoutId ??= crypto.randomUUID();
-    const input = { id: this.checkoutId, at: new Date().toISOString(), lines: this.cartSignal(), payments, customerId };
+    const input = {
+      id: this.checkoutId,
+      at: new Date().toISOString(),
+      lines: this.cartSignal(),
+      payments,
+      customerId,
+      ...(discount && discount.amountFcfa > 0
+        ? { discountFcfa: discount.amountFcfa, ...(discount.approvalToken ? { discountApprovalToken: discount.approvalToken } : {}) }
+        : {}),
+    };
     this.submittingSignal.set(true);
     this.inFlight = (async () => {
       try {
@@ -172,6 +185,20 @@ export class CashService {
       }
     })();
     return this.inFlight;
+  }
+
+  /**
+   * L'identifiant de la vente en cours d'encaissement, connu avant qu'elle soit enregistrée : la validation d'un gérant pour une remise est liée à
+   * cette vente (docs/decisions/0020). Il reste le même jusqu'à l'enregistrement.
+   */
+  checkoutSaleId(): string {
+    this.checkoutId ??= crypto.randomUUID();
+    return this.checkoutId;
+  }
+
+  /** Les espèces rendues à un client par un retour ou une annulation : la clôture attend ce montant de moins dans le tiroir. */
+  async recordCashRefund(returnId: string, amountFcfa: number): Promise<void> {
+    await (await this.journalService.get()).recordCashRefund({ returnId, amountFcfa });
   }
 
   // ---- Clôture -----------------------------------------------------------------------------------

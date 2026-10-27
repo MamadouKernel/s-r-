@@ -41,7 +41,14 @@ public class ExportWriterTests
             new SaleLineExportRow("15/10/2026 08:05 · ticket 7 · Awa Koné", At, 7, "Savon", 1, 50, 50, null),
             new SaleLineExportRow("15/10/2026 08:05 · ticket 7 · Awa Koné", At, 7, "Riz en vrac", 1_250, 600, 750, 450, MeasureUnit.Kilogram),
         ],
-        [new MovementExportRow(At, "Eau minérale · 1 L", StockMovementKind.Reception, 24, "Grossiste Koné", 180, "Awa Koné")]);
+        [
+            new MovementExportRow(At, "Eau minérale · 1 L", StockMovementKind.Reception, 24, "Grossiste Koné", 180, "Awa Koné"),
+            new MovementExportRow(At.AddHours(2), "Eau minérale · 1 L", StockMovementKind.Return, 1, "Article en trop", null, "Awa Koné"),
+        ],
+        [
+            new ReturnExportRow(At.AddHours(2), "15/10/2026 08:05 · ticket 7 · Awa Koné", 7, ReturnKind.Return, "Article en trop", 300, 300, 0, 0, "Awa Koné", "Kofi Diaby"),
+            new ReturnExportRow(At.AddHours(3), "15/10/2026 09:00 · ticket 8 · Awa Koné", 8, ReturnKind.Cancellation, "-Erreur de caisse", 300, 0, 300, 0, "Kofi Diaby", null),
+        ]);
 
     private static XLWorkbook Open(DataExport data) => new(new MemoryStream(new ClosedXmlDataExportWriter().Write(data)));
 
@@ -53,7 +60,7 @@ public class ExportWriterTests
     {
         using var workbook = Open(Sample());
 
-        Assert.Equal(["Lisez-moi", "Produits", "Clients", "Versements", "Ventes", "Lignes de vente", "Mouvements de stock"], workbook.Worksheets.Select(sheet => sheet.Name).ToArray());
+        Assert.Equal(["Lisez-moi", "Produits", "Clients", "Versements", "Ventes", "Lignes de vente", "Mouvements de stock", "Retours"], workbook.Worksheets.Select(sheet => sheet.Name).ToArray());
         Assert.Equal(["Produit", "Format", "Catégorie", "Code-barres", "Prix d'achat", "Prix de vente", "Stock", "Alerte stock", "Suivi du stock", "État", "Unité"], Headers(workbook.Worksheet("Produits")));
         Assert.Equal(["Nom", "Téléphone", "Plafond de crédit", "Dette", "État"], Headers(workbook.Worksheet("Clients")));
         Assert.Equal(["Date et heure", "Client", "Montant", "Moyen", "Référence", "Encaissé par"], Headers(workbook.Worksheet("Versements")));
@@ -134,6 +141,22 @@ public class ExportWriterTests
         Assert.Equal(1.25d, lines.Cell(4, 5).GetDouble());
         Assert.Equal(750d, lines.Cell(4, 7).GetDouble());
         Assert.Equal("kg", lines.Cell(4, 9).GetString());
+    }
+
+    [Fact]
+    public void Returns_and_cancellations_have_their_own_sheet_with_who_did_and_who_validated()
+    {
+        using var workbook = Open(Sample());
+
+        var sheet = workbook.Worksheet("Retours");
+        Assert.Equal(["Date et heure", "Vente", "N° de ticket", "Type", "Motif", "Total rendu", "En espèces", "Dette effacée", "Mobile Money", "Fait par", "Validé par"], Headers(sheet));
+        Assert.Equal("Retour", sheet.Cell(2, 4).GetString());
+        Assert.Equal(300d, sheet.Cell(2, 7).GetDouble());
+        Assert.Equal("Kofi Diaby", sheet.Cell(2, 11).GetString());
+        Assert.Equal("Annulation", sheet.Cell(3, 4).GetString());
+        Assert.Equal("-Erreur de caisse", sheet.Cell(3, 5).GetString());
+        Assert.True(sheet.Cell(3, 11).IsEmpty());
+        Assert.Equal("Retour d'un client", workbook.Worksheet("Mouvements de stock").Cell(3, 3).GetString());
     }
 
     [Fact]

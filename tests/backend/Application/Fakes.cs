@@ -305,6 +305,8 @@ internal sealed class FakeReportingQueries : IReportingQueries
 
     public SalesFilter? LastSalesFilter { get; private set; }
 
+    public SaleDetail? Detail { get; set; }
+
     public Task<IReadOnlyList<SaleSummary>> ListSalesAsync(
         TenantId tenant, SalesFilter filter, CancellationToken cancellationToken)
     {
@@ -316,7 +318,7 @@ internal sealed class FakeReportingQueries : IReportingQueries
     public Task<SaleDetail?> GetSaleAsync(TenantId tenant, SaleId id, CancellationToken cancellationToken)
     {
         Record(nameof(GetSaleAsync), tenant);
-        return Task.FromResult<SaleDetail?>(null);
+        return Task.FromResult(Detail);
     }
 
     public Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
@@ -433,4 +435,41 @@ internal sealed class FakeDataExportWriter : IDataExportWriter
         Last = data;
         return Bytes;
     }
+}
+
+internal sealed class InMemorySaleReturnRepository : ISaleReturnRepository
+{
+    private readonly List<SaleReturn> _all = [];
+
+    public IReadOnlyList<SaleReturn> All => _all;
+
+    public Task<SaleReturn?> GetAsync(SaleReturnId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_all.FirstOrDefault(item => item.Tenant == tenant && item.Id == id));
+
+    public Task<IReadOnlyList<SaleReturn>> ListForSaleAsync(SaleId sale, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SaleReturn>>(_all.Where(item => item.Tenant == tenant && item.SaleId == sale).OrderBy(item => item.At).ToArray());
+
+    public Task AddAsync(SaleReturn saleReturn, CancellationToken cancellationToken)
+    {
+        _all.Add(saleReturn);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Une approbation « signée » en mémoire : se reconnaît, se périme, ne vaut que pour sa vente et son usage.</summary>
+internal sealed class FakeApprovalSeal : IApprovalSeal
+{
+    private readonly Dictionary<string, (TenantId Tenant, UserId Approver, Guid Subject, string Purpose, long Limit, DateTimeOffset Expires)> _issued = [];
+
+    public string Issue(TenantId tenant, UserId approver, Guid subject, string purpose, long limit, DateTimeOffset expiresAt)
+    {
+        var token = $"sceau:{Guid.NewGuid():N}";
+        _issued[token] = (tenant, approver, subject, purpose, limit, expiresAt);
+        return token;
+    }
+
+    public SealedApproval? Open(string token, TenantId tenant, Guid subject, string purpose, DateTimeOffset now) =>
+        _issued.TryGetValue(token, out var found) && found.Tenant == tenant && found.Subject == subject && found.Purpose == purpose && now <= found.Expires
+            ? new SealedApproval(found.Approver, found.Limit)
+            : null;
 }

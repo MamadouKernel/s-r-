@@ -77,6 +77,9 @@ public sealed record RecordSaleRequest
     /// <summary>Le PIN du gérant qui valide la remise : l'identifiant seul ne prouve rien (docs/decisions/0018).</summary>
     public string? DiscountApproverPin { get; init; }
 
+    /// <summary>L'approbation signée donnée plus tôt par un gérant (<c>POST /approvals</c>) : elle remplace son PIN, qui ne reste jamais dans la file de la caisse.</summary>
+    public string? DiscountApprovalToken { get; init; }
+
     /// <summary>Le gérant qui a validé un dépassement du plafond de crédit du client (CRD-04), comme pour une remise.</summary>
     public Guid? CreditApproverId { get; init; }
 
@@ -91,4 +94,65 @@ public sealed record SyncSalesRequest
 public sealed record CancelSaleRequest
 {
     public required string Reason { get; init; }
+
+    /// <summary>Fixé par l'écran à son ouverture : un envoi répété ne rembourse jamais deux fois.</summary>
+    public Guid? OperationId { get; init; }
+
+    /// <summary>La caisse dont le tiroir rend les espèces ; sans elle, la session de la vente si elle est encore ouverte.</summary>
+    public Guid? RegisterId { get; init; }
+
+    /// <summary><c>false</c> : la marchandise est abîmée et ne revient pas en rayon.</summary>
+    public bool Resellable { get; init; } = true;
+
+    /// <summary>Le gérant qui valide, avec son PIN ; inutile quand l'appelant est lui-même gérant ou propriétaire.</summary>
+    public Guid? ApproverId { get; init; }
+
+    public string? ApproverPin { get; init; }
+
+    /// <summary>L'approbation signée d'un gérant (<c>POST /approvals</c>), à la place de son identifiant et de son PIN.</summary>
+    public string? ApprovalToken { get; init; }
+}
+
+public sealed record ReturnLineRequest
+{
+    /// <summary>Position de la ligne dans la vente (0 pour la première).</summary>
+    public required int LineIndex { get; init; }
+
+    /// <summary>Pièces, ou millièmes (grammes, millilitres) pour un produit pesé.</summary>
+    public required int Quantity { get; init; }
+
+    public bool Resellable { get; init; } = true;
+}
+
+public sealed record ReturnSaleRequest
+{
+    public required Guid OperationId { get; init; }
+
+    public required string Reason { get; init; }
+
+    public required IReadOnlyList<ReturnLineRequest> Lines { get; init; }
+
+    public Guid? RegisterId { get; init; }
+
+    public Guid? ApproverId { get; init; }
+
+    public string? ApproverPin { get; init; }
+
+    public string? ApprovalToken { get; init; }
+}
+
+public sealed record GrantApprovalRequest
+{
+    public required string Identifier { get; init; }
+
+    public required string Pin { get; init; }
+
+    /// <summary>La vente concernée : l'approbation ne vaut que pour elle.</summary>
+    public required Guid SubjectId { get; init; }
+
+    /// <summary><c>discount</c> ou <c>reversal</c>.</summary>
+    public required string Purpose { get; init; }
+
+    /// <summary>Pour une remise : le montant en FCFA que le gérant a vu ; la preuve ne vaut pas au-delà.</summary>
+    public long Amount { get; init; }
 }

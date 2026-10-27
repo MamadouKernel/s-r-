@@ -33,6 +33,7 @@ internal static class RequestMapping
                     payment.Reference))
                 .ToArray(),
             request.CustomerId is { } customer ? new CustomerId(customer) : null,
-            request.DiscountApproverId is { } approver ? new Approval(new UserId(approver), request.DiscountApproverPin ?? string.Empty) : null,
+            request.DiscountApprovalToken is { } discountToken ? Approval.FromToken(discountToken)
+                : request.DiscountApproverId is { } approver ? new Approval(new UserId(approver), request.DiscountApproverPin ?? string.Empty) : null,
             request.CreditApproverId is { } creditApprover ? new Approval(new UserId(creditApprover), request.CreditApproverPin ?? string.Empty) : null);
 }

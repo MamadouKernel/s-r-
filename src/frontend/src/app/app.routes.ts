@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, exportGuard, managementGuard, openSessionGuard, reportsGuard, scannerGuard, teamGuard, userGuard, welcomeGuard, labelsGuard } from './guards';
+import { auditGuard, catalogueGuard, customersGuard, deviceGuard, devicesGuard, exportGuard, managementGuard, openSessionGuard, reportsGuard, scannerGuard, teamGuard, userGuard, welcomeGuard, labelsGuard, salesGuard } from './guards';
 
 export const routes: Routes = [
   { path: 'appareil', pathMatch: 'full', redirectTo: 'bienvenue' },
@@ -27,6 +27,16 @@ export const routes: Routes = [
     path: 'vente',
     canActivate: [deviceGuard, userGuard, openSessionGuard],
     loadComponent: () => import('./pages/sale-page').then((m) => m.SalePage),
+  },
+  {
+    path: 'ventes',
+    canActivate: [deviceGuard, salesGuard],
+    loadComponent: () => import('./sales/sales-page').then((m) => m.SalesPage),
+  },
+  {
+    path: 'ventes/:id',
+    canActivate: [deviceGuard, salesGuard],
+    loadComponent: () => import('./sales/sale-detail-page').then((m) => m.SaleDetailPage),
   },
   {
     path: 'file',

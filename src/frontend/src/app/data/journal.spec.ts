@@ -244,7 +244,7 @@ describe('Journal: closing', () => {
     });
 
     expect(await journal.sessionSummary()).toEqual({
-      salesCount: 2, netTotalFcfa: 2400, expectedCashFcfa: 10000 + 1800,
+      salesCount: 2, netTotalFcfa: 2400, expectedCashFcfa: 10000 + 1800, refundsFcfa: 0,
     });
   });
 
@@ -510,5 +510,58 @@ describe('Journal: customers and credit sales (CRD-04, offline)', () => {
     await journal.upsertCustomer({ ...issa, name: 'Issa D.' });
 
     expect((await journal.listCustomers()).map((c) => c.name)).toEqual(['Awa Koné', 'Issa D.']);
+  });
+});
+
+describe('Journal: remises et remboursements (docs/specs/annulations-remises-retours)', () => {
+  const discounted = (id: string, discountFcfa: number, token?: string) => ({
+    id,
+    at: '2026-10-23T08:10:00.000Z',
+    lines: [{ productId: 'p-jus', name: jus.name, unitPriceFcfa: 600, quantity: 3 }],
+    discountFcfa,
+    ...(token ? { discountApprovalToken: token } : {}),
+    payments: [{ id: 'pay-' + id, method: 'Cash' as const, amountFcfa: 1800 - discountFcfa, tenderedFcfa: 2000 }],
+  });
+
+  it('records the discount, asks the payments to cover the total net of it, and keeps the approval of the manager', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    const sale = await journal.recordSale(discounted('d-1', 300, 'sceau'));
+
+    expect(sale.discountFcfa).toBe(300);
+    expect(sale.netTotalFcfa).toBe(1500);
+    expect(sale.changeFcfa).toBe(500);
+    expect(sale.discountApprovalToken).toBe('sceau');
+  });
+
+  it('refuses payments that cover the total without the discount, and a discount as big as the sale', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    await expect(journal.recordSale({ ...discounted('d-2', 300), payments: [{ id: 'p', method: 'Cash', amountFcfa: 1800, tenderedFcfa: 1800 }] })).rejects.toThrow(/total des paiements/);
+    await expect(journal.recordSale({ ...discounted('d-3', 1800), payments: [] })).rejects.toThrow(/remise/i);
+  });
+
+  it('takes the cash given back to customers out of the cash expected, once per return', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.recordSale(cashSale('a', 3, 1800));
+
+    await journal.recordCashRefund({ returnId: 'r-1', amountFcfa: 600 });
+    await journal.recordCashRefund({ returnId: 'r-1', amountFcfa: 600 });
+    await journal.recordCashRefund({ returnId: 'r-2', amountFcfa: 0 });
+
+    expect(await journal.sessionSummary()).toEqual({ salesCount: 1, netTotalFcfa: 1800, expectedCashFcfa: 10000 + 1800 - 600, refundsFcfa: 600 });
+  });
+
+  it('starts the refunds of a new session from zero', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.recordCashRefund({ returnId: 'r-1', amountFcfa: 600 });
+    await journal.closeSession({ countedCashFcfa: 9400, at: '2026-10-23T17:00:00.000Z' });
+    await journal.openSession({ sessionId: 's-2', pointOfSaleId: 'pos-1', registerId: 'reg-1', openingFloatFcfa: 5000, openedAt: '2026-10-24T08:00:00.000Z' });
+
+    expect((await journal.sessionSummary())?.refundsFcfa).toBe(0);
   });
 });

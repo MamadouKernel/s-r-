@@ -39,6 +39,9 @@ public static class AuditActions
     public const string DiscountApproved = "sale.discount.approved";
     public const string DiscountRefused = "sale.discount.refused";
     public const string SaleCancelled = "sale.cancelled";
+    public const string SaleReturned = "sale.returned";
+    public const string ReturnRefused = "sale.return.refused";
+    public const string ApprovalRefused = "sale.approval.refused";
     public const string CancelRefused = "sale.cancel.refused";
     public const string SalePriceLowered = "sale.price.lowered";
     public const string UserDisabled = "user.disabled";

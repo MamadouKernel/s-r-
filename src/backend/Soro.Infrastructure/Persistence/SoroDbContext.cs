@@ -16,6 +16,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
 
     internal DbSet<SaleLineRow> SaleLines => Set<SaleLineRow>();
 
+    internal DbSet<SaleReturnRow> SaleReturns => Set<SaleReturnRow>();
+
     internal DbSet<PaymentRow> Payments => Set<PaymentRow>();
 
     internal DbSet<AuditRow> AuditEntries => Set<AuditRow>();
@@ -56,6 +58,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         ConfigureSales(modelBuilder.Entity<SaleRow>());
         ConfigureSaleLines(modelBuilder.Entity<SaleLineRow>());
         ConfigurePayments(modelBuilder.Entity<PaymentRow>());
+        ConfigureSaleReturns(modelBuilder);
         ConfigureAudit(modelBuilder.Entity<AuditRow>());
         ConfigureUsers(modelBuilder.Entity<UserRow>());
         ConfigureProductFamilies(modelBuilder.Entity<ProductFamilyRow>());
@@ -107,6 +110,28 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         sale.HasOne<SessionRow>().WithMany().HasForeignKey(row => row.SessionId).OnDelete(DeleteBehavior.Restrict);
         sale.HasMany(row => row.Lines).WithOne().HasForeignKey(line => line.SaleId).OnDelete(DeleteBehavior.Restrict);
         sale.HasMany(row => row.Payments).WithOne().HasForeignKey(payment => payment.SaleId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureSaleReturns(ModelBuilder modelBuilder)
+    {
+        var saleReturn = modelBuilder.Entity<SaleReturnRow>();
+        saleReturn.ToTable("sale_returns", table => table.HasCheckConstraint("ck_sale_returns_total", "total >= 0"));
+        saleReturn.HasKey(row => row.Id);
+        saleReturn.Property(row => row.Kind).HasConversion<string>().HasMaxLength(16);
+        saleReturn.Property(row => row.Reason).HasMaxLength(500);
+        saleReturn.HasIndex(row => new { row.TenantId, row.SaleId });
+        saleReturn.HasOne<SaleRow>().WithMany().HasForeignKey(row => row.SaleId).OnDelete(DeleteBehavior.Restrict);
+        saleReturn.HasMany(row => row.Lines).WithOne().HasForeignKey(line => line.ReturnId).OnDelete(DeleteBehavior.Restrict);
+        saleReturn.HasMany(row => row.Refunds).WithOne().HasForeignKey(refund => refund.ReturnId).OnDelete(DeleteBehavior.Restrict);
+
+        var line = modelBuilder.Entity<SaleReturnLineRow>();
+        line.ToTable("sale_return_lines", table => table.HasCheckConstraint("ck_sale_return_lines_values", "quantity > 0 AND line_index >= 0"));
+        line.HasKey(row => new { row.ReturnId, row.Position });
+
+        var refund = modelBuilder.Entity<SaleReturnRefundRow>();
+        refund.ToTable("sale_return_refunds", table => table.HasCheckConstraint("ck_sale_return_refunds_amount", "amount > 0"));
+        refund.HasKey(row => new { row.ReturnId, row.Position });
+        refund.Property(row => row.Method).HasConversion<string>().HasMaxLength(16);
     }
 
     private static void ConfigureSaleLines(EntityTypeBuilder<SaleLineRow> line)

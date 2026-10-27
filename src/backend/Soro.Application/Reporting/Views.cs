@@ -16,13 +16,32 @@ public sealed record SaleSummary(
     long DiscountFcfa,
     SaleStatus Status,
     IReadOnlyList<PaymentMethod> PaymentMethods,
-    int LineCount);
+    int LineCount,
+    long ReturnedFcfa = 0,
+    long Ticket = 0);
 
 public sealed record SaleLineView(Guid ProductId, string ProductName, int Quantity, long UnitPriceFcfa, long TotalFcfa, MeasureUnit Unit = MeasureUnit.Piece);
 
 public sealed record PaymentView(PaymentMethod Method, long AmountFcfa, long ChangeFcfa, string? Reference);
 
 public sealed record CancellationView(Guid CancelledBy, string Reason, DateTimeOffset At);
+
+public sealed record ReturnLineView(int LineIndex, int Quantity, bool Resellable);
+
+public sealed record ReturnRefundView(PaymentMethod Method, long AmountFcfa);
+
+/// <summary>Un retour ou une annulation : de quoi savoir ce qui reste à rendre et dire qui a validé (docs/decisions/0020).</summary>
+public sealed record ReturnView(
+    Guid Id,
+    ReturnKind Kind,
+    DateTimeOffset At,
+    Guid By,
+    Guid? ApprovedBy,
+    string Reason,
+    long TotalFcfa,
+    long CashFcfa,
+    IReadOnlyList<ReturnLineView> Lines,
+    IReadOnlyList<ReturnRefundView> Refund);
 
 public sealed record SaleDetail(
     Guid Id,
@@ -37,7 +56,9 @@ public sealed record SaleDetail(
     Guid? CustomerId,
     IReadOnlyList<SaleLineView> Lines,
     IReadOnlyList<PaymentView> Payments,
-    CancellationView? Cancellation);
+    CancellationView? Cancellation,
+    IReadOnlyList<ReturnView>? Returns = null,
+    long Ticket = 0);
 
 public sealed record SessionSummary(
     Guid Id,
@@ -50,7 +71,8 @@ public sealed record SessionSummary(
     SessionStatus Status,
     long? CountedCashFcfa,
     long? VarianceFcfa,
-    DateTimeOffset? ClosedAt);
+    DateTimeOffset? ClosedAt,
+    long CashRefundedFcfa = 0);
 
 public sealed record PaymentBreakdown(PaymentMethod Method, long AmountFcfa, int Count);
 
@@ -68,7 +90,9 @@ public sealed record ActivityReport(
     IReadOnlyList<CashierBreakdown> ByCashier,
     int SessionsClosed,
     long ShortfallFcfa,
-    long SurplusFcfa);
+    long SurplusFcfa,
+    int ReturnsCount = 0,
+    long ReturnsTotalFcfa = 0);
 
 /// <summary>Critère de classement des produits vendus (MV-01).</summary>
 public enum RankingCriterion

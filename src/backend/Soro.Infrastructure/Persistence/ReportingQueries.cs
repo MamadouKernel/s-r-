@@ -60,14 +60,41 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 sale.Status,
                 Methods = sale.Payments.OrderBy(payment => payment.Position).Select(payment => payment.Method).ToList(),
                 LineCount = sale.Lines.Count,
+                sale.LocalSequence,
+                Returned = db.SaleReturns.Where(item => item.SaleId == sale.Id && item.Kind == ReturnKind.Return).Sum(item => (long?)item.Total) ?? 0L,
             })
             .ToListAsync(cancellationToken);
 
+        var ranks = await RanksAsync(tenant, rows.Select(row => (row.Id, row.RegisterId, row.RecordedAt)), cancellationToken);
         return rows
             .Select(row => new SaleSummary(
                 row.Id, row.RecordedAt, row.CashierId, row.RegisterId, row.SessionId,
-                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount))
+                row.NetTotal, row.Discount, row.Status, row.Methods.Distinct().ToArray(), row.LineCount, row.Returned, ranks[row.Id]))
             .ToArray();
+    }
+
+    /// <summary>
+    /// Le numéro du ticket tel que le client le lit sur son ticket de caisse : le rang de la vente sur sa caisse ce jour-là (le pays suit l'heure UTC),
+    /// annulées comprises (docs/decisions/0016). Le numéro d'ordre interne de la caisse compte aussi les ouvertures et clôtures : il ne se lit pas sur le ticket.
+    /// </summary>
+    private async Task<Dictionary<Guid, long>> RanksAsync(TenantId tenant, IEnumerable<(Guid Id, Guid Register, DateTimeOffset At)> sales, CancellationToken cancellationToken)
+    {
+        var ranks = new Dictionary<Guid, long>();
+        foreach (var group in sales.GroupBy(sale => (sale.Register, Day: sale.At.UtcDateTime.Date)))
+        {
+            var start = new DateTimeOffset(group.Key.Day, TimeSpan.Zero);
+            var sameDay = await db.Sales.AsNoTracking()
+                .Where(sale => sale.TenantId == tenant.Value && sale.RegisterId == group.Key.Register && sale.RecordedAt >= start && sale.RecordedAt < start.AddDays(1))
+                .OrderBy(sale => sale.RecordedAt).ThenBy(sale => sale.LocalSequence)
+                .Select(sale => sale.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var sale in group)
+            {
+                ranks[sale.Id] = sameDay.IndexOf(sale.Id) + 1;
+            }
+        }
+
+        return ranks;
     }
 
     public async Task<SaleDetail?> GetSaleAsync(TenantId tenant, SaleId id, CancellationToken cancellationToken)
@@ -80,6 +107,13 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         {
             return null;
         }
+
+        var returns = await db.SaleReturns.AsNoTracking()
+            .Include(item => item.Lines)
+            .Include(item => item.Refunds)
+            .Where(item => item.SaleId == row.Id && item.TenantId == tenant.Value)
+            .OrderBy(item => item.At)
+            .ToListAsync(cancellationToken);
 
         return new SaleDetail(
             row.Id,
@@ -101,7 +135,19 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 .ToArray(),
             row.CancelledBy is { } by && row.CancelledAt is { } at
                 ? new CancellationView(by, row.CancelReason ?? string.Empty, at)
-                : null);
+                : null,
+            returns.Select(item => new ReturnView(
+                item.Id,
+                item.Kind,
+                item.At,
+                item.ByUserId,
+                item.ApprovedBy,
+                item.Reason,
+                item.Total,
+                item.Refunds.Where(part => part.Method == PaymentMethod.Cash).Sum(part => part.Amount),
+                item.Lines.OrderBy(line => line.Position).Select(line => new ReturnLineView(line.LineIndex, line.Quantity, line.Resellable)).ToArray(),
+                item.Refunds.OrderBy(part => part.Position).Select(part => new ReturnRefundView(part.Method, part.Amount)).ToArray())).ToArray(),
+            (await RanksAsync(tenant, [(row.Id, row.RegisterId, row.RecordedAt)], cancellationToken))[row.Id]);
     }
 
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
@@ -140,7 +186,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         return rows
             .Select(row => new SessionSummary(
                 row.Id, row.CashierId, row.RegisterId, row.OpenedAt, row.OpeningFloat, row.CashReceived,
-                row.OpeningFloat + row.CashReceived, row.Status, row.CountedCash, row.CashVariance, row.ClosedAt))
+                row.OpeningFloat + row.CashReceived - row.CashRefunded, row.Status, row.CountedCash, row.CashVariance, row.ClosedAt, row.CashRefunded))
             .ToArray();
     }
 
@@ -181,6 +227,9 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             })
             .ToListAsync(cancellationToken);
 
+        // Les retours de la période (pas les annulations, déjà exclues avec leur vente) viennent en déduction : quantité, chiffre d'affaires et coût.
+        var returnedByProduct = await ReturnedByProductAsync(tenant, start, end, cancellationToken);
+
         // Fiches des produits vendus : nom actuel et prix d'achat actuel, utilisé seulement pour les lignes sans coût retenu (estimation).
         var ids = sold.Select(item => item.ProductId).ToList();
         var products = ids.Count == 0
@@ -190,8 +239,18 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 .Select(product => new { product.Id, product.Name, product.PurchasePrice, product.Unit })
                 .ToDictionaryAsync(product => product.Id, cancellationToken);
 
-        var ranking = sold.Select(item =>
+        var ranking = sold.Where(raw => raw.Quantity > returnedByProduct.GetValueOrDefault(raw.ProductId).Quantity).Select(raw =>
         {
+            var back = returnedByProduct.GetValueOrDefault(raw.ProductId);
+            var item = new
+            {
+                raw.ProductId,
+                raw.FrozenName,
+                Quantity = raw.Quantity - back.Quantity,
+                Revenue = raw.Revenue - back.Revenue,
+                KnownCost = raw.KnownCost - back.KnownCost,
+                UncostedQuantity = raw.UncostedQuantity,
+            };
             products.TryGetValue(item.ProductId, out var product);
             // Sans fiche, des lignes sans coût n'ont rien pour s'estimer : marge inconnue. Sinon : coûts retenus + estimation du reste.
             long? margin = includeMargin && (item.UncostedQuantity == 0 || product is not null)
@@ -210,6 +269,27 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             _ => ranking.OrderByDescending(item => (decimal)item.Quantity / item.Unit.Scale()),
         };
         return ordered.ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).Take(limit).ToArray();
+    }
+
+    /// <summary>Ce qui est revenu pendant la période, par produit : quantité, argent rendu pour ces lignes (hors remise répartie) et coût retenu.</summary>
+    private async Task<Dictionary<Guid, (int Quantity, long Revenue, long KnownCost)>> ReturnedByProductAsync(
+        TenantId tenant, DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken)
+    {
+        var returned = await (
+                from line in db.Set<SaleReturnLineRow>().AsNoTracking()
+                join item in db.SaleReturns.AsNoTracking() on line.ReturnId equals item.Id
+                where item.TenantId == tenant.Value && item.Kind == ReturnKind.Return && item.At >= start && item.At < end
+                join saleLine in db.SaleLines.AsNoTracking() on new { item.SaleId, Position = line.LineIndex } equals new { saleLine.SaleId, saleLine.Position }
+                select new { saleLine.ProductId, line.Quantity, saleLine.UnitPrice, saleLine.UnitCost, saleLine.Unit })
+            .ToListAsync(cancellationToken);
+        return returned
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(
+                group => group.Key,
+                group => (
+                    group.Sum(item => item.Quantity),
+                    group.Sum(item => Money.Fcfa(item.UnitPrice).ForQuantity(item.Quantity, item.Unit).Amount),
+                    group.Sum(item => item.UnitCost is { } cost ? Money.Fcfa(cost).ForQuantity(item.Quantity, item.Unit).Amount : 0L)));
     }
 
     public async Task<ActivityReport> GetActivityAsync(
@@ -232,6 +312,12 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         var cancelledTotals = await cancelled
             .GroupBy(_ => 1)
             .Select(group => new { Count = group.Count(), Net = group.Sum(sale => sale.NetTotal) })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var returnTotals = await db.SaleReturns.AsNoTracking()
+            .Where(item => item.TenantId == tenant.Value && item.Kind == ReturnKind.Return && item.At >= start && item.At < end)
+            .GroupBy(_ => 1)
+            .Select(group => new { Count = group.Count(), Total = group.Sum(item => item.Total) })
             .SingleOrDefaultAsync(cancellationToken);
 
         var byPayment = await (
@@ -261,7 +347,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
             periodStart,
             periodEnd,
             totals?.Count ?? 0,
-            totals?.Net ?? 0,
+            (totals?.Net ?? 0) - (returnTotals?.Total ?? 0),
             totals?.Discount ?? 0,
             cancelledTotals?.Count ?? 0,
             cancelledTotals?.Net ?? 0,
@@ -273,6 +359,8 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                 .ToArray(),
             sessionsClosed,
             shortfall,
-            surplus);
+            surplus,
+            returnTotals?.Count ?? 0,
+            returnTotals?.Total ?? 0);
     }
 }

@@ -32,6 +32,8 @@ export interface SaleOperation extends OperationBase {
   at: string;
   lines: CartLine[];
   discountFcfa: number;
+  /** L'approbation signée d'un gérant pour une remise au-delà du seuil : elle remplace son PIN, qui n'est jamais gardé (docs/decisions/0020). */
+  discountApprovalToken?: string;
   payments: PaymentDraft[];
   /** Le client d'une vente à crédit (ou d'une vente que le caissier lui a rattachée). */
   customerId?: string;
@@ -106,12 +108,24 @@ export interface SaleInput {
   lines: CartLine[];
   payments: PaymentDraft[];
   customerId?: string | null;
+  /** La remise en FCFA, déjà calculée par l'écran ; 0 ou absente : aucune. */
+  discountFcfa?: number;
+  discountApprovalToken?: string;
 }
 
 export interface SessionSummary {
   salesCount: number;
   netTotalFcfa: number;
   expectedCashFcfa: number;
+  /** Espèces rendues à des clients dans cette session (retours et annulations) : déjà retirées de `expectedCashFcfa`. */
+  refundsFcfa: number;
+}
+
+/** Des espèces sorties du tiroir pour un retour ou une annulation faits en ligne sur cette caisse. */
+export interface CashRefund {
+  returnId: string;
+  sessionId: string;
+  amountFcfa: number;
 }
 
 /** Panier rangé pour servir le client suivant : ce n'est pas une vente (PWA-10). */
@@ -316,7 +330,12 @@ export class Journal {
     if (input.lines.length === 0) {
       throw new Error('Le panier est vide.');
     }
-    const netTotal = cartTotal(input.lines);
+    const gross = cartTotal(input.lines);
+    const discount = input.discountFcfa ?? 0;
+    if (!Number.isInteger(discount) || discount < 0 || discount >= gross) {
+      throw new Error('La remise doit être un montant entier, inférieur au total de la vente.');
+    }
+    const netTotal = gross - discount;
 
     return inTransaction(this.db, [OPERATIONS, PRODUCTS, META], 'readwrite', async (tx) => {
       const operations = tx.objectStore(OPERATIONS);
@@ -351,7 +370,8 @@ export class Journal {
         sessionId: session.sessionId,
         at: input.at,
         lines: input.lines,
-        discountFcfa: 0,
+        discountFcfa: discount,
+        ...(input.discountApprovalToken ? { discountApprovalToken: input.discountApprovalToken } : {}),
         payments: input.payments,
         ...(input.customerId ? { customerId: input.customerId } : {}),
         netTotalFcfa: netTotal,
@@ -377,11 +397,33 @@ export class Journal {
       .flatMap((sale) => sale.payments)
       .filter((payment) => payment.method === 'Cash')
       .reduce((sum, payment) => sum + payment.amountFcfa, 0);
+    const refunds = (await this.cashRefunds()).filter((refund) => refund.sessionId === session.sessionId).reduce((sum, refund) => sum + refund.amountFcfa, 0);
     return {
       salesCount: sales.length,
       netTotalFcfa: sales.reduce((sum, sale) => sum + sale.netTotalFcfa, 0),
-      expectedCashFcfa: session.openingFloatFcfa + cash,
+      expectedCashFcfa: session.openingFloatFcfa + cash - refunds,
+      refundsFcfa: refunds,
     };
+  }
+
+  private async cashRefunds(): Promise<CashRefund[]> {
+    return (await this.getMeta<CashRefund[]>('cash-refunds')) ?? [];
+  }
+
+  /**
+   * Note les espèces rendues à un client par un retour ou une annulation (faits en ligne) dans la session ouverte : la clôture hors ligne attend
+   * ainsi le bon montant. Un même retour ne compte qu'une fois ; sans session ouverte ou sans espèces, rien n'est noté.
+   */
+  async recordCashRefund(input: { returnId: string; amountFcfa: number }): Promise<void> {
+    const session = await this.currentSession();
+    if (!session || input.amountFcfa <= 0) {
+      return;
+    }
+    const kept = (await this.cashRefunds()).filter((refund) => refund.sessionId === session.sessionId);
+    if (kept.some((refund) => refund.returnId === input.returnId)) {
+      return;
+    }
+    await this.putMeta('cash-refunds', [...kept, { returnId: input.returnId, sessionId: session.sessionId, amountFcfa: input.amountFcfa }]);
   }
 
   async closeSession(input: { countedCashFcfa: number; at: string }): Promise<CloseSessionOperation> {

@@ -26,6 +26,7 @@ internal static class SessionMapper
     {
         row.Status = session.Status;
         row.CashReceived = session.CashReceived.Amount;
+        row.CashRefunded = session.CashRefunded.Amount;
         row.CountedCash = session.CountedCash?.Amount;
         row.ClosedAt = session.ClosedAt?.ToUniversalTime();
         row.CashVariance = session.CashVariance;
@@ -45,5 +46,6 @@ internal static class SessionMapper
             Money.Fcfa(row.CashReceived),
             row.CountedCash is { } counted ? Money.Fcfa(counted) : null,
             row.ClosedAt,
-            row.CashVariance);
+            row.CashVariance,
+            Money.Fcfa(row.CashRefunded));
 }

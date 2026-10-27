@@ -8,6 +8,7 @@ public enum StockMovementKind
     Sale,
     Loss,
     SaleCancellation,
+    Return,
 }
 
 /// <summary>
