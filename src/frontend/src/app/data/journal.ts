@@ -1,3 +1,4 @@
+import { sumDenominations } from '../core/cash-count';
 import { OfflineProof } from '../core/offline-proof';
 import { HELD, inTransaction, META, openDatabase, OPERATIONS, PRODUCTS, promisify } from './idb';
 import { CartLine, CatalogueProduct, CustomerSnapshot, PaymentDraft } from '../domain/types';
@@ -41,15 +42,35 @@ export interface SaleOperation extends OperationBase {
   changeFcfa: number;
 }
 
+export type CashMovementKind = 'Expense' | 'Drop' | 'Topup';
+
+/** Une dépense, un versement au coffre ou un apport de monnaie sur la session ouverte (docs/specs/cloture-sorties-rapport CLO-10). */
+export interface CashMovementOperation extends OperationBase {
+  kind: 'cashMovement';
+  movementId: string;
+  sessionId: string;
+  movementKind: CashMovementKind;
+  amountFcfa: number;
+  reason: string | null;
+  at: string;
+  /** L'approbation signée d'un gérant pour une grosse sortie : elle remplace son PIN, qui n'est jamais gardé. */
+  approvalToken?: string;
+}
+
 export interface CloseSessionOperation extends OperationBase {
   kind: 'closeSession';
   sessionId: string;
   countedCashFcfa: number;
   at: string;
-  result?: { expectedCashFcfa: number; countedCashFcfa: number; varianceFcfa: number };
+  /** Le second comptage, définitif, quand le premier s'écartait trop de ce qui était attendu. */
+  recount?: boolean;
+  /** Le détail par coupures (valeur → nombre), facultatif. */
+  denominations?: Record<number, number>;
+  /** Ce que le serveur a répondu ; l'attendu et l'écart ne sont rendus qu'à un gérant ou au propriétaire (clôture à l'aveugle). */
+  result?: { closed: boolean; needsRecount: boolean; countedCashFcfa: number; expectedCashFcfa: number | null; varianceFcfa: number | null };
 }
 
-export type Operation = OpenSessionOperation | SaleOperation | CloseSessionOperation;
+export type Operation = OpenSessionOperation | SaleOperation | CashMovementOperation | CloseSessionOperation;
 
 /**
  * L'appareil tel que l'application le retient : jamais montré à l'utilisateur. `deviceId` et `deviceSecret` viennent de l'enrôlement
@@ -119,6 +140,9 @@ export interface SessionSummary {
   expectedCashFcfa: number;
   /** Espèces rendues à des clients dans cette session (retours et annulations) : déjà retirées de `expectedCashFcfa`. */
   refundsFcfa: number;
+  /** Dépenses et versements au coffre de la session, apports de monnaie : déjà pris en compte dans `expectedCashFcfa`. */
+  paidOutFcfa: number;
+  paidInFcfa: number;
 }
 
 /** Des espèces sorties du tiroir pour un retour ou une annulation faits en ligne sur cette caisse. */
@@ -398,12 +422,94 @@ export class Journal {
       .filter((payment) => payment.method === 'Cash')
       .reduce((sum, payment) => sum + payment.amountFcfa, 0);
     const refunds = (await this.cashRefunds()).filter((refund) => refund.sessionId === session.sessionId).reduce((sum, refund) => sum + refund.amountFcfa, 0);
+    const movements = (await this.cashMovements()).filter((movement) => movement.status !== 'rejected');
+    const paidOut = movements.filter((movement) => movement.movementKind !== 'Topup').reduce((sum, movement) => sum + movement.amountFcfa, 0);
+    const paidIn = movements.filter((movement) => movement.movementKind === 'Topup').reduce((sum, movement) => sum + movement.amountFcfa, 0);
     return {
       salesCount: sales.length,
       netTotalFcfa: sales.reduce((sum, sale) => sum + sale.netTotalFcfa, 0),
-      expectedCashFcfa: session.openingFloatFcfa + cash - refunds,
+      expectedCashFcfa: session.openingFloatFcfa + cash - refunds - paidOut + paidIn,
       refundsFcfa: refunds,
+      paidOutFcfa: paidOut,
+      paidInFcfa: paidIn,
     };
+  }
+
+  /** Les mouvements d'espèces de la session ouverte, du plus ancien au plus récent. */
+  async cashMovements(): Promise<CashMovementOperation[]> {
+    const session = await this.currentSession();
+    if (!session) {
+      return [];
+    }
+    return (await this.operations())
+      .filter((operation): operation is CashMovementOperation => operation.kind === 'cashMovement' && operation.sessionId === session.sessionId)
+      .sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
+   * Note une dépense, un versement ou un apport dans la file, avec le numéro d'ordre de la caisse : le serveur les reçoit avant la clôture. Un même
+   * mouvement ne compte qu'une fois ; l'argent qui sort ne peut pas dépasser ce que le tiroir doit contenir.
+   */
+  async recordCashMovement(input: {
+    movementId: string;
+    movementKind: CashMovementKind;
+    amountFcfa: number;
+    reason: string | null;
+    at: string;
+    approvalToken?: string;
+  }): Promise<CashMovementOperation> {
+    if (!Number.isInteger(input.amountFcfa) || input.amountFcfa <= 0) {
+      throw new Error('Le montant doit être un nombre entier de francs, supérieur à zéro.');
+    }
+    const reason = input.reason?.trim() ? input.reason.trim() : null;
+    if (input.movementKind === 'Expense' && reason === null) {
+      throw new Error('Dites à quoi sert cette dépense.');
+    }
+    // Rejeu ou double appui : le mouvement existe déjà, on le renvoie tel quel avant de refaire le calcul du tiroir.
+    const already = (await this.operations()).find(
+      (operation): operation is CashMovementOperation => operation.kind === 'cashMovement' && operation.movementId === input.movementId,
+    );
+    if (already) {
+      return already;
+    }
+    const outflow = input.movementKind !== 'Topup';
+    if (outflow) {
+      // Hors de la transaction : le calcul de l'attendu relit le journal ; l'écriture ci-dessous reste atomique.
+      const summary = await this.sessionSummary();
+      if (!summary) {
+        throw new Error("Aucune session de caisse n'est ouverte.");
+      }
+      if (input.amountFcfa > summary.expectedCashFcfa) {
+        throw new Error("Cette sortie dépasse l'argent qui doit se trouver dans le tiroir.");
+      }
+    }
+    return inTransaction(this.db, [OPERATIONS, META], 'readwrite', async (tx) => {
+      const session = await this.metaIn<LocalSession>(tx, 'session');
+      if (!session) {
+        throw new Error("Aucune session de caisse n'est ouverte.");
+      }
+      const existing = ((await promisify(tx.objectStore(OPERATIONS).getAll())) as Operation[]).find(
+        (operation): operation is CashMovementOperation => operation.kind === 'cashMovement' && operation.movementId === input.movementId,
+      );
+      if (existing) {
+        return existing;
+      }
+      const movement: CashMovementOperation = {
+        kind: 'cashMovement',
+        seq: await this.nextSequence(tx),
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        movementId: input.movementId,
+        sessionId: session.sessionId,
+        movementKind: input.movementKind,
+        amountFcfa: input.amountFcfa,
+        reason,
+        at: input.at,
+        ...(input.approvalToken ? { approvalToken: input.approvalToken } : {}),
+      };
+      await promisify(tx.objectStore(OPERATIONS).put(movement));
+      return movement;
+    });
   }
 
   private async cashRefunds(): Promise<CashRefund[]> {
@@ -426,7 +532,10 @@ export class Journal {
     await this.putMeta('cash-refunds', [...kept, { returnId: input.returnId, sessionId: session.sessionId, amountFcfa: input.amountFcfa }]);
   }
 
-  async closeSession(input: { countedCashFcfa: number; at: string }): Promise<CloseSessionOperation> {
+  async closeSession(input: { countedCashFcfa: number; at: string; recount?: boolean; denominations?: Record<number, number> }): Promise<CloseSessionOperation> {
+    if (input.denominations && Object.keys(input.denominations).length > 0 && sumDenominations(input.denominations) !== input.countedCashFcfa) {
+      throw new Error('Le détail des billets et des pièces ne correspond pas au montant compté.');
+    }
     return inTransaction(this.db, [OPERATIONS, META, HELD], 'readwrite', async (tx) => {
       const session = await this.metaIn<LocalSession>(tx, 'session');
       if (!session) {
@@ -443,6 +552,8 @@ export class Journal {
         sessionId: session.sessionId,
         countedCashFcfa: input.countedCashFcfa,
         at: input.at,
+        ...(input.recount ? { recount: true } : {}),
+        ...(input.denominations && Object.keys(input.denominations).length > 0 ? { denominations: input.denominations } : {}),
       };
       await promisify(tx.objectStore(OPERATIONS).put(operation));
       await promisify(tx.objectStore(META).delete('session'));

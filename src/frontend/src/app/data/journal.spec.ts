@@ -244,7 +244,7 @@ describe('Journal: closing', () => {
     });
 
     expect(await journal.sessionSummary()).toEqual({
-      salesCount: 2, netTotalFcfa: 2400, expectedCashFcfa: 10000 + 1800, refundsFcfa: 0,
+      salesCount: 2, netTotalFcfa: 2400, expectedCashFcfa: 10000 + 1800, refundsFcfa: 0, paidOutFcfa: 0, paidInFcfa: 0,
     });
   });
 
@@ -552,7 +552,7 @@ describe('Journal: remises et remboursements (docs/specs/annulations-remises-ret
     await journal.recordCashRefund({ returnId: 'r-1', amountFcfa: 600 });
     await journal.recordCashRefund({ returnId: 'r-2', amountFcfa: 0 });
 
-    expect(await journal.sessionSummary()).toEqual({ salesCount: 1, netTotalFcfa: 1800, expectedCashFcfa: 10000 + 1800 - 600, refundsFcfa: 600 });
+    expect(await journal.sessionSummary()).toEqual({ salesCount: 1, netTotalFcfa: 1800, expectedCashFcfa: 10000 + 1800 - 600, refundsFcfa: 600, paidOutFcfa: 0, paidInFcfa: 0 });
   });
 
   it('starts the refunds of a new session from zero', async () => {
@@ -563,5 +563,75 @@ describe('Journal: remises et remboursements (docs/specs/annulations-remises-ret
     await journal.openSession({ sessionId: 's-2', pointOfSaleId: 'pos-1', registerId: 'reg-1', openingFloatFcfa: 5000, openedAt: '2026-10-24T08:00:00.000Z' });
 
     expect((await journal.sessionSummary())?.refundsFcfa).toBe(0);
+  });
+});
+
+describe('Journal: mouvements de caisse et clôture (docs/specs/cloture-sorties-rapport)', () => {
+  const expense = (id: string, amountFcfa = 1500, reason: string | null = 'Transport') => ({
+    movementId: id, movementKind: 'Expense' as const, amountFcfa, reason, at: '2026-10-23T09:00:00.000Z',
+  });
+
+  it('records an expense in the queue and takes it out of the cash expected', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.recordSale(cashSale('a', 3, 1800));
+
+    const movement = await journal.recordCashMovement(expense('m-1'));
+
+    expect(movement).toMatchObject({ kind: 'cashMovement', status: 'pending', movementKind: 'Expense', amountFcfa: 1500, reason: 'Transport' });
+    expect((await journal.pendingOperations()).map((operation) => operation.kind)).toEqual(['openSession', 'sale', 'cashMovement']);
+    expect(await journal.sessionSummary()).toMatchObject({ expectedCashFcfa: 10000 + 1800 - 1500, paidOutFcfa: 1500, paidInFcfa: 0 });
+  });
+
+  it('adds a topup, subtracts a drop and keeps the same movement only once', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    await journal.recordCashMovement({ movementId: 't', movementKind: 'Topup', amountFcfa: 2000, reason: null, at: '2026-10-23T09:00:00.000Z' });
+    await journal.recordCashMovement({ movementId: 'd', movementKind: 'Drop', amountFcfa: 8000, reason: null, at: '2026-10-23T09:05:00.000Z' });
+    await journal.recordCashMovement({ movementId: 'd', movementKind: 'Drop', amountFcfa: 8000, reason: null, at: '2026-10-23T09:05:00.000Z' });
+
+    expect(await journal.cashMovements()).toHaveLength(2);
+    expect(await journal.sessionSummary()).toMatchObject({ expectedCashFcfa: 10000 + 2000 - 8000, paidOutFcfa: 8000, paidInFcfa: 2000 });
+  });
+
+  it('refuses a missing reason for an expense, a bad amount and an exit bigger than the drawer', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    await expect(journal.recordCashMovement(expense('a', 500, null))).rejects.toThrow(/à quoi sert/);
+    await expect(journal.recordCashMovement(expense('b', 0))).rejects.toThrow(/montant/);
+    await expect(journal.recordCashMovement(expense('c', 10_001))).rejects.toThrow(/dépasse l.argent/);
+    expect(await journal.cashMovements()).toEqual([]);
+  });
+
+  it('refuses a movement without an open session and keeps the approval of a manager with the queued movement', async () => {
+    const journal = await newJournal();
+    await expect(journal.recordCashMovement(expense('a'))).rejects.toThrow(/session/i);
+    await withOpenSession(journal);
+
+    const movement = await journal.recordCashMovement({ ...expense('b', 8000), approvalToken: 'sceau' });
+
+    expect(movement.approvalToken).toBe('sceau');
+  });
+
+  it('queues the closing after the movements with the recount and the denominations', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+    await journal.recordCashMovement(expense('m-1'));
+
+    const closing = await journal.closeSession({
+      countedCashFcfa: 8500, at: '2026-10-23T17:00:00.000Z', recount: true, denominations: { 5000: 1, 1000: 3, 500: 1 },
+    });
+
+    expect(closing).toMatchObject({ kind: 'closeSession', recount: true, denominations: { 5000: 1, 1000: 3, 500: 1 } });
+    expect((await journal.pendingOperations()).map((operation) => operation.kind)).toEqual(['openSession', 'cashMovement', 'closeSession']);
+  });
+
+  it('refuses a denomination detail that does not add up to the count', async () => {
+    const journal = await newJournal();
+    await withOpenSession(journal);
+
+    await expect(journal.closeSession({ countedCashFcfa: 8500, at: 'x', denominations: { 5000: 1 } })).rejects.toThrow(/détail/);
   });
 });

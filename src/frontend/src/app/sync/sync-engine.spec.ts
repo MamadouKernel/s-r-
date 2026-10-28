@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { Journal, SaleOperation } from '../data/journal';
+import { CashMovementOperation, CloseSessionOperation, Journal, SaleOperation } from '../data/journal';
 import { CatalogueProduct } from '../domain/types';
 import { ApiError, SaleSyncStatus, SyncApi } from './sync-api';
 import { SyncEngine } from './sync-engine';
@@ -38,10 +38,26 @@ class FakeApi implements SyncApi {
     });
   }
 
-  async closeSession() {
+  readonly movements: string[] = [];
+  movementFailure: ApiError | null = null;
+  closings: boolean[] = [];
+  askRecount = false;
+
+  async recordMovement(operation: CashMovementOperation): Promise<void> {
+    this.calls.push('movement');
+    if (this.movementFailure) throw this.movementFailure;
+    if (this.failWith) throw this.failWith;
+    this.movements.push(operation.movementId);
+  }
+
+  async closeSession(operation: CloseSessionOperation) {
     this.calls.push('close');
     if (this.failWith) throw this.failWith;
-    return { expectedCashFcfa: 11800, countedCashFcfa: 11300, varianceFcfa: -500 };
+    this.closings.push(operation.recount === true);
+    if (this.askRecount && !operation.recount) {
+      return { closed: false, needsRecount: true, countedCashFcfa: operation.countedCashFcfa, expectedCashFcfa: null, varianceFcfa: null };
+    }
+    return { closed: true, needsRecount: false, countedCashFcfa: operation.countedCashFcfa, expectedCashFcfa: 11800, varianceFcfa: -500 };
   }
 }
 
@@ -193,5 +209,60 @@ describe('SyncEngine', () => {
 describe('nextDelayMs', () => {
   it('doubles from 2 seconds and is capped at 60 seconds', () => {
     expect([0, 1, 2, 3, 4, 5, 6, 10].map(nextDelayMs)).toEqual([2000, 4000, 8000, 16000, 32000, 60000, 60000, 60000]);
+  });
+});
+
+describe('SyncEngine: mouvements de caisse et clôture (docs/specs/cloture-sorties-rapport)', () => {
+  const expense = (id: string, amountFcfa = 1500) => ({
+    movementId: id, movementKind: 'Expense' as const, amountFcfa, reason: 'Transport', at: '2026-10-23T09:00:00.000Z',
+  });
+
+  it('sends the movements in the order of the register, before the closing', async () => {
+    const { journal, engine, api } = await setup(1);
+    await journal.recordCashMovement(expense('m-1'));
+    await journal.closeSession({ countedCashFcfa: 9100, at: '2026-10-23T17:00:00.000Z' });
+
+    await engine.flush();
+
+    expect(api.calls).toEqual(['open', 'sync:1', 'movement', 'close']);
+    expect(api.movements).toEqual(['m-1']);
+    expect(await journal.counts()).toEqual({ pending: 0, synced: 4, rejected: 0 });
+  });
+
+  it('shows a movement the server refuses with its reason and carries on with the rest', async () => {
+    const { journal, engine, api } = await setup(0);
+    await journal.recordCashMovement(expense('m-1'));
+    api.movementFailure = new ApiError(403, 'forbidden', 'Au-delà de 5 000 FCFA, l’accord d’un gérant est nécessaire.');
+    await journal.closeSession({ countedCashFcfa: 8500, at: '2026-10-23T17:00:00.000Z' });
+
+    const outcome = await engine.flush();
+
+    expect(outcome).toMatchObject({ rejected: 1, stopped: 'none' });
+    expect(api.calls).toContain('close');
+    const refused = (await journal.operations()).find((operation) => operation.kind === 'cashMovement');
+    expect(refused).toMatchObject({ status: 'rejected', message: expect.stringContaining('accord d’un gérant') });
+  });
+
+  it('keeps a movement for later when the network fails, and stops there', async () => {
+    const { journal, engine, api } = await setup(0);
+    await journal.recordCashMovement(expense('m-1'));
+    api.failWith = new ApiError(0, 'network', 'x');
+
+    const outcome = await engine.flush();
+
+    expect(outcome.stopped).toBe('network');
+    expect((await journal.pendingOperations()).some((operation) => operation.kind === 'cashMovement')).toBe(true);
+  });
+
+  it('finishes a closing the server wants recounted with the same count, since the cash of that day cannot be counted again', async () => {
+    const { journal, engine, api } = await setup(0);
+    api.askRecount = true;
+    await journal.closeSession({ countedCashFcfa: 12000, at: '2026-10-23T17:00:00.000Z' });
+
+    await engine.flush();
+
+    expect(api.closings).toEqual([false, true]);
+    const closing = (await journal.operations()).find((operation) => operation.kind === 'closeSession');
+    expect(closing).toMatchObject({ status: 'synced', result: { closed: true, needsRecount: false } });
   });
 });

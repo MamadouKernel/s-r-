@@ -140,7 +140,7 @@ describe('CashService', () => {
     const { cash, journal } = await setup();
     cash.add(jus);
     await cash.confirmSale([{ id: 'p', method: 'Cash', amountFcfa: 600, tenderedFcfa: 600 }]);
-    expect(await cash.summary()).toEqual({ salesCount: 1, netTotalFcfa: 600, expectedCashFcfa: 10600, refundsFcfa: 0 });
+    expect(await cash.summary()).toEqual({ salesCount: 1, netTotalFcfa: 600, expectedCashFcfa: 10600, refundsFcfa: 0, paidOutFcfa: 0, paidInFcfa: 0 });
 
     const closing = await cash.closeSession(10600);
 

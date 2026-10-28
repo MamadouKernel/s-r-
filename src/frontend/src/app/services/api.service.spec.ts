@@ -176,4 +176,25 @@ describe('ApiService', () => {
 
     expect(body).not.toHaveProperty('discountApprovalToken');
   });
+
+  it('sends a cash movement with its kind, reason and the approval of a manager, never a PIN', async () => {
+    const result = api.recordMovement({
+      kind: 'cashMovement', seq: 5, status: 'pending', createdAt: 'x', movementId: 'm-1', sessionId: 's-1', movementKind: 'Expense',
+      amountFcfa: 8000, reason: 'Transport', at: '2026-10-23T09:00:00.000Z', approvalToken: 'sceau',
+    });
+    const request = http.expectOne('/api/v1/register-sessions/s-1/movements');
+    expect(request.request.body).toEqual({ movementId: 'm-1', kind: 'Expense', amountFcfa: 8000, reason: 'Transport', at: '2026-10-23T09:00:00.000Z', approvalToken: 'sceau' });
+    request.flush({ movementId: 'm-1', alreadyProcessed: false });
+    await result;
+  });
+
+  it('sends the closing with the recount and the denominations when there are some', async () => {
+    const result = api.closeSession({
+      kind: 'closeSession', seq: 9, status: 'pending', createdAt: 'x', sessionId: 's-1', countedCashFcfa: 8500, at: 'y', recount: true, denominations: { 5000: 1, 1000: 3, 500: 1 },
+    });
+    const request = http.expectOne('/api/v1/register-sessions/s-1/close');
+    expect(request.request.body).toEqual({ countedCashFcfa: 8500, at: 'y', recount: true, denominations: { 5000: 1, 1000: 3, 500: 1 } });
+    request.flush({ closed: true, needsRecount: false, countedCashFcfa: 8500, expectedCashFcfa: null, varianceFcfa: null, alreadyProcessed: false });
+    expect((await result).expectedCashFcfa).toBeNull();
+  });
 });

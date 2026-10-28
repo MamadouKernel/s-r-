@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { CloseSessionOperation, OpenSessionOperation, SaleOperation } from '../data/journal';
+import { CashMovementOperation, CloseSessionOperation, OpenSessionOperation, SaleOperation } from '../data/journal';
 import { MeasureUnit } from '../core/measure';
 import { CatalogueProduct } from '../domain/types';
 import { ApiError, ClosingResult, SaleSyncStatus, SyncApi } from '../sync/sync-api';
@@ -129,11 +129,26 @@ export class ApiService implements SyncApi {
     return response.statuses;
   }
 
+  async recordMovement(operation: CashMovementOperation): Promise<void> {
+    await this.call(
+      this.http.post(`${API_ROOT}/register-sessions/${operation.sessionId}/movements`, {
+        movementId: operation.movementId,
+        kind: operation.movementKind,
+        amountFcfa: operation.amountFcfa,
+        reason: operation.reason,
+        at: operation.at,
+        ...(operation.approvalToken ? { approvalToken: operation.approvalToken } : {}),
+      }),
+    );
+  }
+
   async closeSession(operation: CloseSessionOperation): Promise<ClosingResult> {
     return this.call(
       this.http.post<ClosingResult>(`${API_ROOT}/register-sessions/${operation.sessionId}/close`, {
         countedCashFcfa: operation.countedCashFcfa,
         at: operation.at,
+        ...(operation.recount ? { recount: true } : {}),
+        ...(operation.denominations ? { denominations: operation.denominations } : {}),
       }),
     );
   }
