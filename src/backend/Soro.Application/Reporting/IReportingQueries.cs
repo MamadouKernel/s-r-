@@ -40,6 +40,9 @@ public interface IReportingQueries
     /// Produits les plus vendus sur <c>[périodeDébut, périodeFin[</c>, ventes validées seulement. Quand <paramref name="includeMargin"/> est faux,
     /// la marge est toujours <c>null</c> (profil sans accès aux prix d'achat).
     /// </summary>
+    /// <summary>Les chiffres bruts d'une journée (de <paramref name="dayStart"/> inclus à <paramref name="nextDayStart"/> exclu) : ventes, caissiers, mouvements d'espèces, caisses, crédit, stock bas.</summary>
+    Task<DayFigures> GetDayFiguresAsync(TenantId tenant, DateTimeOffset dayStart, DateTimeOffset nextDayStart, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ProductRanking>> GetTopProductsAsync(
         TenantId tenant,
         DateTimeOffset periodStart,

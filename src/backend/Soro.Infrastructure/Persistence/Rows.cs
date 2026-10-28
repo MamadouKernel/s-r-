@@ -39,6 +39,40 @@ internal sealed class SessionRow
     public DateTimeOffset? ClosedAt { get; set; }
 
     public long? CashVariance { get; set; }
+
+    /// <summary>Dépenses et versements d'espèces de la session (docs/decisions/0021).</summary>
+    public long CashPaidOut { get; set; }
+
+    /// <summary>Apports de monnaie de la session.</summary>
+    public long CashPaidIn { get; set; }
+
+    /// <summary>Le premier comptage, gardé quand un recomptage a été demandé.</summary>
+    public long? FirstCount { get; set; }
+
+    public string? FirstCountDetail { get; set; }
+
+    public string? CountDetail { get; set; }
+}
+
+internal sealed class CashMovementRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid SessionId { get; set; }
+
+    public CashMovementKind Kind { get; set; }
+
+    public long Amount { get; set; }
+
+    public string? Reason { get; set; }
+
+    public DateTimeOffset At { get; set; }
+
+    public Guid ByUserId { get; set; }
+
+    public Guid? ApprovedBy { get; set; }
 }
 
 internal sealed class SaleRow
@@ -452,6 +486,16 @@ internal sealed class SubscriptionReminderRow
     public DateTimeOffset EndsAt { get; set; }
 
     public string Kind { get; set; } = string.Empty;
+
+    public DateTimeOffset SentAt { get; set; }
+}
+
+/// <summary>Un e-mail du soir envoyé : un par commerce et par jour (docs/specs/cloture-sorties-rapport CLO-08).</summary>
+internal sealed class EveningReportRow
+{
+    public Guid TenantId { get; set; }
+
+    public DateOnly Day { get; set; }
 
     public DateTimeOffset SentAt { get; set; }
 }

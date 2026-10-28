@@ -120,7 +120,11 @@ internal sealed class TestWorld
 
     public OpenRegisterSessionHandler OpenSession => new(Current, Sessions, UnitOfWork);
 
-    public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, UnitOfWork);
+    public InMemoryCashMovementRepository CashMovements { get; } = new();
+
+    public RecordCashMovementHandler RecordCashMovement => new(Current, Sessions, CashMovements, Users, Hasher, Seal, Settings, Audit, Clock, UnitOfWork);
+
+    public CloseRegisterSessionHandler CloseSession => new(Current, Sessions, Settings, Audit, Clock, UnitOfWork);
 
     public RecordSaleHandler RecordSale => new(Current, Sessions, Sales, Products, Movements, Customers, Settings, Users, Hasher, Seal, Repayments, Audit, Clock, UnitOfWork);
 
@@ -225,6 +229,12 @@ internal sealed class TestWorld
     public RefuseSubscriptionPaymentHandler RefusePayment => new(Subscriptions, Mail, Audit, Clock, UnitOfWork);
 
     public ListPendingSubscriptionPaymentsHandler ListPendingPayments => new(Subscriptions);
+
+    public InMemoryEveningReportLog EveningLog { get; } = new();
+
+    public GetDayReportHandler DayReport => new(Current, Reporting, Settings, Clock);
+
+    public SendEveningReportsHandler SendEveningReports => new(Subscriptions, Reporting, Settings, Users, EveningLog, Mail, Clock, UnitOfWork);
 
     public SendSubscriptionRemindersHandler SendReminders => new(Subscriptions, Mail, SubscriptionSettings, Clock, UnitOfWork);
 

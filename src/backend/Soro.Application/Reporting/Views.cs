@@ -72,7 +72,9 @@ public sealed record SessionSummary(
     long? CountedCashFcfa,
     long? VarianceFcfa,
     DateTimeOffset? ClosedAt,
-    long CashRefundedFcfa = 0);
+    long CashRefundedFcfa = 0,
+    long CashPaidOutFcfa = 0,
+    long CashPaidInFcfa = 0);
 
 public sealed record PaymentBreakdown(PaymentMethod Method, long AmountFcfa, int Count);
 

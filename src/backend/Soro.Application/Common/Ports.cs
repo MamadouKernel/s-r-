@@ -72,4 +72,7 @@ public static class AuditActions
     public const string DeviceRevoked = "device.revoked";
     public const string DeviceInvitationRevoked = "device.invitation.revoked";
     public const string LoginOffline = "login.offline";
+    public const string CashMovement = "cash.movement";
+    public const string CashMovementRefused = "cash.movement.refused";
+    public const string SessionVariance = "session.variance";
 }

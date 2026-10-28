@@ -64,6 +64,62 @@ namespace Soro.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.CashMovementRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid>("ByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("by_user_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("TenantId", "At");
+
+                    b.HasIndex("TenantId", "SessionId");
+
+                    b.ToTable("cash_movements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_cash_movements_amount", "amount > 0");
+                        });
+                });
+
             modelBuilder.Entity("Soro.Infrastructure.Persistence.CommerceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -404,6 +460,25 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_email_verifications_counters", "attempts >= 0 AND resend_count >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.EveningReportRow", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("TenantId", "Day");
+
+                    b.ToTable("evening_reports", (string)null);
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.OwnerDirectoryRow", b =>
@@ -933,6 +1008,14 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<long>("CashPaidIn")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_paid_in");
+
+                    b.Property<long>("CashPaidOut")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_paid_out");
+
                     b.Property<long>("CashReceived")
                         .HasColumnType("bigint")
                         .HasColumnName("cash_received");
@@ -953,9 +1036,21 @@ namespace Soro.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("closed_at");
 
+                    b.Property<string>("CountDetail")
+                        .HasColumnType("text")
+                        .HasColumnName("count_detail");
+
                     b.Property<long?>("CountedCash")
                         .HasColumnType("bigint")
                         .HasColumnName("counted_cash");
+
+                    b.Property<long?>("FirstCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("first_count");
+
+                    b.Property<string>("FirstCountDetail")
+                        .HasColumnType("text")
+                        .HasColumnName("first_count_detail");
 
                     b.Property<DateTimeOffset>("OpenedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1259,6 +1354,15 @@ namespace Soro.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_users_credential", "pin_hash IS NOT NULL OR password_hash IS NOT NULL");
                         });
+                });
+
+            modelBuilder.Entity("Soro.Infrastructure.Persistence.CashMovementRow", b =>
+                {
+                    b.HasOne("Soro.Infrastructure.Persistence.SessionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Soro.Infrastructure.Persistence.DebtRepaymentRow", b =>

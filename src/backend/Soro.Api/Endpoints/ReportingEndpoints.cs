@@ -14,6 +14,7 @@ internal static class ReportingEndpoints
         api.MapGet("/sales/{saleId:guid}", GetSaleAsync);
         api.MapGet("/register-sessions", ListSessionsAsync);
         api.MapGet("/reports/activity", GetActivityAsync);
+        api.MapGet("/reports/day", GetDayAsync);
         api.MapGet("/reports/top-products", GetTopProductsAsync);
         api.MapGet("/audit-log", ListAuditLogAsync);
         return api;
@@ -46,6 +47,10 @@ internal static class ReportingEndpoints
         GetSaleHandler handler,
         CancellationToken cancellationToken) =>
         (await handler.HandleAsync(new SaleId(saleId), cancellationToken)).ToHttp(sale => Results.Ok(sale));
+
+    /// <summary>Le rapport du jour : la même matière que l'e-mail du soir (docs/specs/cloture-sorties-rapport CLO-07).</summary>
+    private static async Task<IResult> GetDayAsync(DateOnly? date, GetDayReportHandler handler, CancellationToken cancellationToken) =>
+        (await handler.HandleAsync(new GetDayReportQuery(date), cancellationToken)).ToHttp(report => Results.Ok(report));
 
     private static async Task<IResult> ListSessionsAsync(
         DateTimeOffset? from,

@@ -30,6 +30,11 @@ internal static class SessionMapper
         row.CountedCash = session.CountedCash?.Amount;
         row.ClosedAt = session.ClosedAt?.ToUniversalTime();
         row.CashVariance = session.CashVariance;
+        row.CashPaidOut = session.CashPaidOut.Amount;
+        row.CashPaidIn = session.CashPaidIn.Amount;
+        row.FirstCount = session.FirstCount?.Amount;
+        row.FirstCountDetail = session.FirstCountDetail;
+        row.CountDetail = session.CountDetail;
     }
 
     public static CashRegisterSession ToDomain(SessionRow row) =>
@@ -47,5 +52,10 @@ internal static class SessionMapper
             row.CountedCash is { } counted ? Money.Fcfa(counted) : null,
             row.ClosedAt,
             row.CashVariance,
-            Money.Fcfa(row.CashRefunded));
+            Money.Fcfa(row.CashRefunded),
+            Money.Fcfa(row.CashPaidOut),
+            Money.Fcfa(row.CashPaidIn),
+            row.FirstCount is { } first ? Money.Fcfa(first) : null,
+            row.FirstCountDetail,
+            row.CountDetail);
 }

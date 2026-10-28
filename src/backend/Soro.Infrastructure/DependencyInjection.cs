@@ -36,6 +36,7 @@ public static class DependencyInjection
             .ConfigureWarnings(warnings => warnings.Throw(CoreEventId.ManyServiceProvidersCreatedWarning)));
 
         services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<ICashMovementRepository, CashMovementRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
         services.AddScoped<ISaleReturnRepository, SaleReturnRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IPhotoStore, PhotoStore>();
         services.AddScoped<ISubscriptionPaymentRepository, SubscriptionPaymentRepository>();
         services.AddScoped<IPlatformSubscriptions, PlatformSubscriptions>();
+        services.AddScoped<IEveningReportLog, EveningReportLog>();
         services.AddScoped<IDataExportQueries, DataExportQueries>();
         services.AddSingleton<IDataExportWriter, Soro.Infrastructure.Export.ClosedXmlDataExportWriter>();
         services.AddSingleton<IProductSheetReader, Soro.Infrastructure.Import.ClosedXmlProductSheetReader>();

@@ -1,3 +1,4 @@
+using Soro.Domain.Cash;
 using Soro.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,6 +18,8 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
     internal DbSet<SaleLineRow> SaleLines => Set<SaleLineRow>();
 
     internal DbSet<SaleReturnRow> SaleReturns => Set<SaleReturnRow>();
+    internal DbSet<CashMovementRow> CashMovements => Set<CashMovementRow>();
+    internal DbSet<EveningReportRow> EveningReports => Set<EveningReportRow>();
 
     internal DbSet<PaymentRow> Payments => Set<PaymentRow>();
 
@@ -55,6 +58,7 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSessions(modelBuilder.Entity<SessionRow>());
+        ConfigureCashMovements(modelBuilder);
         ConfigureSales(modelBuilder.Entity<SaleRow>());
         ConfigureSaleLines(modelBuilder.Entity<SaleLineRow>());
         ConfigurePayments(modelBuilder.Entity<PaymentRow>());
@@ -110,6 +114,18 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         sale.HasOne<SessionRow>().WithMany().HasForeignKey(row => row.SessionId).OnDelete(DeleteBehavior.Restrict);
         sale.HasMany(row => row.Lines).WithOne().HasForeignKey(line => line.SaleId).OnDelete(DeleteBehavior.Restrict);
         sale.HasMany(row => row.Payments).WithOne().HasForeignKey(payment => payment.SaleId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureCashMovements(ModelBuilder modelBuilder)
+    {
+        var movement = modelBuilder.Entity<CashMovementRow>();
+        movement.ToTable("cash_movements", table => table.HasCheckConstraint("ck_cash_movements_amount", "amount > 0"));
+        movement.HasKey(row => row.Id);
+        movement.Property(row => row.Kind).HasConversion<string>().HasMaxLength(16);
+        movement.Property(row => row.Reason).HasMaxLength(CashMovement.MaxReasonLength);
+        movement.HasIndex(row => new { row.TenantId, row.SessionId });
+        movement.HasIndex(row => new { row.TenantId, row.At });
+        movement.HasOne<SessionRow>().WithMany().HasForeignKey(row => row.SessionId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureSaleReturns(ModelBuilder modelBuilder)
@@ -211,6 +227,10 @@ public sealed class SoroDbContext(DbContextOptions<SoroDbContext> options) : DbC
         reference.HasKey(row => new { row.Method, row.ReferenceKey });
         reference.Property(row => row.Method).HasConversion<string>().HasMaxLength(16);
         reference.Property(row => row.ReferenceKey).HasMaxLength(100);
+
+        var evening = modelBuilder.Entity<EveningReportRow>();
+        evening.ToTable("evening_reports");
+        evening.HasKey(row => new { row.TenantId, row.Day });
 
         var reminder = modelBuilder.Entity<SubscriptionReminderRow>();
         reminder.ToTable("subscription_reminders");
