@@ -213,19 +213,29 @@ public sealed class ApiTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
-    public async Task Closes_the_session_and_reports_the_variance()
+    public async Task Closes_the_session_and_reports_the_variance_to_the_manager_but_not_to_the_cashier()
     {
         using var client = Cashier();
         var sessionId = await OpenSessionAsync(client);
         await client.PostAsJsonAsync("/api/v1/sales", CashSaleBody(sessionId, price: 2_000));
 
-        var response = await client.PostAsJsonAsync(
+        var first = await client.PostAsJsonAsync(
             $"/api/v1/register-sessions/{sessionId}/close",
             new { countedCashFcfa = 11_500, at = Morning.AddHours(8) });
+        var closing = await JsonAsync(first);
 
-        var closing = await JsonAsync(response);
-        Assert.Equal(12_000, closing.GetProperty("expectedCashFcfa").GetInt64());
-        Assert.Equal(-500, closing.GetProperty("varianceFcfa").GetInt64());
+        // 500 FCFA de manque : dans la tolérance, la caisse est close, et le caissier ne voit ni l'attendu ni l'écart.
+        Assert.True(closing.GetProperty("closed").GetBoolean());
+        Assert.Equal(11_500, closing.GetProperty("countedCashFcfa").GetInt64());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, closing.GetProperty("expectedCashFcfa").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, closing.GetProperty("varianceFcfa").ValueKind);
+
+        using var manager = _factory.ClientFor(_tenant, UserId.New(), Role.Manager);
+        var replay = await JsonAsync(await manager.PostAsJsonAsync(
+            $"/api/v1/register-sessions/{sessionId}/close",
+            new { countedCashFcfa = 11_500, at = Morning.AddHours(8) }));
+        Assert.Equal(12_000, replay.GetProperty("expectedCashFcfa").GetInt64());
+        Assert.Equal(-500, replay.GetProperty("varianceFcfa").GetInt64());
     }
 
     [Fact]

@@ -12,11 +12,12 @@ public class CloseRegisterSessionTests
     private static readonly DateTimeOffset Evening = TestWorld.Morning.AddHours(8);
 
     [Fact]
-    public async Task Closes_the_session_and_reports_the_variance()
+    public async Task Closes_the_session_and_reports_the_variance_to_a_manager()
     {
         var world = new TestWorld();
         var session = world.GivenOpenSession(openingFloat: 10_000);
         await world.RecordSale.HandleAsync(world.CashSale(session, price: 2_000));
+        world.ActAs(world.Manager, Role.Manager);
 
         var result = await world.CloseSession.HandleAsync(
             new CloseRegisterSessionCommand(session.Id, 11_500, Evening));
@@ -61,6 +62,7 @@ public class CloseRegisterSessionTests
         var session = world.GivenOpenSession();
         var command = new CloseRegisterSessionCommand(session.Id, 10_200, Evening);
         await world.CloseSession.HandleAsync(command);
+        world.ActAs(world.Manager, Role.Manager);
 
         var replay = await world.CloseSession.HandleAsync(command);
 

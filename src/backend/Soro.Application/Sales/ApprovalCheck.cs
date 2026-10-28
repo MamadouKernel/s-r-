@@ -19,7 +19,10 @@ public static class ApprovalPurposes
     public const string Discount = "discount";
     public const string Reversal = "reversal";
 
-    public static bool IsKnown(string purpose) => purpose is Discount or Reversal;
+    /// <summary>Une grosse dépense ou un gros versement d'espèces (docs/decisions/0021).</summary>
+    public const string CashOut = "cash-out";
+
+    public static bool IsKnown(string purpose) => purpose is Discount or Reversal or CashOut;
 }
 
 /// <summary>Signe et relit les approbations : un gérant tape son PIN une fois, la caisse garde seulement la preuve, liée à une vente et à un usage.</summary>

@@ -186,7 +186,7 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
         return rows
             .Select(row => new SessionSummary(
                 row.Id, row.CashierId, row.RegisterId, row.OpenedAt, row.OpeningFloat, row.CashReceived,
-                row.OpeningFloat + row.CashReceived - row.CashRefunded, row.Status, row.CountedCash, row.CashVariance, row.ClosedAt, row.CashRefunded))
+                row.OpeningFloat + row.CashReceived - row.CashRefunded - row.CashPaidOut + row.CashPaidIn, row.Status, row.CountedCash, row.CashVariance, row.ClosedAt, row.CashRefunded, row.CashPaidOut, row.CashPaidIn))
             .ToArray();
     }
 
@@ -290,6 +290,92 @@ public sealed class ReportingQueries(SoroDbContext db) : IReportingQueries
                     group.Sum(item => item.Quantity),
                     group.Sum(item => Money.Fcfa(item.UnitPrice).ForQuantity(item.Quantity, item.Unit).Amount),
                     group.Sum(item => item.UnitCost is { } cost ? Money.Fcfa(cost).ForQuantity(item.Quantity, item.Unit).Amount : 0L)));
+    }
+
+    public async Task<DayFigures> GetDayFiguresAsync(TenantId tenant, DateTimeOffset dayStart, DateTimeOffset nextDayStart, CancellationToken cancellationToken)
+    {
+        var id = tenant.Value;
+        var start = dayStart.ToUniversalTime();
+        var end = nextDayStart.ToUniversalTime();
+        var validated = db.Sales.AsNoTracking().Where(sale => sale.TenantId == id && sale.RecordedAt >= start && sale.RecordedAt < end && sale.Status == SaleStatus.Validated);
+
+        var totals = await validated.GroupBy(_ => 1).Select(group => new { Count = group.Count(), Net = group.Sum(sale => sale.NetTotal) }).SingleOrDefaultAsync(cancellationToken);
+        var payments = await (
+                from payment in db.Payments.AsNoTracking()
+                join sale in validated on payment.SaleId equals sale.Id
+                group payment by payment.Method into methodGroup
+                select new { Method = methodGroup.Key, Amount = methodGroup.Sum(payment => payment.Amount), Count = methodGroup.Count() })
+            .ToListAsync(cancellationToken);
+        var sold = await validated
+            .GroupBy(sale => sale.CashierId)
+            .Select(group => new
+            {
+                Cashier = group.Key,
+                Count = group.Count(),
+                Net = group.Sum(sale => sale.NetTotal),
+                DiscountCount = group.Count(sale => sale.Discount > 0),
+                Discount = group.Sum(sale => sale.Discount),
+            })
+            .ToListAsync(cancellationToken);
+        var reversed = await db.SaleReturns.AsNoTracking()
+            .Where(item => item.TenantId == id && item.At >= start && item.At < end)
+            .GroupBy(item => new { item.ByUserId, item.Kind })
+            .Select(group => new { group.Key.ByUserId, group.Key.Kind, Count = group.Count(), Total = group.Sum(item => item.Total) })
+            .ToListAsync(cancellationToken);
+
+        var cashierIds = sold.Select(item => item.Cashier).Concat(reversed.Select(item => item.ByUserId)).Distinct().ToList();
+        var cashiers = cashierIds.Select(cashier =>
+        {
+            var mine = sold.FirstOrDefault(item => item.Cashier == cashier);
+            var cancels = reversed.FirstOrDefault(item => item.ByUserId == cashier && item.Kind == ReturnKind.Cancellation);
+            var returns = reversed.FirstOrDefault(item => item.ByUserId == cashier && item.Kind == ReturnKind.Return);
+            return new CashierFigures(
+                cashier, mine?.Count ?? 0, mine?.Net ?? 0, mine?.DiscountCount ?? 0, mine?.Discount ?? 0,
+                cancels?.Count ?? 0, cancels?.Total ?? 0, returns?.Count ?? 0, returns?.Total ?? 0);
+        }).ToArray();
+
+        var movements = await db.CashMovements.AsNoTracking()
+            .Where(item => item.TenantId == id && item.At >= start && item.At < end)
+            .GroupBy(item => new { item.Kind, item.Reason })
+            .Select(group => new { group.Key.Kind, group.Key.Reason, Count = group.Count(), Amount = group.Sum(item => item.Amount) })
+            .ToListAsync(cancellationToken);
+
+        var sessions = await db.Sessions.AsNoTracking()
+            .Where(row => row.TenantId == id
+                && ((row.OpenedAt >= start && row.OpenedAt < end) || row.Status == SessionStatus.Open || (row.ClosedAt >= start && row.ClosedAt < end)))
+            .OrderBy(row => row.OpenedAt)
+            .Select(row => new SessionFigures(
+                row.Id, row.CashierId, row.OpenedAt, row.ClosedAt, row.Status, row.OpeningFloat,
+                row.OpeningFloat + row.CashReceived - row.CashRefunded - row.CashPaidOut + row.CashPaidIn, row.CountedCash, row.CashVariance))
+            .ToListAsync(cancellationToken);
+
+        var debtCreated = await (
+                from payment in db.Payments.AsNoTracking()
+                join sale in validated on payment.SaleId equals sale.Id
+                where payment.Method == PaymentMethod.Credit
+                select (long?)payment.Amount)
+            .SumAsync(cancellationToken) ?? 0;
+        var repaid = await db.DebtRepayments.AsNoTracking()
+            .Where(item => item.TenantId == id && item.At >= start && item.At < end)
+            .SumAsync(item => (long?)item.Amount, cancellationToken) ?? 0;
+
+        var lowStock = await db.Products.AsNoTracking()
+            .Where(product => product.TenantId == id && product.IsActive && product.TracksStock && product.AlertThreshold > 0 && product.QuantityOnHand <= product.AlertThreshold)
+            .OrderBy(product => product.Name)
+            .Take(20)
+            .Select(product => new LowStockLine(product.Name, product.QuantityOnHand, product.AlertThreshold, product.Unit))
+            .ToListAsync(cancellationToken);
+
+        return new DayFigures(
+            totals?.Count ?? 0,
+            totals?.Net ?? 0,
+            payments.Select(item => new PaymentBreakdown(item.Method, item.Amount, item.Count)).ToArray(),
+            cashiers,
+            movements.Select(item => new CashMovementTotal(item.Kind, item.Reason, item.Count, item.Amount)).ToArray(),
+            sessions,
+            debtCreated,
+            repaid,
+            lowStock);
     }
 
     public async Task<ActivityReport> GetActivityAsync(

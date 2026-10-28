@@ -307,6 +307,10 @@ internal sealed class FakeReportingQueries : IReportingQueries
 
     public SaleDetail? Detail { get; set; }
 
+    public DayFigures Day { get; set; } = new(0, 0, [], [], [], [], 0, 0, []);
+
+    public Task<DayFigures> GetDayFiguresAsync(TenantId tenant, DateTimeOffset dayStart, DateTimeOffset nextDayStart, CancellationToken cancellationToken) => Task.FromResult(Day);
+
     public Task<IReadOnlyList<SaleSummary>> ListSalesAsync(
         TenantId tenant, SalesFilter filter, CancellationToken cancellationToken)
     {
@@ -472,4 +476,33 @@ internal sealed class FakeApprovalSeal : IApprovalSeal
         _issued.TryGetValue(token, out var found) && found.Tenant == tenant && found.Subject == subject && found.Purpose == purpose && now <= found.Expires
             ? new SealedApproval(found.Approver, found.Limit)
             : null;
+}
+
+internal sealed class InMemoryCashMovementRepository : ICashMovementRepository
+{
+    private readonly List<CashMovement> _movements = [];
+
+    public IReadOnlyList<CashMovement> All => _movements;
+
+    public Task<CashMovement?> GetAsync(CashMovementId id, TenantId tenant, CancellationToken cancellationToken) =>
+        Task.FromResult(_movements.FirstOrDefault(movement => movement.Id == id && movement.Tenant == tenant));
+
+    public Task AddAsync(CashMovement movement, CancellationToken cancellationToken)
+    {
+        _movements.Add(movement);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryEveningReportLog : IEveningReportLog
+{
+    private readonly HashSet<(TenantId, DateOnly)> _sent = [];
+
+    public Task<bool> WasSentAsync(TenantId tenant, DateOnly day, CancellationToken cancellationToken) => Task.FromResult(_sent.Contains((tenant, day)));
+
+    public Task RecordSentAsync(TenantId tenant, DateOnly day, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        _sent.Add((tenant, day));
+        return Task.CompletedTask;
+    }
 }

@@ -25,6 +25,29 @@ public sealed record CloseRegisterSessionRequest
     public required long CountedCashFcfa { get; init; }
 
     public required DateTimeOffset At { get; init; }
+
+    /// <summary>Le second comptage, définitif, demandé après un écart au-delà de la tolérance.</summary>
+    public bool Recount { get; init; }
+
+    /// <summary>Le détail par coupures (valeur → nombre), facultatif ; sa somme doit égaler le total compté.</summary>
+    public Dictionary<int, int>? Denominations { get; init; }
+}
+
+public sealed record CashMovementRequest
+{
+    public required Guid MovementId { get; init; }
+
+    public required Soro.Domain.Cash.CashMovementKind Kind { get; init; }
+
+    public required long AmountFcfa { get; init; }
+
+    /// <summary>Obligatoire pour une dépense (« Transport », « Sachets et emballages »…).</summary>
+    public string? Reason { get; init; }
+
+    public required DateTimeOffset At { get; init; }
+
+    /// <summary>L'approbation signée d'un gérant (<c>POST /approvals</c>, usage <c>cash-out</c>) pour une sortie de plus de 5 000 FCFA.</summary>
+    public string? ApprovalToken { get; init; }
 }
 
 public sealed record SaleLineRequest

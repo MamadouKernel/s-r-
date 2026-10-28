@@ -204,6 +204,7 @@ public static class AuditCategories
         ["subscription"] = ["subscription."],
         ["data"] = ["data."],
         ["security"] = ["login."],
+        ["cash"] = ["cash.", "session."],
     };
 
     public static IReadOnlyCollection<string> Names => Prefixes.Keys;

@@ -7,6 +7,15 @@ namespace Soro.Domain.Cash;
 /// Session de caisse : racine d'agrégat qui porte le fond de caisse, les espèces encaissées
 /// et la clôture. Son état ne change que par des opérations métier nommées.
 /// </summary>
+public enum CountOutcome
+{
+    /// <summary>Le comptage est accepté : la session est clôturée.</summary>
+    Closed,
+
+    /// <summary>Le comptage s'écarte trop de ce qui est attendu : la session reste ouverte, un recomptage est demandé.</summary>
+    NeedsRecount,
+}
+
 public sealed class CashRegisterSession
 {
     private CashRegisterSession(
@@ -38,6 +47,20 @@ public sealed class CashRegisterSession
     /// <summary>Espèces rendues aux clients pendant la session (annulations et retours, docs/decisions/0020).</summary>
     public Money CashRefunded { get; private set; }
 
+    /// <summary>Espèces sorties du tiroir en cours de journée : dépenses et versements (docs/decisions/0021).</summary>
+    public Money CashPaidOut { get; private set; }
+
+    /// <summary>Espèces ajoutées au tiroir en cours de journée (apports de monnaie).</summary>
+    public Money CashPaidIn { get; private set; }
+
+    /// <summary>Le premier comptage, gardé quand il s'écartait trop et qu'un recomptage a été demandé ; <c>null</c> sinon.</summary>
+    public Money? FirstCount { get; private set; }
+
+    /// <summary>Le détail par coupures du premier comptage et du comptage final (JSON, facultatif) : gardé tel quel pour l'audit.</summary>
+    public string? FirstCountDetail { get; private set; }
+
+    public string? CountDetail { get; private set; }
+
     public Money? CountedCash { get; private set; }
 
     public DateTimeOffset? ClosedAt { get; private set; }
@@ -45,8 +68,8 @@ public sealed class CashRegisterSession
     /// <summary>Écart de clôture en FCFA : négatif = manque, positif = excédent (RG-07).</summary>
     public long? CashVariance { get; private set; }
 
-    /// <summary>Montant attendu en caisse : fond + espèces encaissées − espèces rendues (RG-24, hors dépenses pour l'instant).</summary>
-    public Money ExpectedCash => OpeningFloat + CashReceived - CashRefunded;
+    /// <summary>Montant attendu en caisse : fond + espèces encaissées − espèces rendues − dépenses et versements + apports (RG-24).</summary>
+    public Money ExpectedCash => OpeningFloat + CashReceived - CashRefunded - CashPaidOut + CashPaidIn;
 
     public static CashRegisterSession Open(
         SessionId id,
@@ -73,6 +96,40 @@ public sealed class CashRegisterSession
         CashRefunded += amount;
     }
 
+    /// <summary>Une dépense, un versement ou un apport. L'argent qui sort ne peut pas dépasser ce que le tiroir doit contenir.</summary>
+    public void RecordCashMovement(CashMovementKind kind, Money amount)
+    {
+        EnsureOpen();
+        Ensure.That(amount > Money.Zero, "Le montant doit être supérieur à zéro.");
+        if (kind == CashMovementKind.Topup)
+        {
+            CashPaidIn += amount;
+            return;
+        }
+
+        Ensure.That(amount <= ExpectedCash, "Cette sortie dépasse l'argent qui doit se trouver dans le tiroir.");
+        CashPaidOut += amount;
+    }
+
+    /// <summary>
+    /// Le comptage de clôture, à l'aveugle (docs/decisions/0021) : s'il s'écarte de plus que la tolérance, la session reste ouverte et le premier
+    /// comptage est gardé ; le recomptage est définitif, quel que soit l'écart.
+    /// </summary>
+    public CountOutcome Count(Money counted, DateTimeOffset at, Money tolerance, bool isRecount, string? detail = null)
+    {
+        EnsureOpen();
+        if (!isRecount && Math.Abs(counted.Amount - ExpectedCash.Amount) > tolerance.Amount)
+        {
+            FirstCount = counted;
+            FirstCountDetail = detail;
+            return CountOutcome.NeedsRecount;
+        }
+
+        Close(counted, at);
+        CountDetail = detail;
+        return CountOutcome.Closed;
+    }
+
     public void Close(Money countedCash, DateTimeOffset at)
     {
         EnsureOpen();
@@ -95,10 +152,20 @@ public sealed class CashRegisterSession
         Money? countedCash,
         DateTimeOffset? closedAt,
         long? cashVariance,
-        Money cashRefunded = default) =>
+        Money cashRefunded = default,
+        Money cashPaidOut = default,
+        Money cashPaidIn = default,
+        Money? firstCount = null,
+        string? firstCountDetail = null,
+        string? countDetail = null) =>
         new(id, assignment, openingFloat, openedAt)
         {
             CashRefunded = cashRefunded,
+            CashPaidOut = cashPaidOut,
+            CashPaidIn = cashPaidIn,
+            FirstCount = firstCount,
+            FirstCountDetail = firstCountDetail,
+            CountDetail = countDetail,
             Status = status,
             CashReceived = cashReceived,
             CountedCash = countedCash,

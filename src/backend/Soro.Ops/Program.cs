@@ -3,6 +3,8 @@ using MailKit.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Soro.Application.Common;
+using Soro.Application.Reporting;
+using Soro.Application.Settings;
 using Soro.Application.Signup;
 using Soro.Application.Subscription;
 using Soro.Domain.Common;
@@ -24,6 +26,7 @@ if (args.Length == 0 || args[0] is "aide" or "--help" or "-h")
           soro-ops valider <identifiant>       valide un paiement (la boutique est prolongée, un e-mail confirme)
           soro-ops refuser <identifiant> <motif>   refuse un paiement avec un motif (un e-mail le dit au propriétaire)
           soro-ops rappels                     envoie les rappels d'échéance (à lancer chaque jour)
+          soro-ops rapport-du-soir [jj/mm/aaaa]  envoie l'e-mail du soir aux propriétaires (à lancer chaque jour à 20 h, heure du pays)
 
         Variables : SORO_OPS_CONNECTION (obligatoire), Mail__Smtp__* (envoi des e-mails),
                     Subscription__MonthlyPriceFcfa, Subscription__AnnualPriceFcfa, Subscription__PayNumbers__Wave…
@@ -48,6 +51,8 @@ services.AddScoped<ListPendingSubscriptionPaymentsHandler>();
 services.AddScoped<ValidateSubscriptionPaymentHandler>();
 services.AddScoped<RefuseSubscriptionPaymentHandler>();
 services.AddScoped<SendSubscriptionRemindersHandler>();
+services.AddScoped<SendEveningReportsHandler>();
+services.AddSingleton<IShopSettings, OpsShopSettings>();
 
 await using var provider = services.BuildServiceProvider();
 await using var scope = provider.CreateAsyncScope();
@@ -102,6 +107,23 @@ try
             Console.WriteLine($"{sent.Value} rappel(s) envoyé(s).");
             return 0;
 
+        case "rapport-du-soir":
+            DateOnly? day = null;
+            if (args.Length > 1)
+            {
+                if (!DateOnly.TryParseExact(args[1], "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDay))
+                {
+                    Console.Error.WriteLine("La date doit s'écrire jj/mm/aaaa, par exemple 27/10/2026.");
+                    return 1;
+                }
+
+                day = parsedDay;
+            }
+
+            var reports = await scoped.GetRequiredService<SendEveningReportsHandler>().HandleAsync(day);
+            Console.WriteLine($"{reports.Value} rapport(s) du soir envoyé(s).");
+            return 0;
+
         default:
             Console.Error.WriteLine("Commande inconnue ou incomplète. Lancez « soro-ops aide ».");
             return 1;
@@ -145,4 +167,10 @@ static void AddEmail(IServiceCollection services)
 internal sealed class OpsClock : IClock
 {
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}
+
+/// <summary>Les seuils par défaut tant que les paramètres du commerce ne sont pas stockés (T028) : ceux de l'API.</summary>
+internal sealed class OpsShopSettings : IShopSettings
+{
+    public Task<ShopSettings> GetAsync(TenantId tenant, CancellationToken cancellationToken) => Task.FromResult(ShopSettings.Default);
 }

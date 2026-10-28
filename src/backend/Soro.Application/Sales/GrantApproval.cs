@@ -43,9 +43,9 @@ public sealed class GrantApprovalHandler(
             return Result<ApprovalGranted>.Failure(ApplicationError.RuleViolation("Cette validation n'existe pas."));
         }
 
-        if (command.Purpose == ApprovalPurposes.Discount && command.Amount <= 0)
+        if (command.Purpose is ApprovalPurposes.Discount or ApprovalPurposes.CashOut && command.Amount <= 0)
         {
-            return Result<ApprovalGranted>.Failure(ApplicationError.RuleViolation("Indiquez le montant de la remise."));
+            return Result<ApprovalGranted>.Failure(ApplicationError.RuleViolation("Indiquez le montant."));
         }
 
         var approver = await users.FindByIdentifierAsync(user.Tenant, User.Normalize(command.Identifier ?? string.Empty), cancellationToken);
@@ -67,6 +67,6 @@ public sealed class GrantApprovalHandler(
 
         var expires = clock.UtcNow + (command.Purpose == ApprovalPurposes.Discount ? DiscountValidity : ReversalValidity);
         return Result<ApprovalGranted>.Success(new ApprovalGranted(
-            seal.Issue(user.Tenant, approver.Id, command.Subject, command.Purpose, command.Purpose == ApprovalPurposes.Discount ? command.Amount : 0, expires), approver.Id, approver.DisplayName, expires));
+            seal.Issue(user.Tenant, approver.Id, command.Subject, command.Purpose, command.Purpose == ApprovalPurposes.Reversal ? 0 : command.Amount, expires), approver.Id, approver.DisplayName, expires));
     }
 }

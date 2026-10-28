@@ -43,6 +43,11 @@ public readonly record struct SessionId(Guid Value)
     public static SessionId New() => new(Guid.CreateVersion7());
 }
 
+public readonly record struct CashMovementId(Guid Value)
+{
+    public static CashMovementId New() => new(Guid.CreateVersion7());
+}
+
 public readonly record struct SaleReturnId(Guid Value)
 {
     public static SaleReturnId New() => new(Guid.CreateVersion7());

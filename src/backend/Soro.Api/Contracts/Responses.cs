@@ -4,11 +4,19 @@ namespace Soro.Api.Contracts;
 
 public sealed record SessionOpenedResponse(Guid SessionId, bool AlreadyProcessed);
 
+/// <summary>
+/// Le résultat d'un comptage. <c>ExpectedCashFcfa</c> et <c>VarianceFcfa</c> ne sont rendus qu'à un gérant ou au propriétaire (clôture à l'aveugle) ;
+/// <c>NeedsRecount</c> : la session reste ouverte, il faut recompter.
+/// </summary>
 public sealed record SessionClosedResponse(
-    long ExpectedCashFcfa,
+    bool Closed,
+    bool NeedsRecount,
     long CountedCashFcfa,
-    long VarianceFcfa,
+    long? ExpectedCashFcfa,
+    long? VarianceFcfa,
     bool AlreadyProcessed);
+
+public sealed record CashMovementRecordedResponse(Guid MovementId, bool AlreadyProcessed);
 
 public sealed record SaleRecordedResponse(Guid SaleId, long NetTotalFcfa, long ChangeFcfa, bool AlreadyProcessed);
 
