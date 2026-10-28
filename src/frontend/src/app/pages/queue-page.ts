@@ -4,6 +4,7 @@ import { Operation } from '../data/journal';
 import { JournalService } from '../services/journal.service';
 import { SyncService } from '../services/sync.service';
 
+const MOVEMENT_LABEL = { Expense: 'Dépense', Drop: 'Versement au coffre', Topup: 'Apport de monnaie' } as const;
 const STATUS_LABEL = { pending: 'En attente', synced: 'Synchronisée', rejected: 'Refusée' } as const;
 
 /** S6 : ce qui est en attente, envoyé ou refusé. Un rejet reste visible avec son motif, jamais supprimé (REQ-06). */
@@ -73,10 +74,11 @@ export class QueuePage {
         return `Ouverture de caisse · fond ${formatFcfa(operation.openingFloatFcfa)}`;
       case 'sale':
         return `Vente · ${formatFcfa(operation.netTotalFcfa)}`;
+      case 'cashMovement':
+        return `${MOVEMENT_LABEL[operation.movementKind]} · ${formatFcfa(operation.amountFcfa)}${operation.reason ? ` · ${operation.reason}` : ''}`;
       case 'closeSession':
-        return operation.result
-          ? `Clôture · écart ${formatFcfa(operation.result.varianceFcfa)}`
-          : `Clôture · compté ${formatFcfa(operation.countedCashFcfa)}`;
+        // Clôture à l'aveugle : jamais l'écart ni l'attendu à l'écran du caissier (docs/decisions/0021).
+        return `Clôture · compté ${formatFcfa(operation.countedCashFcfa)}`;
     }
   }
 

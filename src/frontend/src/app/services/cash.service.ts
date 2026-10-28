@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { CloseSessionOperation, HeldCart, LocalSession, SaleOperation, SessionSummary } from '../data/journal';
+import { CashMovementKind, CashMovementOperation, CloseSessionOperation, HeldCart, LocalSession, SaleOperation, SessionSummary } from '../data/journal';
 import { addProduct, cartTotal, removeLine, setQuantity } from '../domain/cart';
 import { CartLine, CatalogueProduct, PaymentDraft } from '../domain/types';
 import { AuthService } from './auth.service';
@@ -21,6 +21,7 @@ export class CashService {
   private readonly lastSaleSignal = signal<SaleOperation | null>(null);
   private readonly submittingSignal = signal(false);
   private checkoutId: string | null = null;
+  private pendingMovementId: string | null = null;
   private inFlight: Promise<SaleOperation> | null = null;
   /** Écritures du brouillon, en file : elles arrivent dans l'ordre et jamais après un « mettre en attente ». */
   private draftWrites: Promise<void> = Promise.resolve();
@@ -196,6 +197,35 @@ export class CashService {
     return this.checkoutId;
   }
 
+  /**
+   * L'identifiant du mouvement d'espèces en cours de saisie, connu avant son enregistrement : l'accord d'un gérant pour une grosse sortie est lié à ce
+   * mouvement (docs/decisions/0021). Il change après chaque enregistrement.
+   */
+  movementId(): string {
+    this.pendingMovementId ??= crypto.randomUUID();
+    return this.pendingMovementId;
+  }
+
+  /** Les mouvements de la session ouverte, du plus ancien au plus récent. */
+  async movements(): Promise<CashMovementOperation[]> {
+    return (await this.journalService.get()).cashMovements();
+  }
+
+  /** Enregistre une dépense, un versement au coffre ou un apport de monnaie dans la file (envoyé avant la clôture). */
+  async recordMovement(input: { kind: CashMovementKind; amountFcfa: number; reason: string | null; approvalToken?: string }): Promise<CashMovementOperation> {
+    const movement = await (await this.journalService.get()).recordCashMovement({
+      movementId: this.movementId(),
+      movementKind: input.kind,
+      amountFcfa: input.amountFcfa,
+      reason: input.reason,
+      at: new Date().toISOString(),
+      ...(input.approvalToken ? { approvalToken: input.approvalToken } : {}),
+    });
+    this.pendingMovementId = null;
+    void this.sync.requestFlush();
+    return movement;
+  }
+
   /** Les espèces rendues à un client par un retour ou une annulation : la clôture attend ce montant de moins dans le tiroir. */
   async recordCashRefund(returnId: string, amountFcfa: number): Promise<void> {
     await (await this.journalService.get()).recordCashRefund({ returnId, amountFcfa });
@@ -207,10 +237,19 @@ export class CashService {
     return (await this.journalService.get()).sessionSummary();
   }
 
-  async closeSession(countedCashFcfa: number): Promise<CloseSessionOperation> {
+  /**
+   * Enregistre le comptage de clôture (à l'aveugle : l'appelant a déjà demandé le recomptage éventuel). `recount` : second comptage, définitif ;
+   * `denominations` : le détail par billets et pièces, facultatif.
+   */
+  async closeSession(
+    countedCashFcfa: number,
+    options: { recount?: boolean; denominations?: Record<number, number> } = {},
+  ): Promise<CloseSessionOperation> {
     const closing = await (await this.journalService.get()).closeSession({
       countedCashFcfa,
       at: new Date().toISOString(),
+      ...(options.recount ? { recount: true } : {}),
+      ...(options.denominations ? { denominations: options.denominations } : {}),
     });
     this.sessionSignal.set(null);
     this.cartSignal.set([]);

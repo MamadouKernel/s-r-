@@ -91,7 +91,7 @@ export interface GrantInput {
   identifier: string;
   pin: string;
   saleId: string;
-  purpose: 'discount' | 'reversal';
+  purpose: 'discount' | 'reversal' | 'cash-out';
   /** Pour une remise : le montant que le gérant voit et accepte. */
   amountFcfa: number;
 }

@@ -19,6 +19,12 @@ describe('actionLabel', () => {
     ]);
   });
 
+  it('names the cash actions in plain words', () => {
+    expect(['cash.movement', 'cash.movement.refused', 'session.variance'].map(actionLabel)).toEqual([
+      'Mouvement d’espèces', 'Mouvement d’espèces refusé', 'Écart de caisse à la clôture',
+    ]);
+  });
+
   it('names the credit and debt actions in plain words', () => {
     const labels = ['debt.repaid', 'credit.limit.approved', 'credit.limit.refused', 'credit.limit.exceeded'].map(actionLabel);
     expect(labels).toEqual([
@@ -34,7 +40,7 @@ describe('actionLabel', () => {
 describe('CATEGORIES', () => {
   it('starts with “all” and uses the values the server understands', () => {
     expect(CATEGORIES[0]).toEqual({ value: null, label: 'Toutes' });
-    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription', 'data', 'security']);
+    expect(CATEGORIES.slice(1).map((category) => category.value)).toEqual(['sales', 'cash', 'catalogue', 'stock', 'team', 'devices', 'credit', 'subscription', 'data', 'security']);
     expect(actionLabel('sale.returned')).toBe('Retour d’un client');
     expect(actionLabel('sale.return.refused')).toBe('Retour refusé');
     expect(actionLabel('login.offline')).toBe('Connexion sans réseau');

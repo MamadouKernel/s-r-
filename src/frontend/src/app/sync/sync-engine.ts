@@ -1,4 +1,4 @@
-import { CloseSessionOperation, Journal, OpenSessionOperation, Operation, SaleOperation } from '../data/journal';
+import { CashMovementOperation, CloseSessionOperation, Journal, OpenSessionOperation, Operation, SaleOperation } from '../data/journal';
 import { ApiError, SyncApi } from './sync-api';
 
 /** Un lot contient au plus 200 ventes (limite du serveur). */
@@ -47,6 +47,9 @@ export class SyncEngine {
         } else if (head.kind === 'openSession') {
           await this.sendOpening(head, outcome);
           pending = pending.slice(1);
+        } else if (head.kind === 'cashMovement') {
+          await this.sendMovement(head, outcome);
+          pending = pending.slice(1);
         } else {
           await this.sendClosing(head, outcome);
           pending = pending.slice(1);
@@ -92,9 +95,30 @@ export class SyncEngine {
     }
   }
 
+  /** Un refus du serveur (accord d'un gérant manquant, session close) se montre avec son motif et ne bloque pas la suite ; un échec réseau arrête l'envoi. */
+  private async sendMovement(operation: CashMovementOperation, outcome: FlushOutcome): Promise<void> {
+    try {
+      await retryOnConflict(() => this.api.recordMovement(operation));
+      await this.journal.markSynced(operation.seq);
+      outcome.sent++;
+    } catch (error) {
+      if (isDefinitive(error)) {
+        await this.journal.markRejected(operation.seq, error.code, error.message);
+        outcome.rejected++;
+        return;
+      }
+      throw error;
+    }
+  }
+
   private async sendClosing(operation: CloseSessionOperation, outcome: FlushOutcome): Promise<void> {
     try {
-      const result = await retryOnConflict(() => this.api.closeSession(operation));
+      let result = await retryOnConflict(() => this.api.closeSession(operation));
+      if (result.needsRecount) {
+        // Le comptage a été fait hors de la vue du serveur : recompter maintenant n'aurait aucun sens, l'argent de ce jour-là n'est plus dans le tiroir.
+        // Le même comptage devient définitif ; l'écart sera signalé au gérant.
+        result = await retryOnConflict(() => this.api.closeSession({ ...operation, recount: true }));
+      }
       await this.journal.markSynced(operation.seq, { result });
       outcome.sent++;
     } catch (error) {

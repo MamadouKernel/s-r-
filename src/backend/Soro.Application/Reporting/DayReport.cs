@@ -93,6 +93,9 @@ public sealed record DayReport(
     long RepaymentsFcfa,
     IReadOnlyList<LowStockLine> LowStock)
 {
+    /// <summary>Les noms des caissiers cités, pour que l'écran dise « caisse de Awa » (le comptable ne lit pas l'annuaire).</summary>
+    public IReadOnlyDictionary<Guid, string> Names { get; init; } = new Dictionary<Guid, string>();
+
     /// <summary>Un jour sans vente, sans caisse ouverte et sans mouvement n'envoie rien.</summary>
     public bool HasActivity => SalesCount > 0 || Movements.Count > 0 || Sessions.Count > 0;
 }
@@ -147,7 +150,7 @@ public static class DayReportBuilder
 public sealed record GetDayReportQuery(DateOnly? Day);
 
 /// <summary>Le rapport du jour : propriétaire, gérant et comptable. Le stock n'est montré qu'à qui peut le lire.</summary>
-public sealed class GetDayReportHandler(ICurrentUser user, IReportingQueries queries, IShopSettings settings, IClock clock)
+public sealed class GetDayReportHandler(ICurrentUser user, IReportingQueries queries, IShopSettings settings, IUserRepository users, IClock clock)
 {
     public async Task<Result<DayReport>> HandleAsync(GetDayReportQuery query, CancellationToken cancellationToken = default)
     {
@@ -161,6 +164,9 @@ public sealed class GetDayReportHandler(ICurrentUser user, IReportingQueries que
         var (from, to) = DayReportBuilder.Bounds(day);
         var figures = await queries.GetDayFiguresAsync(user.Tenant, from, to, cancellationToken);
         var shop = await settings.GetAsync(user.Tenant, cancellationToken);
-        return Result<DayReport>.Success(DayReportBuilder.Build(figures, day, shop, now, includeStock: user.Role is Role.Owner or Role.Manager));
+        var report = DayReportBuilder.Build(figures, day, shop, now, includeStock: user.Role is Role.Owner or Role.Manager);
+        var cited = report.Cashiers.Select(item => item.CashierId).Concat(report.Sessions.Select(item => item.CashierId)).ToHashSet();
+        var names = (await users.ListAsync(user.Tenant, cancellationToken)).Where(item => cited.Contains(item.Id.Value)).ToDictionary(item => item.Id.Value, item => item.DisplayName);
+        return Result<DayReport>.Success(report with { Names = names });
     }
 }

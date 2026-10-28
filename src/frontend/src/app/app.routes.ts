@@ -49,6 +49,16 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/close-page').then((m) => m.ClosePage),
   },
   {
+    path: 'mouvements',
+    canActivate: [deviceGuard, userGuard, openSessionGuard],
+    loadComponent: () => import('./pages/movements-page').then((m) => m.MovementsPage),
+  },
+  {
+    path: 'rapport',
+    canActivate: [deviceGuard, reportsGuard],
+    loadComponent: () => import('./report/day-report-page').then((m) => m.DayReportPage),
+  },
+  {
     path: 'tableau-de-bord',
     canActivate: [deviceGuard, reportsGuard],
     loadComponent: () => import('./dashboard/dashboard-page').then((m) => m.DashboardPage),
