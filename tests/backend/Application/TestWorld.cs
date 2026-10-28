@@ -232,7 +232,7 @@ internal sealed class TestWorld
 
     public InMemoryEveningReportLog EveningLog { get; } = new();
 
-    public GetDayReportHandler DayReport => new(Current, Reporting, Settings, Clock);
+    public GetDayReportHandler DayReport => new(Current, Reporting, Settings, Users, Clock);
 
     public SendEveningReportsHandler SendEveningReports => new(Subscriptions, Reporting, Settings, Users, EveningLog, Mail, Clock, UnitOfWork);
 

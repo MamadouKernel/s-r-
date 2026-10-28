@@ -5,6 +5,9 @@ const ACTIONS: Record<string, string> = {
   'sale.cancel.refused': 'Annulation refusée',
   'sale.returned': 'Retour d’un client',
   'sale.return.refused': 'Retour refusé',
+  'cash.movement': 'Mouvement d’espèces',
+  'cash.movement.refused': 'Mouvement d’espèces refusé',
+  'session.variance': 'Écart de caisse à la clôture',
   'product.created': 'Produit créé',
   'product.updated': 'Fiche produit modifiée',
   'product.deactivated': 'Produit désactivé',
@@ -44,6 +47,7 @@ export function actionLabel(action: string): string {
 export const CATEGORIES: readonly { value: string | null; label: string }[] = [
   { value: null, label: 'Toutes' },
   { value: 'sales', label: 'Remises et annulations' },
+  { value: 'cash', label: 'Caisse' },
   { value: 'catalogue', label: 'Produits et prix' },
   { value: 'stock', label: 'Pertes de stock' },
   { value: 'team', label: 'Équipe' },

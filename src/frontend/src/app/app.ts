@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NetworkBanner } from './shell/network-banner';
+import { DrawerWarning } from './shell/drawer-warning';
 import { ReconnectPrompt } from './shell/reconnect-prompt';
 import { canManageStock, canReadAuditLog, canReadCustomers, canReverseSales, canViewReports } from './management/roles';
 import { AuthService } from './services/auth.service';
@@ -10,7 +11,7 @@ import { SubscriptionBanner } from './subscription/subscription-banner';
 import { SubscriptionService } from './subscription/subscription.service';
 
 @Component({
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NetworkBanner, ReconnectPrompt, SubscriptionBanner],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NetworkBanner, DrawerWarning, ReconnectPrompt, SubscriptionBanner],
   selector: 'app-root',
   templateUrl: './app.html',
 })

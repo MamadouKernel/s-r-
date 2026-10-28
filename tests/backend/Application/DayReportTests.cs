@@ -46,6 +46,21 @@ public class DayReportTests
     }
 
     [Fact]
+    public async Task The_report_carries_the_names_of_the_cashiers_it_cites_for_readers_who_cannot_read_the_directory()
+    {
+        var world = await OwnerWorldAsync();
+        var awa = world.GivenUser("awa", role: Role.Cashier);
+        world.GivenUser("autre", role: Role.Cashier);
+        world.Reporting.Day = Figures(world, Session(world)) with { Cashiers = [new CashierFigures(awa.Id.Value, 4, 20_000, 0, 0, 0, 0, 0, 0)] };
+        world.ActAs(world.Owner, Role.Accountant);
+
+        var report = (await world.DayReport.HandleAsync(new GetDayReportQuery(Day))).Value!;
+
+        Assert.Equal("Awa Koné", report.Names[awa.Id.Value]);
+        Assert.Single(report.Names);
+    }
+
+    [Fact]
     public async Task An_accountant_reads_the_report_without_the_stock_and_a_cashier_cannot_read_it()
     {
         var world = await OwnerWorldAsync();

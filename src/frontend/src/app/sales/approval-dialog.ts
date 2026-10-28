@@ -34,7 +34,7 @@ export class ApprovalDialog {
 
   /** La vente concernée : la validation ne vaut que pour elle. */
   readonly saleId = input.required<string>();
-  readonly purpose = input.required<'discount' | 'reversal'>();
+  readonly purpose = input.required<'discount' | 'reversal' | 'cash-out'>();
   /** Pour une remise : le montant que le gérant voit et accepte. */
   readonly amountFcfa = input(0);
   /** Ce que le gérant est invité à valider, en toutes lettres. */

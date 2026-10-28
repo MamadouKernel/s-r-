@@ -33,8 +33,14 @@
         @if (showCustomers()) {
           <a class="btn" routerLink="/clients" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Clients</a>
         }
+        @if (showDashboard()) {
+          <a class="btn" routerLink="/rapport" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Rapport du jour</a>
+        }
         @if (showJournal()) {
           <a class="btn" routerLink="/journal" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Journal</a>
+        }
+        @if (hasSession()) {
+          <a class="btn" routerLink="/mouvements" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Mouvements</a>
         }
         @if (hasSession()) {
           <a class="btn" routerLink="/cloture" routerLinkActive="border-feuille text-feuille" ariaCurrentWhenActive="page">Clôture</a>
@@ -49,6 +55,7 @@
     }
   </div>
   <app-network-banner />
+  <app-drawer-warning />
   <app-reconnect-prompt />
   <app-subscription-banner />
 </header>
