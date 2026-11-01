@@ -15,3 +15,4 @@ dist/
 
 # Dossiers de travail des outils de l'assistant
 .omc/
+!deploy/.env.example

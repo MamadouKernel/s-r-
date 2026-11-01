@@ -1,0 +1,10 @@
+**/bin
+**/obj
+**/node_modules
+**/.angular
+**/dist
+.git
+.dev
+tests
+docs
+*.docx

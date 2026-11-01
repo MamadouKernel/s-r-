@@ -44,6 +44,7 @@ app.UseSubscriptionAccess();
 app.UseRateLimiter();
 app.UseAuthorization();
 
+app.MapHealthEndpoints(connectionString);
 app.MapAuthEndpoints();
 app.MapSignupEndpoints();
 app.MapDeviceEnrollment();
