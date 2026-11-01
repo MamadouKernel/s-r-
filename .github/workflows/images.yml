@@ -1,0 +1,42 @@
+name: Images
+
+# Vérifie que les trois images de déploiement se construisent (docs/specs/exploitation EXP-01). Rien n'est publié : le registre sera choisi avec l'hébergeur.
+on:
+  pull_request:
+    paths: ['deploy/**', 'src/**', 'Directory.Build.props', 'Soro.slnx', '.github/workflows/images.yml']
+  push:
+    branches: [main]
+    paths: ['deploy/**', 'src/**', 'Directory.Build.props', 'Soro.slnx', '.github/workflows/images.yml']
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Images (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, ops, web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'image
+        run: docker build -f deploy/${{ matrix.image }}.Dockerfile -t soro-${{ matrix.image }}:${{ github.sha }} .
+
+  compose:
+    name: Fichier de déploiement
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier compose.yml avec des valeurs d'exemple
+        run: |
+          cp deploy/.env.example deploy/.env
+          sed -i -E 's/^(POSTGRES_ADMIN_PASSWORD|SORO_OWNER_PASSWORD|SORO_APP_PASSWORD|SORO_OPS_PASSWORD|JWT_SIGNING_KEY|PIN_PEPPER|SMTP_HOST|SMTP_FROM_ADDRESS|SUBSCRIPTION_MONTHLY_PRICE_FCFA|SUBSCRIPTION_ANNUAL_PRICE_FCFA|PAY_NUMBER_WAVE)=$/\1=x/' deploy/.env
+          docker compose -f deploy/compose.yml --env-file deploy/.env config --quiet

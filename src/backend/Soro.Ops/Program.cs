@@ -10,6 +10,7 @@ using Soro.Application.Subscription;
 using Soro.Domain.Common;
 using Soro.Domain.Subscription;
 using Soro.Infrastructure;
+using Soro.Infrastructure.Persistence;
 using Soro.Infrastructure.Security;
 using Soro.Infrastructure.Subscription;
 
@@ -27,11 +28,19 @@ if (args.Length == 0 || args[0] is "aide" or "--help" or "-h")
           soro-ops refuser <identifiant> <motif>   refuse un paiement avec un motif (un e-mail le dit au propriétaire)
           soro-ops rappels                     envoie les rappels d'échéance (à lancer chaque jour)
           soro-ops rapport-du-soir [jj/mm/aaaa]  envoie l'e-mail du soir aux propriétaires (à lancer chaque jour à 20 h, heure du pays)
+          soro-ops migrer [--verifier]         applique les migrations de la base (étape de déploiement, après la sauvegarde) ;
+                                               avec --verifier, liste seulement ce qui reste à appliquer
 
-        Variables : SORO_OPS_CONNECTION (obligatoire), Mail__Smtp__* (envoi des e-mails),
+        Variables : SORO_OPS_CONNECTION (obligatoire), SORO_MIGRATION_CONNECTION (pour « migrer » : un rôle qui a le droit de modifier la base),
+                    Mail__Smtp__* (envoi des e-mails),
                     Subscription__MonthlyPriceFcfa, Subscription__AnnualPriceFcfa, Subscription__PayNumbers__Wave…
         """);
     return args.Length == 0 ? 1 : 0;
+}
+
+if (args[0] == "migrer")
+{
+    return await MigrateAsync(args.Skip(1).ToArray());
 }
 
 var connection = Environment.GetEnvironmentVariable("SORO_OPS_CONNECTION");
@@ -162,6 +171,42 @@ static void AddEmail(IServiceCollection services)
         Setting("Mail:Smtp:FromName") ?? "Sôrô",
         security));
     services.AddSingleton<IEmailSender, SmtpEmailSender>();
+}
+
+// Les migrations demandent un rôle qui peut modifier la structure de la base : jamais celui de l'API ni celui de l'outil d'exploitation courant.
+static async Task<int> MigrateAsync(string[] options)
+{
+    var connection = Environment.GetEnvironmentVariable("SORO_MIGRATION_CONNECTION");
+    if (string.IsNullOrWhiteSpace(connection))
+    {
+        Console.Error.WriteLine("La variable SORO_MIGRATION_CONNECTION est obligatoire (chaîne de connexion avec un rôle qui peut modifier la base).");
+        return 1;
+    }
+
+    try
+    {
+        var checkOnly = options.Contains("--verifier");
+        var names = checkOnly ? await DatabaseMigrator.PendingAsync(connection) : await DatabaseMigrator.MigrateAsync(connection);
+        if (names.Count == 0)
+        {
+            Console.WriteLine("La base est à jour : rien à appliquer.");
+            return 0;
+        }
+
+        Console.WriteLine(checkOnly ? $"{names.Count} migration(s) à appliquer :" : $"{names.Count} migration(s) appliquée(s) :");
+        foreach (var name in names)
+        {
+            Console.WriteLine($"  {name}");
+        }
+
+        return 0;
+    }
+    catch (Exception exception)
+    {
+        // Le déploiement doit s'arrêter : code de sortie non nul, ancienne version laissée en marche.
+        Console.Error.WriteLine($"Échec des migrations : {exception.Message}");
+        return 1;
+    }
 }
 
 internal sealed class OpsClock : IClock

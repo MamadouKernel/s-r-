@@ -1,0 +1,78 @@
+# Pile complète pour la préproduction et les essais : base, migrations, API et frontend.
+#   cp deploy/.env.example deploy/.env   (puis remplir les valeurs)
+#   docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build
+# L'ordre est garanti : la base est prête, puis les migrations s'appliquent, puis l'API démarre. Si les migrations échouent, l'API ne démarre pas
+# (et en mise à jour, l'ancienne version reste en marche).
+name: soro
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?à définir}
+      POSTGRES_DB: soro
+      SORO_OWNER_PASSWORD: ${SORO_OWNER_PASSWORD:?à définir}
+      SORO_APP_PASSWORD: ${SORO_APP_PASSWORD:?à définir}
+      SORO_OPS_PASSWORD: ${SORO_OPS_PASSWORD:?à définir}
+    volumes:
+      - dbdata:/var/lib/postgresql
+      - ./db-init.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d soro"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    build: { context: .., dockerfile: deploy/ops.Dockerfile }
+    command: ["migrer"]
+    environment:
+      SORO_MIGRATION_CONNECTION: Host=db;Database=soro;Username=soro_owner;Password=${SORO_OWNER_PASSWORD}
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: { context: .., dockerfile: deploy/api.Dockerfile }
+    environment:
+      ConnectionStrings__Soro: Host=db;Database=soro;Username=soro_app;Password=${SORO_APP_PASSWORD}
+      Jwt__Issuer: ${JWT_ISSUER:-soro}
+      Jwt__Audience: ${JWT_AUDIENCE:-soro}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?à définir}
+      Security__PinPepper: ${PIN_PEPPER:?à définir}
+      # Le relais web est le seul proxy de confiance : son adresse est celle du réseau interne (voir docs/exploitation/variables.md).
+      ForwardedHeaders__KnownProxies__0: ${WEB_PROXY_ADDRESS:?à définir}
+      # Hors développement, l'API refuse de démarrer sans envoi d'e-mails réel ni tarifs d'abonnement ni numéro où payer.
+      Mail__Smtp__Host: ${SMTP_HOST:?à définir}
+      Mail__Smtp__Port: ${SMTP_PORT:-587}
+      Mail__Smtp__Security: ${SMTP_SECURITY:-StartTls}
+      Mail__Smtp__UserName: ${SMTP_USER:-}
+      Mail__Smtp__Password: ${SMTP_PASSWORD:-}
+      Mail__Smtp__FromAddress: ${SMTP_FROM_ADDRESS:?à définir}
+      Subscription__MonthlyPriceFcfa: ${SUBSCRIPTION_MONTHLY_PRICE_FCFA:?à définir}
+      Subscription__AnnualPriceFcfa: ${SUBSCRIPTION_ANNUAL_PRICE_FCFA:?à définir}
+      Subscription__PayNumbers__Wave: ${PAY_NUMBER_WAVE:?à définir}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  web:
+    build: { context: .., dockerfile: deploy/web.Dockerfile }
+    ports:
+      - "${WEB_PORT:-8081}:8080"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      default:
+        ipv4_address: 172.28.0.10
+
+volumes:
+  dbdata:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
